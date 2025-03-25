@@ -1,7 +1,7 @@
 // src/services/game.service.ts
 import api from './api';
 
-interface Game {
+export interface Game {
     id: number;
     name: string;
     type: 'jeopardy' | 'wheel';
@@ -12,7 +12,7 @@ interface Game {
     questions?: Question[];
 }
 
-interface Question {
+export interface Question {
     id: number;
     question_text: string;
     question_type: string;
@@ -24,7 +24,7 @@ interface Question {
     };
 }
 
-interface GameCreate {
+export interface GameCreate {
     name: string;
     type: 'jeopardy' | 'wheel';
     description?: string;
@@ -32,7 +32,7 @@ interface GameCreate {
     is_active?: boolean;
 }
 
-interface PaginatedResponse<T> {
+export interface PaginatedResponse<T> {
     data: T[];
     total: number;
     per_page: number;
@@ -40,7 +40,7 @@ interface PaginatedResponse<T> {
     last_page: number;
 }
 
-interface AddQuestionData {
+export interface AddQuestionData {
     question_id: number;
     points: number;
     order?: number;
@@ -48,7 +48,7 @@ interface AddQuestionData {
     special_effects?: string;
 }
 
-interface IframeResponse {
+export interface IframeResponse {
     iframe_code: string;
     game_url: string;
 }

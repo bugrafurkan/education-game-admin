@@ -1,6 +1,12 @@
 // src/hooks/useDashboard.ts
 import { useState, useEffect } from 'react';
 import { getDashboardStats, DashboardStats } from '../services/dashboard.service';
+import axios, { AxiosError } from 'axios';
+
+interface ApiError {
+    message: string;
+    errors?: Record<string, string[]>;
+}
 
 export const useDashboard = () => {
     const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -14,9 +20,13 @@ export const useDashboard = () => {
                 const data = await getDashboardStats();
                 setStats(data);
                 setLoading(false);
-                // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            } catch (err) {
-                setError('Dashboard bilgileri yüklenirken bir hata oluştu.');
+            } catch (error) {
+                if (axios.isAxiosError(error)) {
+                    const axiosError = error as AxiosError<ApiError>;
+                    setError(axiosError.response?.data?.message || 'Dashboard bilgileri yüklenirken bir hata oluştu.');
+                } else {
+                    setError('Dashboard bilgileri yüklenirken beklenmeyen bir hata oluştu.');
+                }
                 setLoading(false);
             }
         };

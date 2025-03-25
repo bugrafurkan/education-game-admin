@@ -1,10 +1,11 @@
 // src/pages/questions/QuestionList.tsx
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
     Box, Typography, Paper, Button, TextField, InputAdornment,
     Table, TableHead, TableRow, TableCell, TableBody, TableContainer,
     TablePagination, Chip, IconButton, Grid, MenuItem, Select, FormControl,
-    InputLabel, SelectChangeEvent
+    InputLabel, SelectChangeEvent, Dialog, DialogActions, DialogContent,
+    DialogContentText, DialogTitle, CircularProgress, Alert
 } from '@mui/material';
 import {
     Add as AddIcon,
@@ -14,106 +15,82 @@ import {
     Visibility as ViewIcon
 } from '@mui/icons-material';
 import { Link } from 'react-router-dom';
-
-// Geçici soru tipi
-interface Question {
-    id: number;
-    question_text: string;
-    question_type: 'multiple_choice' | 'true_false' | 'qa';
-    difficulty: 'easy' | 'medium' | 'hard';
-    category_name: string;
-    game_names: string[];
-}
-
-// Mock veri
-const mockQuestions: Question[] = [
-    {
-        id: 1,
-        question_text: 'İstanbul hangi yılda fethedilmiştir?',
-        question_type: 'multiple_choice',
-        difficulty: 'medium',
-        category_name: 'Tarih - 8. Sınıf',
-        game_names: ['Tarih Bilgi Yarışması', 'Osmanlı İmparatorluğu']
-    },
-    {
-        id: 2,
-        question_text: 'Su molekülü kaç atomdan oluşur?',
-        question_type: 'multiple_choice',
-        difficulty: 'easy',
-        category_name: 'Fen Bilgisi - 6. Sınıf',
-        game_names: ['Fen Soruları', 'Elementler']
-    },
-    {
-        id: 3,
-        question_text: 'Yer çekimi bir kuvvet midir?',
-        question_type: 'true_false',
-        difficulty: 'easy',
-        category_name: 'Fen Bilgisi - 5. Sınıf',
-        game_names: ['Fizik Bilgisi']
-    },
-    {
-        id: 4,
-        question_text: 'Türkiye\'nin başkenti neresidir?',
-        question_type: 'qa',
-        difficulty: 'easy',
-        category_name: 'Sosyal Bilgiler - 4. Sınıf',
-        game_names: ['Türkiye Bilgisi', 'Genel Kültür']
-    },
-    {
-        id: 5,
-        question_text: 'Pisagor teoremi nedir? Açıklayınız.',
-        question_type: 'qa',
-        difficulty: 'hard',
-        category_name: 'Matematik - 8. Sınıf',
-        game_names: ['Matematik Yarışması']
-    },
-];
+import { useQuestions } from '../../hooks/useQuestions';
+import { deleteQuestion } from '../../services/question.service';
 
 const QuestionList = () => {
-    const [questions, setQuestions] = useState<Question[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [page, setPage] = useState(0);
+    const [page, setPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [search, setSearch] = useState('');
     const [typeFilter, setTypeFilter] = useState<string>('');
     const [difficultyFilter, setDifficultyFilter] = useState<string>('');
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [questionToDelete, setQuestionToDelete] = useState<number | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
 
-    useEffect(() => {
-        // Backend API bağlantısı yerine mock veri kullanıyoruz
-        setLoading(true);
-
-        setTimeout(() => {
-            setQuestions(mockQuestions);
-            setLoading(false);
-        }, 500);
-    }, []);
-
-    // Filtreleme işlemi
-    const filteredQuestions = questions.filter(question => {
-        return (
-            question.question_text.toLowerCase().includes(search.toLowerCase()) &&
-            (typeFilter === '' || question.question_type === typeFilter) &&
-            (difficultyFilter === '' || question.difficulty === difficultyFilter)
-        );
-    });
-
-    // Sayfalama işlemleri
-    const handleChangePage = (_: unknown, newPage: number) => {
-        setPage(newPage);
+    // API filtreleri
+    const filters = {
+        search: search || undefined,
+        type: typeFilter || undefined,
+        difficulty: difficultyFilter || undefined
     };
 
-    const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
-        setRowsPerPage(parseInt(event.target.value, 10));
-        setPage(0);
+    // Hook ile soruları yükle
+    const { questions, loading, error, pagination, refresh } = useQuestions(page, filters);
+
+    // Filtre değişikliklerini yönet
+    const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setSearch(e.target.value);
+        setPage(1); // Filtreleme yapıldığında ilk sayfaya dön
     };
 
-    // Filtre değişiklikleri
     const handleTypeChange = (event: SelectChangeEvent) => {
         setTypeFilter(event.target.value);
+        setPage(1);
     };
 
     const handleDifficultyChange = (event: SelectChangeEvent) => {
         setDifficultyFilter(event.target.value);
+        setPage(1);
+    };
+
+    // Sayfalama işlemleri
+    const handleChangePage = (_: unknown, newPage: number) => {
+        setPage(newPage + 1); // Material-UI sayfalama 0-tabanlı, API'miz 1-tabanlı
+    };
+
+    const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+        setRowsPerPage(parseInt(event.target.value, 10));
+        setPage(1);
+    };
+
+    // Silme işlemleri
+    const handleDeleteClick = (questionId: number) => {
+        setQuestionToDelete(questionId);
+        setDeleteDialogOpen(true);
+        setDeleteError(null);
+    };
+
+    const handleDeleteConfirm = async () => {
+        if (questionToDelete === null) return;
+
+        setIsDeleting(true);
+        try {
+            await deleteQuestion(questionToDelete);
+            setDeleteDialogOpen(false);
+            refresh(); // Listeyi yenile
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        } catch (err) {
+            setDeleteError('Soru silinirken bir hata oluştu.');
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
+    const handleDeleteCancel = () => {
+        setDeleteDialogOpen(false);
+        setQuestionToDelete(null);
     };
 
     // Soru tipini Türkçe olarak gösterme
@@ -134,13 +111,13 @@ const QuestionList = () => {
     const getDifficultyLabel = (difficulty: string) => {
         switch (difficulty) {
             case 'easy':
-                return { label: 'Kolay', color: 'success' };
+                return { label: 'Kolay', color: 'success' as const };
             case 'medium':
-                return { label: 'Orta', color: 'warning' };
+                return { label: 'Orta', color: 'warning' as const };
             case 'hard':
-                return { label: 'Zor', color: 'error' };
+                return { label: 'Zor', color: 'error' as const };
             default:
-                return { label: difficulty, color: 'default' };
+                return { label: difficulty, color: 'default' as const };
         }
     };
 
@@ -158,7 +135,7 @@ const QuestionList = () => {
                             label="Soru Ara"
                             variant="outlined"
                             value={search}
-                            onChange={(e) => setSearch(e.target.value)}
+                            onChange={handleSearchChange}
                             InputProps={{
                                 startAdornment: (
                                     <InputAdornment position="start">
@@ -220,6 +197,12 @@ const QuestionList = () => {
                 </Grid>
             </Paper>
 
+            {error && (
+                <Alert severity="error" sx={{ mb: 3 }}>
+                    {error}
+                </Alert>
+            )}
+
             <Paper sx={{ borderRadius: 2 }}>
                 <TableContainer>
                     <Table>
@@ -237,61 +220,107 @@ const QuestionList = () => {
                             {loading ? (
                                 <TableRow>
                                     <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
-                                        Yükleniyor...
+                                        <CircularProgress size={24} />
                                     </TableCell>
                                 </TableRow>
-                            ) : filteredQuestions.length === 0 ? (
+                            ) : questions.length === 0 ? (
                                 <TableRow>
                                     <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
                                         Soru bulunamadı.
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                filteredQuestions
-                                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                                    .map((question) => (
-                                        <TableRow key={question.id} hover>
-                                            <TableCell>{question.id}</TableCell>
-                                            <TableCell>{question.question_text}</TableCell>
-                                            <TableCell>{getQuestionTypeLabel(question.question_type)}</TableCell>
-                                            <TableCell>
-                                                <Chip
-                                                    label={getDifficultyLabel(question.difficulty).label}
-                                                    color={getDifficultyLabel(question.difficulty).color as any}
-                                                    size="small"
-                                                />
-                                            </TableCell>
-                                            <TableCell>{question.category_name}</TableCell>
-                                            <TableCell>
-                                                <IconButton color="primary" title="Görüntüle">
-                                                    <ViewIcon />
-                                                </IconButton>
-                                                <IconButton color="info" title="Düzenle">
-                                                    <EditIcon />
-                                                </IconButton>
-                                                <IconButton color="error" title="Sil">
-                                                    <DeleteIcon />
-                                                </IconButton>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
+                                questions.map((question) => (
+                                    <TableRow key={question.id} hover>
+                                        <TableCell>{question.id}</TableCell>
+                                        <TableCell>{question.question_text}</TableCell>
+                                        <TableCell>{getQuestionTypeLabel(question.question_type)}</TableCell>
+                                        <TableCell>
+                                            <Chip
+                                                label={getDifficultyLabel(question.difficulty).label}
+                                                color={getDifficultyLabel(question.difficulty).color}
+                                                size="small"
+                                            />
+                                        </TableCell>
+                                        <TableCell>{question.category?.name || '-'}</TableCell>
+                                        <TableCell>
+                                            <IconButton
+                                                color="primary"
+                                                title="Görüntüle"
+                                                component={Link}
+                                                to={`/questions/${question.id}`}
+                                            >
+                                                <ViewIcon />
+                                            </IconButton>
+                                            <IconButton
+                                                color="info"
+                                                title="Düzenle"
+                                                component={Link}
+                                                to={`/questions/${question.id}/edit`}
+                                            >
+                                                <EditIcon />
+                                            </IconButton>
+                                            <IconButton
+                                                color="error"
+                                                title="Sil"
+                                                onClick={() => handleDeleteClick(question.id)}
+                                            >
+                                                <DeleteIcon />
+                                            </IconButton>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
                             )}
                         </TableBody>
                     </Table>
                 </TableContainer>
 
-                <TablePagination
-                    rowsPerPageOptions={[5, 10, 25]}
-                    component="div"
-                    count={filteredQuestions.length}
-                    rowsPerPage={rowsPerPage}
-                    page={page}
-                    onPageChange={handleChangePage}
-                    onRowsPerPageChange={handleChangeRowsPerPage}
-                    labelRowsPerPage="Sayfa başına satır:"
-                    labelDisplayedRows={({ from, to, count }) => `${from}-${to} / ${count}`}
-                />
+                {!loading && questions.length > 0 && (
+                    <TablePagination
+                        rowsPerPageOptions={[5, 10, 25]}
+                        component="div"
+                        count={pagination.total}
+                        rowsPerPage={rowsPerPage}
+                        page={pagination.currentPage - 1} // API'den 1-tabanlı, MUI'de 0-tabanlı
+                        onPageChange={handleChangePage}
+                        onRowsPerPageChange={handleChangeRowsPerPage}
+                        labelRowsPerPage="Sayfa başına satır:"
+                        labelDisplayedRows={({ from, to, count }) => `${from}-${to} / ${count}`}
+                    />
+                )}
             </Paper>
+
+            {/* Silme Onay Dialogu */}
+            <Dialog
+                open={deleteDialogOpen}
+                onClose={handleDeleteCancel}
+            >
+                <DialogTitle>Soruyu Sil</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        Bu soruyu silmek istediğinize emin misiniz? Bu işlem geri alınamaz.
+                    </DialogContentText>
+
+                    {deleteError && (
+                        <Alert severity="error" sx={{ mt: 2 }}>
+                            {deleteError}
+                        </Alert>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleDeleteCancel} disabled={isDeleting}>
+                        İptal
+                    </Button>
+                    <Button
+                        onClick={handleDeleteConfirm}
+                        color="error"
+                        disabled={isDeleting}
+                        startIcon={isDeleting ? <CircularProgress size={20} /> : null}
+                    >
+                        {isDeleting ? 'Siliniyor...' : 'Sil'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 };

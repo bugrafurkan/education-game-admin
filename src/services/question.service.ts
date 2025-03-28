@@ -1,44 +1,51 @@
 // src/services/question.service.ts
 import api from './api';
 
-interface Question {
+export interface Category {
     id: number;
-    category_id: number;
-    question_text: string;
-    question_type: string;
-    difficulty: string;
-    image_path?: string;
-    metadata?: Record<string, unknown>;
-    answers: Answer[];
+    name: string;
+    grade: string;
+    subject: string;
+    unit?: string;
 }
 
-interface Answer {
+export interface Answer {
     id?: number;
-    question_id?: number;
     answer_text: string;
     is_correct: boolean;
     image_path?: string;
 }
 
-interface QuestionCreate {
+export interface Question {
+    id: number;
     category_id: number;
     question_text: string;
-    question_type: string;
-    difficulty: string;
+    question_type: 'multiple_choice' | 'true_false' | 'qa';
+    difficulty: 'easy' | 'medium' | 'hard';
     image_path?: string;
     metadata?: Record<string, unknown>;
-    answers: Omit<Answer, 'id' | 'question_id'>[];
+    answers: Answer[];
+    category?: Category;
 }
 
-interface QuestionFilters {
+export interface QuestionCreate {
+    category_id: number;
+    question_text: string;
+    question_type: 'multiple_choice' | 'true_false' | 'qa';
+    difficulty: 'easy' | 'medium' | 'hard';
+    image_path?: string;
+    metadata?: Record<string, unknown>;
+    answers: Omit<Answer, 'id'>[];
+}
+
+export interface QuestionFilter {
     search?: string;
     type?: string;
     difficulty?: string;
     category_id?: number;
-    [key: string]: unknown;
 }
 
-interface PaginatedResponse<T> {
+export interface PaginatedResponse<T> {
     data: T[];
     total: number;
     per_page: number;
@@ -46,12 +53,8 @@ interface PaginatedResponse<T> {
     last_page: number;
 }
 
-interface ImageUploadResponse {
-    url: string;
-}
-
 // Tüm soruları getir (filtreleme ve sayfalama ile)
-export const getQuestions = async (page = 1, filters: QuestionFilters = {}): Promise<PaginatedResponse<Question>> => {
+export const getQuestions = async (page = 1, filters: QuestionFilter = {}): Promise<PaginatedResponse<Question>> => {
     const response = await api.get<PaginatedResponse<Question>>('/questions', {
         params: { page, ...filters }
     });
@@ -82,11 +85,15 @@ export const deleteQuestion = async (id: number): Promise<void> => {
 };
 
 // Resim yükleme
-export const uploadQuestionImage = async (formData: FormData): Promise<ImageUploadResponse> => {
-    const response = await api.post<ImageUploadResponse>('/questions/upload-image', formData, {
+export const uploadImage = async (file: File): Promise<{ url: string }> => {
+    const formData = new FormData();
+    formData.append('image', file);
+
+    const response = await api.post<{ url: string }>('/questions/upload-image', formData, {
         headers: {
             'Content-Type': 'multipart/form-data',
         },
     });
+
     return response.data;
 };

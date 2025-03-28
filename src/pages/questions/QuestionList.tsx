@@ -16,7 +16,7 @@ import {
 } from '@mui/icons-material';
 import { Link } from 'react-router-dom';
 import { useQuestions } from '../../hooks/useQuestions';
-import { deleteQuestion } from '../../services/question.service';
+import { QuestionFilter } from '../../services/question.service';
 
 const QuestionList = () => {
     const [page, setPage] = useState(1);
@@ -26,18 +26,16 @@ const QuestionList = () => {
     const [difficultyFilter, setDifficultyFilter] = useState<string>('');
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [questionToDelete, setQuestionToDelete] = useState<number | null>(null);
-    const [isDeleting, setIsDeleting] = useState(false);
-    const [deleteError, setDeleteError] = useState<string | null>(null);
 
     // API filtreleri
-    const filters = {
+    const filters: QuestionFilter = {
         search: search || undefined,
         type: typeFilter || undefined,
         difficulty: difficultyFilter || undefined
     };
 
     // Hook ile soruları yükle
-    const { questions, loading, error, pagination, refresh } = useQuestions(page, filters);
+    const { questions, loading, error, pagination, deleteQuestion } = useQuestions(page, filters);
 
     // Filtre değişikliklerini yönet
     const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -69,22 +67,15 @@ const QuestionList = () => {
     const handleDeleteClick = (questionId: number) => {
         setQuestionToDelete(questionId);
         setDeleteDialogOpen(true);
-        setDeleteError(null);
     };
 
     const handleDeleteConfirm = async () => {
         if (questionToDelete === null) return;
 
-        setIsDeleting(true);
-        try {
-            await deleteQuestion(questionToDelete);
+        const success = await deleteQuestion(questionToDelete);
+        if (success) {
             setDeleteDialogOpen(false);
-            refresh(); // Listeyi yenile
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        } catch (err) {
-            setDeleteError('Soru silinirken bir hata oluştu.');
-        } finally {
-            setIsDeleting(false);
+            setQuestionToDelete(null);
         }
     };
 
@@ -275,13 +266,13 @@ const QuestionList = () => {
                     </Table>
                 </TableContainer>
 
-                {!loading && questions.length > 0 && (
+                {!loading && pagination && (
                     <TablePagination
                         rowsPerPageOptions={[5, 10, 25]}
                         component="div"
                         count={pagination.total}
                         rowsPerPage={rowsPerPage}
-                        page={pagination.currentPage - 1} // API'den 1-tabanlı, MUI'de 0-tabanlı
+                        page={pagination.current_page - 1} // API'den 1-tabanlı, MUI'de 0-tabanlı
                         onPageChange={handleChangePage}
                         onRowsPerPageChange={handleChangeRowsPerPage}
                         labelRowsPerPage="Sayfa başına satır:"
@@ -300,24 +291,18 @@ const QuestionList = () => {
                     <DialogContentText>
                         Bu soruyu silmek istediğinize emin misiniz? Bu işlem geri alınamaz.
                     </DialogContentText>
-
-                    {deleteError && (
-                        <Alert severity="error" sx={{ mt: 2 }}>
-                            {deleteError}
-                        </Alert>
-                    )}
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={handleDeleteCancel} disabled={isDeleting}>
+                    <Button onClick={handleDeleteCancel} disabled={loading}>
                         İptal
                     </Button>
                     <Button
                         onClick={handleDeleteConfirm}
                         color="error"
-                        disabled={isDeleting}
-                        startIcon={isDeleting ? <CircularProgress size={20} /> : null}
+                        disabled={loading}
+                        startIcon={loading ? <CircularProgress size={20} /> : null}
                     >
-                        {isDeleting ? 'Siliniyor...' : 'Sil'}
+                        {loading ? 'Siliniyor...' : 'Sil'}
                     </Button>
                 </DialogActions>
             </Dialog>

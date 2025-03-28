@@ -2,10 +2,10 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
-    Box, Typography, Paper, Button,  Grid, Chip,
+    Box, Typography, Paper, Button, Grid, Chip,
     List, ListItem, ListItemText, ListItemIcon, ListItemSecondaryAction,
     IconButton, Tabs, Tab, Alert, CircularProgress, Dialog,
-    DialogTitle, DialogContent, DialogContentText, DialogActions
+    DialogTitle, DialogContent, DialogContentText, DialogActions, TextField
 } from '@mui/material';
 import {
     QuestionAnswer as QuestionIcon,
@@ -18,7 +18,7 @@ import {
     Share as ShareIcon
 } from '@mui/icons-material';
 import { useGame } from '../../hooks/useGame';
-import { removeQuestionFromGame, getGameIframeCode } from '../../services/game.service';
+import axios, { AxiosError } from 'axios';
 
 // Sekme değerleri için interface
 interface TabPanelProps {
@@ -48,15 +48,21 @@ const TabPanel = (props: TabPanelProps) => {
     );
 };
 
+interface ApiErrorResponse {
+    message: string;
+    errors?: Record<string, string[]>;
+}
+
 const GameDetail = () => {
     const { id } = useParams<{ id: string }>();
     const gameId = parseInt(id || '0');
 
-    const { game, loading, error, refresh } = useGame(gameId);
+    const {
+        game, loading, error,  removeQuestion,
+        getIframeCode, iframeCode, iframeLoading, iframeError
+    } = useGame(gameId);
+
     const [tabValue, setTabValue] = useState(0);
-    const [iframeCode, setIframeCode] = useState<string | null>(null);
-    const [iframeLoading, setIframeLoading] = useState(false);
-    const [iframeError, setIframeError] = useState<string | null>(null);
 
     // Soru silme
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -80,15 +86,19 @@ const GameDetail = () => {
 
         setIsDeleting(true);
         try {
-            await removeQuestionFromGame(game.id, questionToDelete);
-            setDeleteDialogOpen(false);
-            refresh(); // Oyun bilgilerini yenile
+            const success = await removeQuestion(questionToDelete);
+            if (success) {
+                setDeleteDialogOpen(false);
+                setQuestionToDelete(null);
+            }
         } catch (error) {
             if (axios.isAxiosError(error)) {
-                const axiosError = error as AxiosError<ApiError>;
-                setDeleteError(axiosError.response?.data?.message || 'Soru oyundan çıkarılırken bir hata oluştu.');
+                const axiosError = error as AxiosError<ApiErrorResponse>;
+                setDeleteError(axiosError.response?.data?.message || 'Soru oyundan çıkarılırken bir hata oluştu');
+                console.error('Error removing question:', axiosError.response?.data);
             } else {
-                setDeleteError('Soru oyundan çıkarılırken beklenmeyen bir hata oluştu.');
+                setDeleteError('Soru oyundan çıkarılırken beklenmeyen bir hata oluştu');
+                console.error('Unexpected error:', error);
             }
         } finally {
             setIsDeleting(false);
@@ -100,26 +110,9 @@ const GameDetail = () => {
         setQuestionToDelete(null);
     };
 
-    // iframe kodu alma
-    const getIframeCode = async () => {
-        if (!game) return;
-
-        setIframeLoading(true);
-        setIframeError(null);
-
-        try {
-            const response = await getGameIframeCode(game.id);
-            setIframeCode(response.iframe_code);
-        } catch (error) {
-            if (axios.isAxiosError(error)) {
-                const axiosError = error as AxiosError<ApiError>;
-                setIframeError(axiosError.response?.data?.message || 'iframe kodu alınırken bir hata oluştu.');
-            } else {
-                setIframeError('iframe kodu alınırken beklenmeyen bir hata oluştu.');
-            }
-        } finally {
-            setIframeLoading(false);
-        }
+    // iframe kodunu al
+    const handleGetIframeCode = async () => {
+        await getIframeCode();
     };
 
     // Oyun tipini Türkçe olarak gösterme
@@ -260,6 +253,17 @@ const GameDetail = () => {
                                     {game.questions?.length || 0}
                                 </Typography>
                             </Grid>
+
+                            {game.creator && (
+                                <Grid item xs={6}>
+                                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                                        Oluşturan
+                                    </Typography>
+                                    <Typography variant="body1">
+                                        {game.creator.name}
+                                    </Typography>
+                                </Grid>
+                            )}
                         </Grid>
                     </Grid>
 
@@ -273,7 +277,7 @@ const GameDetail = () => {
                                 fullWidth
                                 variant="outlined"
                                 startIcon={<ShareIcon />}
-                                onClick={getIframeCode}
+                                onClick={handleGetIframeCode}
                                 disabled={iframeLoading}
                                 sx={{ mb: 2 }}
                             >
@@ -390,7 +394,7 @@ const GameDetail = () => {
                                                         sx={{ mr: 1 }}
                                                     />
                                                     <Chip
-                                                        label={`${question.pivot?.points || 0} Puan`}
+                                                        label="100 Puan"
                                                         size="small"
                                                         color="primary"
                                                     />
@@ -450,7 +454,7 @@ const GameDetail = () => {
                                             <Typography variant="body1">
                                                 {typeof value === 'boolean'
                                                     ? (value ? 'Evet' : 'Hayır')
-                                                    : (value?.toString() || '-')
+                                                    : (String(value) || '-')
                                                 }
                                             </Typography>
                                         </Paper>

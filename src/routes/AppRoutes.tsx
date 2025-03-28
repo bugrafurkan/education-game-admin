@@ -67,6 +67,7 @@ const AppRoutes = () => {
                 <Route index element={<Dashboard />} />
                 <Route path="questions" element={<QuestionList />} />
                 <Route path="questions/add" element={<AddQuestion />} />
+                <Route path="questions/:id/edit" element={<AddQuestion />} />
                 <Route path="games" element={<GameList />} />
                 <Route path="games/:id" element={<GameDetail />} />
                 <Route path="exports" element={<ExportList />} />

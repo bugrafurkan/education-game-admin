@@ -1,11 +1,16 @@
 // src/pages/questions/AddQuestion.tsx
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import {
     Box, Typography, Paper, Stepper, Step, StepLabel, Button,
     Grid, FormControl, FormLabel, RadioGroup, FormControlLabel, Radio,
-    TextField, Divider, Alert, MenuItem, Select, SelectChangeEvent
+    TextField, Divider, Alert, MenuItem, Select, SelectChangeEvent,
+    CircularProgress
 } from '@mui/material';
+import { useCategories } from '../../hooks/useCategories';
+import * as questionService from '../../services/question.service';
+import * as gameService from '../../services/game.service';
+import axios, { AxiosError } from 'axios';
 
 // Soru tipi seçenekleri
 const questionTypes = [
@@ -21,52 +26,136 @@ const difficultyLevels = [
     { value: 'hard', label: 'Zor' }
 ];
 
-// Mock oyun verileri
-const mockGames = [
-    { id: 1, name: 'Tarih Bilgi Yarışması' },
-    { id: 2, name: 'Fen Soruları' },
-    { id: 3, name: 'Matematik Yarışması' },
-    { id: 4, name: 'Genel Kültür' }
-];
-
-// Mock kategori verileri
-const mockCategories = [
-    { id: 1, name: 'Tarih - 8. Sınıf' },
-    { id: 2, name: 'Fen Bilgisi - 6. Sınıf' },
-    { id: 3, name: 'Matematik - 7. Sınıf' },
-    { id: 4, name: 'Sosyal Bilgiler - 5. Sınıf' }
-];
-
 // Adımlar
 const steps = ['Soru Tipi', 'Soru ve Cevap', 'Oyun Seçimi'];
 
-// Şık verisi için tip tanımı
-interface Choice {
-    id: string;
-    text: string;
-    isCorrect: boolean;
+// URL'den query parametresi alma fonksiyonu
+function useQuery() {
+    return new URLSearchParams(useLocation().search);
+}
+
+interface ApiErrorResponse {
+    message: string;
+    errors?: Record<string, string[]>;
 }
 
 const AddQuestion = () => {
     const navigate = useNavigate();
+    const query = useQuery();
+    const params = useParams();
+    const isEdit = !!params.id;
+    const questionId = params.id ? parseInt(params.id) : undefined;
+    const gameIdFromUrl = query.get('gameId');
+
     const [activeStep, setActiveStep] = useState(0);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     // Form verileri
     const [questionType, setQuestionType] = useState<string>('');
     const [questionText, setQuestionText] = useState('');
     const [difficulty, setDifficulty] = useState('medium');
     const [categoryId, setCategoryId] = useState('');
-    const [gameId, setGameId] = useState('');
+    const [gameId, setGameId] = useState(gameIdFromUrl || '');
 
     // Cevap verileri
     const [correctAnswer, setCorrectAnswer] = useState('');
     const [trueOrFalse, setTrueOrFalse] = useState('true');
-    const [choices, setChoices] = useState<Choice[]>([
+    const [choices, setChoices] = useState([
         { id: 'A', text: '', isCorrect: false },
         { id: 'B', text: '', isCorrect: false },
         { id: 'C', text: '', isCorrect: false },
         { id: 'D', text: '', isCorrect: false }
     ]);
+
+    // Oyun listesi
+    const [games, setGames] = useState<gameService.Game[]>([]);
+    const [gamesLoading, setGamesLoading] = useState(false);
+
+    // Kategori hook'u
+    const { categories, loading: categoriesLoading } = useCategories();
+
+    // Düzenleme durumunda soruyu yükle
+    useEffect(() => {
+        const fetchQuestion = async () => {
+            if (isEdit && questionId) {
+                try {
+                    setLoading(true);
+                    const question = await questionService.getQuestion(questionId);
+
+                    // Form verilerini doldur
+                    setQuestionType(question.question_type);
+                    setQuestionText(question.question_text);
+                    setDifficulty(question.difficulty);
+                    setCategoryId(question.category_id.toString());
+
+                    // Cevapları doldur
+                    if (question.question_type === 'multiple_choice') {
+                        const updatedChoices = [...choices];
+                        question.answers.forEach((answer, index) => {
+                            if (index < updatedChoices.length) {
+                                updatedChoices[index].text = answer.answer_text;
+                                updatedChoices[index].isCorrect = answer.is_correct;
+                            }
+                        });
+                        setChoices(updatedChoices);
+                    } else if (question.question_type === 'true_false') {
+                        const trueAnswer = question.answers.find(a => a.is_correct);
+                        setTrueOrFalse(trueAnswer?.answer_text.toLowerCase() === 'doğru' ? 'true' : 'false');
+                    } else if (question.question_type === 'qa') {
+                        const correctAns = question.answers.find(a => a.is_correct);
+                        if (correctAns) {
+                            setCorrectAnswer(correctAns.answer_text);
+                        }
+                    }
+
+                    setLoading(false);
+
+                    // Düzenleme modunda ilk adım tipi zaten seçili olduğu için 2. adıma geç
+                    setActiveStep(1);
+                } catch (error) {
+                    if (axios.isAxiosError(error)) {
+                        const axiosError = error as AxiosError<ApiErrorResponse>;
+                        setError(axiosError.response?.data?.message || 'Soru yüklenirken bir hata oluştu');
+                        console.error('Error fetching question:', axiosError.response?.data);
+                    } else {
+                        setError('Soru yüklenirken beklenmeyen bir hata oluştu');
+                        console.error('Unexpected error:', error);
+                    }
+                    setLoading(false);
+                }
+            }
+        };
+
+        fetchQuestion();
+    }, [isEdit, questionId]);
+
+    // Oyun listesini yükle
+    useEffect(() => {
+        const fetchGames = async () => {
+            try {
+                setGamesLoading(true);
+                const response = await gameService.getGames(1);
+                setGames(response.data);
+                setGamesLoading(false);
+            } catch (error) {
+                if (axios.isAxiosError(error)) {
+                    const axiosError = error as AxiosError<ApiErrorResponse>;
+                    setError(axiosError.response?.data?.message || 'Oyunlar yüklenirken bir hata oluştu');
+                    console.error('Error fetching games:', axiosError.response?.data);
+                } else {
+                    setError('Oyunlar yüklenirken beklenmeyen bir hata oluştu');
+                    console.error('Unexpected error:', error);
+                }
+                setGamesLoading(false);
+            }
+        };
+
+        // 3. adıma geldiğimizde oyunları yükle
+        if (activeStep === 2) {
+            fetchGames();
+        }
+    }, [activeStep]);
 
     // Adım kontrolü
     const handleNext = () => {
@@ -117,22 +206,57 @@ const AddQuestion = () => {
     };
 
     // Formu gönder
-    const handleSubmit = () => {
-        // Form verilerini hazırla
-        const formData = {
-            question_type: questionType,
-            question_text: questionText,
-            difficulty,
-            category_id: parseInt(categoryId),
-            game_id: parseInt(gameId),
-            answers: getAnswersBasedOnType()
-        };
+    const handleSubmit = async () => {
+        try {
+            setLoading(true);
+            setError(null);
 
-        console.log('Form verileri:', formData);
+            // Soru tipine göre cevapları hazırla
+            const answers = getAnswersBasedOnType();
 
-        // Normalde burada API'ye post yapılır
-        alert('Soru başarıyla eklendi.');
-        navigate('/questions');
+            // QuestionCreate için veri oluştur
+            const questionData: questionService.QuestionCreate = {
+                category_id: parseInt(categoryId),
+                question_text: questionText,
+                question_type: questionType as 'multiple_choice' | 'true_false' | 'qa',
+                difficulty: difficulty as 'easy' | 'medium' | 'hard',
+                answers
+            };
+
+            let question;
+
+            // Yeni soru mu, düzenleme mi?
+            if (isEdit && questionId) {
+                question = await questionService.updateQuestion(questionId, questionData);
+            } else {
+                question = await questionService.createQuestion(questionData);
+            }
+
+            // Eğer oyun seçildiyse, soruyu oyuna ekle
+            if (gameId && question) {
+                await gameService.addQuestionToGame(parseInt(gameId), {
+                    question_id: question.id,
+                    points: 100 // Varsayılan puan
+                });
+            }
+
+            // Başarılı mesajı göster
+            alert(isEdit ? 'Soru başarıyla güncellendi.' : 'Soru başarıyla eklendi.');
+
+            // Soru listesine yönlendir
+            navigate('/questions');
+        } catch (error) {
+            if (axios.isAxiosError(error)) {
+                const axiosError = error as AxiosError<ApiErrorResponse>;
+                setError(axiosError.response?.data?.message || (isEdit ? 'Soru güncellenirken bir hata oluştu' : 'Soru eklenirken bir hata oluştu'));
+                console.error('Error submitting question:', axiosError.response?.data);
+            } else {
+                setError(isEdit ? 'Soru güncellenirken beklenmeyen bir hata oluştu' : 'Soru eklenirken beklenmeyen bir hata oluştu');
+                console.error('Unexpected error:', error);
+            }
+        } finally {
+            setLoading(false);
+        }
     };
 
     // Soru tipine göre cevapları düzenle
@@ -182,7 +306,8 @@ const AddQuestion = () => {
 
     // Son adım geçerli mi
     const isThirdStepValid = () => {
-        return gameId !== '';
+        // Oyun seçimi opsiyonel olabilir
+        return true;
     };
 
     // Adım içeriği
@@ -240,11 +365,15 @@ const AddQuestion = () => {
                                         displayEmpty
                                     >
                                         <MenuItem value="" disabled>Kategori Seçin</MenuItem>
-                                        {mockCategories.map((category) => (
-                                            <MenuItem key={category.id} value={category.id.toString()}>
-                                                {category.name}
-                                            </MenuItem>
-                                        ))}
+                                        {categoriesLoading ? (
+                                            <MenuItem value="" disabled>Yükleniyor...</MenuItem>
+                                        ) : (
+                                            categories.map((category) => (
+                                                <MenuItem key={category.id} value={category.id.toString()}>
+                                                    {category.name}
+                                                </MenuItem>
+                                            ))
+                                        )}
                                     </Select>
                                 </FormControl>
                             </Grid>
@@ -332,17 +461,21 @@ const AddQuestion = () => {
                                 onChange={handleGameChange}
                                 displayEmpty
                             >
-                                <MenuItem value="" disabled>Oyun Seçin</MenuItem>
-                                {mockGames.map((game) => (
-                                    <MenuItem key={game.id} value={game.id.toString()}>
-                                        {game.name}
-                                    </MenuItem>
-                                ))}
+                                <MenuItem value="">Oyun Seçin (Opsiyonel)</MenuItem>
+                                {gamesLoading ? (
+                                    <MenuItem value="" disabled>Yükleniyor...</MenuItem>
+                                ) : (
+                                    games.map((game) => (
+                                        <MenuItem key={game.id} value={game.id.toString()}>
+                                            {game.name} ({game.type === 'jeopardy' ? 'Jeopardy' : 'Bilgi Çarkı'})
+                                        </MenuItem>
+                                    ))
+                                )}
                             </Select>
                         </FormControl>
 
                         <Alert severity="info" sx={{ mt: 2 }}>
-                            Soru seçtiğiniz oyuna eklenecektir. Bu işlem, oyunun içeriğini günceller.
+                            Soru seçtiğiniz oyuna eklenecektir. Bu adımı atlarsanız, soruyu daha sonra bir oyuna ekleyebilirsiniz.
                         </Alert>
                     </Box>
                 );
@@ -363,7 +496,7 @@ const AddQuestion = () => {
         return (
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>
                 <Button
-                    disabled={activeStep === 0}
+                    disabled={activeStep === 0 || loading}
                     onClick={handleBack}
                     sx={{ mr: 1 }}
                 >
@@ -374,21 +507,22 @@ const AddQuestion = () => {
                         <Button
                             variant="contained"
                             onClick={handleSubmit}
-                            disabled={!isStepValid}
+                            disabled={loading}
                             sx={{
                                 py: 1,
                                 px: 3,
                                 bgcolor: '#1a1a27',
                                 '&:hover': { bgcolor: '#2a2a37' }
                             }}
+                            startIcon={loading ? <CircularProgress size={20} /> : null}
                         >
-                            Tamamla
+                            {loading ? 'İşleniyor...' : (isEdit ? 'Güncelle' : 'Tamamla')}
                         </Button>
                     ) : (
                         <Button
                             variant="contained"
                             onClick={handleNext}
-                            disabled={!isStepValid}
+                            disabled={!isStepValid || loading}
                             sx={{
                                 py: 1,
                                 px: 3,
@@ -407,22 +541,36 @@ const AddQuestion = () => {
     return (
         <Box>
             <Typography variant="h4" gutterBottom sx={{ mb: 4, fontWeight: 'bold' }}>
-                Yeni Soru Ekle
+                {isEdit ? 'Soruyu Düzenle' : 'Yeni Soru Ekle'}
             </Typography>
 
             <Paper sx={{ p: 3, borderRadius: 2 }}>
-                <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 4 }}>
-                    {steps.map((label) => (
-                        <Step key={label}>
-                            <StepLabel>{label}</StepLabel>
-                        </Step>
-                    ))}
-                </Stepper>
+                {loading && activeStep === 0 ? (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                        <CircularProgress />
+                    </Box>
+                ) : (
+                    <>
+                        <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 4 }}>
+                            {steps.map((label) => (
+                                <Step key={label}>
+                                    <StepLabel>{label}</StepLabel>
+                                </Step>
+                            ))}
+                        </Stepper>
 
-                <Box>
-                    {getStepContent(activeStep)}
-                    {getStepActions()}
-                </Box>
+                        {error && (
+                            <Alert severity="error" sx={{ mb: 3 }}>
+                                {error}
+                            </Alert>
+                        )}
+
+                        <Box>
+                            {getStepContent(activeStep)}
+                            {getStepActions()}
+                        </Box>
+                    </>
+                )}
             </Paper>
         </Box>
     );

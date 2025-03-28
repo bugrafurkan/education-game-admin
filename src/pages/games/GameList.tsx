@@ -7,7 +7,6 @@ import {
     DialogContent, DialogContentText, DialogTitle
 } from '@mui/material';
 import {
-    Add as AddIcon,
     Search as SearchIcon,
     Visibility as ViewIcon,
     Edit as EditIcon,
@@ -84,7 +83,7 @@ const GameList = () => {
 
             <Paper sx={{ p: 3, mb: 3, borderRadius: 2 }}>
                 <Grid container spacing={2} alignItems="center">
-                    <Grid item xs={12} md={8}>
+                    <Grid item xs={12}>
                         <TextField
                             fullWidth
                             label="Oyun Ara"
@@ -101,22 +100,6 @@ const GameList = () => {
                         />
                     </Grid>
 
-                    <Grid item xs={12} md={4} sx={{ textAlign: { xs: 'left', md: 'right' } }}>
-                        <Button
-                            variant="contained"
-                            startIcon={<AddIcon />}
-                            component={Link}
-                            to="/games/add"
-                            sx={{
-                                py: 1.5,
-                                px: 3,
-                                bgcolor: '#1a1a27',
-                                '&:hover': { bgcolor: '#2a2a37' }
-                            }}
-                        >
-                            Yeni Oyun Ekle
-                        </Button>
-                    </Grid>
                 </Grid>
             </Paper>
 

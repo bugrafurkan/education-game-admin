@@ -1,4 +1,4 @@
-// src/hooks/useGames.ts
+// src/hooks/useGame.ts
 import { useState, useEffect } from 'react';
 import { getGames, Game } from '../services/game.service';
 import axios, { AxiosError } from 'axios';
@@ -15,7 +15,7 @@ interface ApiError {
     errors?: Record<string, string[]>;
 }
 
-export const useGames = (page = 1) => {
+export const useGame = (page = 1) => {
     const [games, setGames] = useState<Game[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -53,7 +53,7 @@ export const useGames = (page = 1) => {
 
     useEffect(() => {
         fetchGames();
-    }, [page]);
+    }, [fetchGames, page]);
 
     return {
         games,

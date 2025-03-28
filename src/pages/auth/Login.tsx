@@ -6,6 +6,12 @@ import {
 } from '@mui/material';
 import { LockOutlined } from '@mui/icons-material';
 import { useAuth } from '../../hooks/useAuth';
+import axios, { AxiosError } from 'axios';
+
+interface ApiErrorResponse {
+    message: string;
+    errors?: Record<string, string[]>;
+}
 
 const Login = () => {
     const [email, setEmail] = useState('');
@@ -17,9 +23,13 @@ const Login = () => {
 
         try {
             await login(email, password);
-        } catch (err) {
-            // Hata hook içinde ele alınıyor
-            console.error('Login failed');
+        } catch (error) {
+            if (axios.isAxiosError(error)) {
+                const axiosError = error as AxiosError<ApiErrorResponse>;
+                console.error('Login failed:', axiosError.response?.data?.message || 'Unknown error');
+            } else {
+                console.error('Login failed:', error);
+            }
         }
     };
 

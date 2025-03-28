@@ -1,9 +1,10 @@
 // src/services/api.ts
 import axios from 'axios';
 
-// Backend API URL'si (Laravel API'nize göre değiştir)
+// API temel URL'si - .env dosyasından alınabilir
 const API_URL = 'http://localhost:8000/api';
 
+// axios örneğini oluştur
 const api = axios.create({
     baseURL: API_URL,
     headers: {
@@ -11,21 +12,26 @@ const api = axios.create({
     }
 });
 
-// Request interceptor - her istekte token ekleme
-api.interceptors.request.use(config => {
-    const token = sessionStorage.getItem('auth_token');
-    if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
+// İstek gönderilmeden önce çalışacak interceptor - token ekleme
+api.interceptors.request.use(
+    (config) => {
+        const token = sessionStorage.getItem('auth_token');
+        if (token && config.headers) {
+            config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+    },
+    (error) => {
+        return Promise.reject(error);
     }
-    return config;
-});
+);
 
-// Response interceptor - hata yakalama ve token süresi bitme durumu
+// Yanıt geldiğinde çalışacak interceptor - hata işleme
 api.interceptors.response.use(
-    response => response,
-    error => {
-        if (error.response && error.response.status === 401) {
-            // Token süresi bitti veya geçersiz
+    (response) => response,
+    async (error) => {
+        // 401 Unauthorized hatası - token süresi dolmuş veya geçersiz
+        if (error.response?.status === 401) {
             sessionStorage.removeItem('auth_token');
             window.location.href = '/login';
         }

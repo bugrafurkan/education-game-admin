@@ -1,35 +1,35 @@
 // src/pages/auth/Login.tsx
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
     Box, Paper, Typography, TextField, Button,
     CircularProgress, Alert, Link
 } from '@mui/material';
 import { LockOutlined } from '@mui/icons-material';
+import { useAuth } from '../../hooks/useAuth';
+import axios, { AxiosError } from 'axios';
+
+interface ApiErrorResponse {
+    message: string;
+    errors?: Record<string, string[]>;
+}
 
 const Login = () => {
-    const navigate = useNavigate();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
+    const { login, loading, error } = useAuth();
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setLoading(true);
-        setError('');
 
         try {
-            // Simüle edilmiş login - gerçek uygulamada API çağrısı yapılır
-            setTimeout(() => {
-                // API çağrısı başarılı olduğunda:
-                sessionStorage.setItem('auth_token', 'sample_token');
-                navigate('/');
-            }, 1000);
-        } catch (err) {
-            setError('Giriş başarısız. E-posta veya şifre hatalı.');
-        } finally {
-            setLoading(false);
+            await login(email, password);
+        } catch (error) {
+            if (axios.isAxiosError(error)) {
+                const axiosError = error as AxiosError<ApiErrorResponse>;
+                console.error('Login failed:', axiosError.response?.data?.message || 'Unknown error');
+            } else {
+                console.error('Login failed:', error);
+            }
         }
     };
 

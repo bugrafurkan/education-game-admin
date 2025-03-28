@@ -1,10 +1,11 @@
 // src/pages/games/GameDetail.tsx
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
     Box, Typography, Paper, Button, Grid, Chip,
     List, ListItem, ListItemText, ListItemIcon, ListItemSecondaryAction,
-    IconButton, Tabs, Tab, Alert
+    IconButton, Tabs, Tab, Alert, CircularProgress, Dialog,
+    DialogTitle, DialogContent, DialogContentText, DialogActions, TextField
 } from '@mui/material';
 import {
     QuestionAnswer as QuestionIcon,
@@ -16,63 +17,8 @@ import {
     CloudDownload as ExportIcon,
     Share as ShareIcon
 } from '@mui/icons-material';
-
-// Geçici oyun tipi
-interface Game {
-    id: number;
-    name: string;
-    type: 'jeopardy' | 'wheel';
-    description: string;
-    questionCount: number;
-    created_by: string;
-    is_active: boolean;
-    questions: Question[];
-    config: any;
-}
-
-// Geçici soru tipi
-interface Question {
-    id: number;
-    question_text: string;
-    question_type: string;
-    points: number;
-}
-
-// Mock veri
-const mockGame: Game = {
-    id: 1,
-    name: 'Tarih Bilgi Yarışması',
-    type: 'jeopardy',
-    description: 'Osmanlı ve Cumhuriyet tarihiyle ilgili sorular içeren bir yarışma oyunu.',
-    questionCount: 3,
-    created_by: 'Admin',
-    is_active: true,
-    questions: [
-        {
-            id: 1,
-            question_text: 'İstanbul hangi yılda fethedilmiştir?',
-            question_type: 'multiple_choice',
-            points: 100
-        },
-        {
-            id: 2,
-            question_text: 'Türkiye Cumhuriyeti hangi yılda kurulmuştur?',
-            question_type: 'multiple_choice',
-            points: 200
-        },
-        {
-            id: 3,
-            question_text: 'Osmanlı İmparatorluğu\'nun kurucusu kimdir?',
-            question_type: 'qa',
-            points: 300
-        }
-    ],
-    config: {
-        time_mode: 'countdown',
-        surprise_enabled: true,
-        point_multiplier: 1
-    }
-};
+import { useGame } from '../../hooks/useGame';
+import axios, { AxiosError } from 'axios';
 
 // Sekme değerleri için interface
 interface TabPanelProps {
@@ -102,25 +48,71 @@ const TabPanel = (props: TabPanelProps) => {
     );
 };
 
+interface ApiErrorResponse {
+    message: string;
+    errors?: Record<string, string[]>;
+}
+
 const GameDetail = () => {
     const { id } = useParams<{ id: string }>();
-    const [game, setGame] = useState<Game | null>(null);
-    const [loading, setLoading] = useState(true);
+    const gameId = parseInt(id || '0');
+
+    const {
+        game, loading, error,  removeQuestion,
+        getIframeCode, iframeCode, iframeLoading, iframeError
+    } = useGame(gameId);
+
     const [tabValue, setTabValue] = useState(0);
 
-    useEffect(() => {
-        // Backend API bağlantısı yerine mock veri kullanıyoruz
-        setLoading(true);
-
-        setTimeout(() => {
-            // Gerçek uygulamada burada id'ye göre bir API çağrısı yapılır
-            setGame(mockGame);
-            setLoading(false);
-        }, 500);
-    }, [id]);
+    // Soru silme
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [questionToDelete, setQuestionToDelete] = useState<number | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
 
     const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
         setTabValue(newValue);
+    };
+
+    // Soru silme işlemleri
+    const handleDeleteClick = (questionId: number) => {
+        setQuestionToDelete(questionId);
+        setDeleteDialogOpen(true);
+        setDeleteError(null);
+    };
+
+    const handleDeleteConfirm = async () => {
+        if (questionToDelete === null || !game) return;
+
+        setIsDeleting(true);
+        try {
+            const success = await removeQuestion(questionToDelete);
+            if (success) {
+                setDeleteDialogOpen(false);
+                setQuestionToDelete(null);
+            }
+        } catch (error) {
+            if (axios.isAxiosError(error)) {
+                const axiosError = error as AxiosError<ApiErrorResponse>;
+                setDeleteError(axiosError.response?.data?.message || 'Soru oyundan çıkarılırken bir hata oluştu');
+                console.error('Error removing question:', axiosError.response?.data);
+            } else {
+                setDeleteError('Soru oyundan çıkarılırken beklenmeyen bir hata oluştu');
+                console.error('Unexpected error:', error);
+            }
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
+    const handleDeleteCancel = () => {
+        setDeleteDialogOpen(false);
+        setQuestionToDelete(null);
+    };
+
+    // iframe kodunu al
+    const handleGetIframeCode = async () => {
+        await getIframeCode();
     };
 
     // Oyun tipini Türkçe olarak gösterme
@@ -151,14 +143,17 @@ const GameDetail = () => {
 
     if (loading) {
         return (
-            <Box>
-                <Typography variant="h4" gutterBottom sx={{ mb: 4, fontWeight: 'bold' }}>
-                    Oyun Detayı
-                </Typography>
-                <Paper sx={{ p: 3, textAlign: 'center' }}>
-                    Yükleniyor...
-                </Paper>
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+                <CircularProgress />
             </Box>
+        );
+    }
+
+    if (error) {
+        return (
+            <Alert severity="error" sx={{ mt: 2 }}>
+                {error}
+            </Alert>
         );
     }
 
@@ -169,7 +164,7 @@ const GameDetail = () => {
                     Oyun Detayı
                 </Typography>
                 <Paper sx={{ p: 3, textAlign: 'center' }}>
-                    Oyun bulunamadı.
+                    <Typography>Oyun bulunamadı.</Typography>
                 </Paper>
             </Box>
         );
@@ -205,6 +200,8 @@ const GameDetail = () => {
                 <Button
                     variant="outlined"
                     startIcon={<EditIcon />}
+                    component={Link}
+                    to={`/games/${game.id}/edit`}
                     sx={{ mr: 1 }}
                 >
                     Düzenle
@@ -223,7 +220,7 @@ const GameDetail = () => {
                                 Açıklama
                             </Typography>
                             <Typography variant="body1">
-                                {game.description}
+                                {game.description || 'Bu oyun için açıklama bulunmuyor.'}
                             </Typography>
                         </Box>
 
@@ -253,18 +250,20 @@ const GameDetail = () => {
                                     Soru Sayısı
                                 </Typography>
                                 <Typography variant="body1">
-                                    {game.questionCount}
+                                    {game.questions?.length || 0}
                                 </Typography>
                             </Grid>
 
-                            <Grid item xs={6}>
-                                <Typography variant="body2" color="text.secondary" gutterBottom>
-                                    Oluşturan
-                                </Typography>
-                                <Typography variant="body1">
-                                    {game.created_by}
-                                </Typography>
-                            </Grid>
+                            {game.creator && (
+                                <Grid item xs={6}>
+                                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                                        Oluşturan
+                                    </Typography>
+                                    <Typography variant="body1">
+                                        {game.creator.name}
+                                    </Typography>
+                                </Grid>
+                            )}
                         </Grid>
                     </Grid>
 
@@ -278,15 +277,39 @@ const GameDetail = () => {
                                 fullWidth
                                 variant="outlined"
                                 startIcon={<ShareIcon />}
+                                onClick={handleGetIframeCode}
+                                disabled={iframeLoading}
                                 sx={{ mb: 2 }}
                             >
-                                iframe Kodu Al
+                                {iframeLoading ? 'Yükleniyor...' : 'iframe Kodu Al'}
                             </Button>
+
+                            {iframeError && (
+                                <Alert severity="error" sx={{ mb: 2 }}>
+                                    {iframeError}
+                                </Alert>
+                            )}
+
+                            {iframeCode && (
+                                <TextField
+                                    fullWidth
+                                    multiline
+                                    rows={3}
+                                    value={iframeCode}
+                                    variant="outlined"
+                                    InputProps={{
+                                        readOnly: true,
+                                    }}
+                                    sx={{ mb: 2 }}
+                                />
+                            )}
 
                             <Button
                                 fullWidth
                                 variant="outlined"
                                 startIcon={<ExportIcon />}
+                                component={Link}
+                                to={`/exports/create?gameId=${game.id}`}
                             >
                                 WebGL Export
                             </Button>
@@ -305,6 +328,9 @@ const GameDetail = () => {
                             variant="contained"
                             color="primary"
                             sx={{ mb: 2 }}
+                            component="a"
+                            href={`/api/game-access/${game.id}`}
+                            target="_blank"
                         >
                             Oyun Ön İzleme
                         </Button>
@@ -339,7 +365,7 @@ const GameDetail = () => {
                         </Box>
 
                         <List>
-                            {game.questions.length === 0 ? (
+                            {!game.questions || game.questions.length === 0 ? (
                                 <Alert severity="warning">
                                     Bu oyuna henüz soru eklenmemiş.
                                 </Alert>
@@ -368,7 +394,7 @@ const GameDetail = () => {
                                                         sx={{ mr: 1 }}
                                                     />
                                                     <Chip
-                                                        label={`${question.points} Puan`}
+                                                        label="100 Puan"
                                                         size="small"
                                                         color="primary"
                                                     />
@@ -377,10 +403,20 @@ const GameDetail = () => {
                                         />
 
                                         <ListItemSecondaryAction>
-                                            <IconButton edge="end" aria-label="edit">
+                                            <IconButton
+                                                edge="end"
+                                                aria-label="edit"
+                                                component={Link}
+                                                to={`/questions/${question.id}/edit`}
+                                            >
                                                 <EditIcon />
                                             </IconButton>
-                                            <IconButton edge="end" aria-label="delete" color="error">
+                                            <IconButton
+                                                edge="end"
+                                                aria-label="delete"
+                                                color="error"
+                                                onClick={() => handleDeleteClick(question.id)}
+                                            >
                                                 <DeleteIcon />
                                             </IconButton>
                                         </ListItemSecondaryAction>
@@ -399,6 +435,8 @@ const GameDetail = () => {
                             <Button
                                 variant="outlined"
                                 startIcon={<SettingsIcon />}
+                                component={Link}
+                                to={`/games/${game.id}/settings`}
                                 size="small"
                             >
                                 Ayarları Düzenle
@@ -406,42 +444,65 @@ const GameDetail = () => {
                         </Box>
 
                         <Grid container spacing={3}>
-                            <Grid item xs={12} sm={6}>
-                                <Paper sx={{ p: 2, borderRadius: 2 }}>
-                                    <Typography variant="subtitle1" gutterBottom>
-                                        Zaman Modu
-                                    </Typography>
-                                    <Typography variant="body1">
-                                        {game.config.time_mode === 'countdown' ? 'Geri Sayım' : 'Sınırsız'}
-                                    </Typography>
-                                </Paper>
-                            </Grid>
-
-                            <Grid item xs={12} sm={6}>
-                                <Paper sx={{ p: 2, borderRadius: 2 }}>
-                                    <Typography variant="subtitle1" gutterBottom>
-                                        Sürpriz Özellikler
-                                    </Typography>
-                                    <Typography variant="body1">
-                                        {game.config.surprise_enabled ? 'Aktif' : 'Pasif'}
-                                    </Typography>
-                                </Paper>
-                            </Grid>
-
-                            <Grid item xs={12} sm={6}>
-                                <Paper sx={{ p: 2, borderRadius: 2 }}>
-                                    <Typography variant="subtitle1" gutterBottom>
-                                        Puan Çarpanı
-                                    </Typography>
-                                    <Typography variant="body1">
-                                        {game.config.point_multiplier}x
-                                    </Typography>
-                                </Paper>
-                            </Grid>
+                            {game.config ? (
+                                Object.entries(game.config).map(([key, value]) => (
+                                    <Grid item xs={12} sm={6} key={key}>
+                                        <Paper sx={{ p: 2, borderRadius: 2 }}>
+                                            <Typography variant="subtitle1" gutterBottom>
+                                                {key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                            </Typography>
+                                            <Typography variant="body1">
+                                                {typeof value === 'boolean'
+                                                    ? (value ? 'Evet' : 'Hayır')
+                                                    : (String(value) || '-')
+                                                }
+                                            </Typography>
+                                        </Paper>
+                                    </Grid>
+                                ))
+                            ) : (
+                                <Grid item xs={12}>
+                                    <Alert severity="info">
+                                        Bu oyun için henüz özel ayar tanımlanmamış.
+                                    </Alert>
+                                </Grid>
+                            )}
                         </Grid>
                     </TabPanel>
                 </Box>
             </Paper>
+
+            {/* Silme Onay Dialogu */}
+            <Dialog
+                open={deleteDialogOpen}
+                onClose={handleDeleteCancel}
+            >
+                <DialogTitle>Soruyu Oyundan Çıkar</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        Bu soruyu oyundan çıkarmak istediğinize emin misiniz?
+                    </DialogContentText>
+
+                    {deleteError && (
+                        <Alert severity="error" sx={{ mt: 2 }}>
+                            {deleteError}
+                        </Alert>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleDeleteCancel} disabled={isDeleting}>
+                        İptal
+                    </Button>
+                    <Button
+                        onClick={handleDeleteConfirm}
+                        color="error"
+                        disabled={isDeleting}
+                        startIcon={isDeleting ? <CircularProgress size={20} /> : null}
+                    >
+                        {isDeleting ? 'İşleniyor...' : 'Çıkar'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 };

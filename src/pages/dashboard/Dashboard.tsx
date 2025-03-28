@@ -1,26 +1,72 @@
 // src/pages/dashboard/Dashboard.tsx
 import {
     Box, Grid, Paper, Typography, Card, CardContent,
-    CardHeader, Divider, Button
+    CardHeader, Divider, Button, List, ListItem,
+    ListItemText, CircularProgress, Alert
 } from '@mui/material';
 import { Link } from 'react-router-dom';
 import {
     QuestionAnswer as QuestionIcon,
     Games as GameIcon,
     School as SchoolIcon,
-    PlayArrow as PlayIcon,
+    CloudUpload as ExportIcon,
     Add as AddIcon,
     ViewList as ViewListIcon,
     Gamepad as GamepadIcon,
-    CloudUpload as CloudUploadIcon
+    CloudDownload as CloudDownloadIcon
 } from '@mui/icons-material';
+import { useDashboard } from '../../hooks/useDashboard';
 
 const Dashboard = () => {
-    const stats = [
-        { title: 'Toplam Soru', value: 256, icon: <QuestionIcon sx={{ fontSize: 40 }} color="primary" /> },
-        { title: 'Oyun Sayısı', value: 12, icon: <GameIcon sx={{ fontSize: 40 }} color="success" /> },
-        { title: 'Kategoriler', value: 18, icon: <SchoolIcon sx={{ fontSize: 40 }} color="warning" /> },
-        { title: 'Exports', value: 34, icon: <PlayIcon sx={{ fontSize: 40 }} color="error" /> },
+    const { stats, loading, error } = useDashboard();
+
+    if (loading) {
+        return (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+                <CircularProgress />
+            </Box>
+        );
+    }
+
+    if (error) {
+        return (
+            <Alert severity="error" sx={{ mt: 2 }}>
+                {error}
+            </Alert>
+        );
+    }
+
+    // eğer stats null ise varsayılan değerlerle gösterelim
+    const dashboardStats = stats || {
+        questionCount: 0,
+        gameCount: 0,
+        categoryCount: 0,
+        exportCount: 0,
+        recentQuestions: [],
+        recentGames: []
+    };
+
+    const statItems = [
+        {
+            title: 'Toplam Soru',
+            value: dashboardStats.questionCount,
+            icon: <QuestionIcon sx={{ fontSize: 40 }} color="primary" />
+        },
+        {
+            title: 'Oyun Sayısı',
+            value: dashboardStats.gameCount,
+            icon: <GameIcon sx={{ fontSize: 40 }} color="success" />
+        },
+        {
+            title: 'Kategoriler',
+            value: dashboardStats.categoryCount,
+            icon: <SchoolIcon sx={{ fontSize: 40 }} color="warning" />
+        },
+        {
+            title: 'Exports',
+            value: dashboardStats.exportCount,
+            icon: <ExportIcon sx={{ fontSize: 40 }} color="error" />
+        },
     ];
 
     return (
@@ -30,7 +76,7 @@ const Dashboard = () => {
             </Typography>
 
             <Grid container spacing={3}>
-                {stats.map((stat, index) => (
+                {statItems.map((stat, index) => (
                     <Grid item xs={12} sm={6} md={3} key={index}>
                         <Paper
                             elevation={0}
@@ -65,9 +111,35 @@ const Dashboard = () => {
                         <CardHeader title="Son Eklenen Sorular" />
                         <Divider />
                         <CardContent>
-                            <Typography variant="body2" color="text.secondary">
-                                Henüz soru eklenmemiş.
-                            </Typography>
+                            {dashboardStats.recentQuestions.length === 0 ? (
+                                <Typography variant="body2" color="text.secondary">
+                                    Henüz soru eklenmemiş.
+                                </Typography>
+                            ) : (
+                                <List>
+                                    {dashboardStats.recentQuestions.map((question) => (
+                                        <ListItem
+                                            key={question.id}
+                                            component={Link}
+                                            to={`/questions/${question.id}`}
+                                            sx={{
+                                                textDecoration: 'none',
+                                                color: 'inherit',
+                                                '&:hover': { bgcolor: '#f5f5f5' }
+                                            }}
+                                        >
+                                            <ListItemText
+                                                primary={question.question_text}
+                                                secondary={`Eklenme: ${new Date(question.created_at).toLocaleDateString()}`}
+                                                primaryTypographyProps={{
+                                                    noWrap: true,
+                                                    style: { maxWidth: '100%' }
+                                                }}
+                                            />
+                                        </ListItem>
+                                    ))}
+                                </List>
+                            )}
                         </CardContent>
                     </Card>
                 </Grid>
@@ -77,9 +149,31 @@ const Dashboard = () => {
                         <CardHeader title="Son Oyunlar" />
                         <Divider />
                         <CardContent>
-                            <Typography variant="body2" color="text.secondary">
-                                Henüz oyun eklenmemiş.
-                            </Typography>
+                            {dashboardStats.recentGames.length === 0 ? (
+                                <Typography variant="body2" color="text.secondary">
+                                    Henüz oyun eklenmemiş.
+                                </Typography>
+                            ) : (
+                                <List>
+                                    {dashboardStats.recentGames.map((game) => (
+                                        <ListItem
+                                            key={game.id}
+                                            component={Link}
+                                            to={`/games/${game.id}`}
+                                            sx={{
+                                                textDecoration: 'none',
+                                                color: 'inherit',
+                                                '&:hover': { bgcolor: '#f5f5f5' }
+                                            }}
+                                        >
+                                            <ListItemText
+                                                primary={game.name}
+                                                secondary={`Tip: ${game.type === 'jeopardy' ? 'Jeopardy' : 'Bilgi Çarkı'}`}
+                                            />
+                                        </ListItem>
+                                    ))}
+                                </List>
+                            )}
                         </CardContent>
                     </Card>
                 </Grid>
@@ -132,7 +226,7 @@ const Dashboard = () => {
                                     <Button
                                         variant="outlined"
                                         fullWidth
-                                        startIcon={<CloudUploadIcon />}
+                                        startIcon={<CloudDownloadIcon />}
                                         component={Link}
                                         to="/exports"
                                         sx={{ py: 1.5 }}

@@ -1,108 +1,78 @@
 // src/pages/games/GameList.tsx
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
-    Box, Typography, Paper, Button, Grid, Card, CardMedia,
-    CardContent, CardActions, IconButton, Chip, Tooltip, TextField,
-    InputAdornment
+    Box, Typography, Paper, Button, TextField, InputAdornment,
+    Grid, Card, CardContent, CardActions, CardMedia, Chip,
+    TablePagination, CircularProgress, Alert, Dialog, DialogActions,
+    DialogContent, DialogContentText, DialogTitle
 } from '@mui/material';
 import {
-    Add as AddIcon,
     Search as SearchIcon,
-    PlayArrow as PlayIcon,
+    Visibility as ViewIcon,
     Edit as EditIcon,
     Delete as DeleteIcon
 } from '@mui/icons-material';
 import { Link } from 'react-router-dom';
-
-// Oyun tipi
-interface Game {
-    id: number;
-    name: string;
-    type: 'jeopardy' | 'wheel';
-    description: string;
-    questionCount: number;
-    is_active: boolean;
-    image?: string;
-}
-
-// Mock veri
-const mockGames: Game[] = [
-    {
-        id: 1,
-        name: 'Tarih Bilgi Yarışması',
-        type: 'jeopardy',
-        description: 'Osmanlı İmparatorluğu ve Türkiye Cumhuriyeti hakkında sorular',
-        questionCount: 25,
-        is_active: true,
-        image: 'https://via.placeholder.com/300x180?text=Tarih+Bilgi+Yarışması'
-    },
-    {
-        id: 2,
-        name: 'Fen Soruları',
-        type: 'jeopardy',
-        description: 'Fizik, kimya ve biyoloji konularında interaktif sorular',
-        questionCount: 30,
-        is_active: true,
-        image: 'https://via.placeholder.com/300x180?text=Fen+Soruları'
-    },
-    {
-        id: 3,
-        name: 'Matematik Çarkı',
-        type: 'wheel',
-        description: 'Matematik problemleri içeren çarkıfelek oyunu',
-        questionCount: 20,
-        is_active: true,
-        image: 'https://via.placeholder.com/300x180?text=Matematik+Çarkı'
-    },
-    {
-        id: 4,
-        name: 'Genel Kültür',
-        type: 'jeopardy',
-        description: 'Çeşitli konularda genel kültür soruları',
-        questionCount: 40,
-        is_active: false,
-        image: 'https://via.placeholder.com/300x180?text=Genel+Kültür'
-    }
-];
+import { useGames } from '../../hooks/useGames';
 
 const GameList = () => {
-    const [games, setGames] = useState<Game[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [page, setPage] = useState(1);
+    const [rowsPerPage, setRowsPerPage] = useState(6);
     const [search, setSearch] = useState('');
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [gameToDelete, setGameToDelete] = useState<number | null>(null);
 
-    useEffect(() => {
-        // Backend API bağlantısı yerine mock veri
-        setLoading(true);
+    // Hook ile oyunları yükle
+    const { games, loading, error, pagination, deleteGame } = useGames(page);
 
-        setTimeout(() => {
-            setGames(mockGames);
-            setLoading(false);
-        }, 500);
-    }, []);
+    // Arama işlemi - client-side filtreleme
+    const filteredGames = games.filter(game => {
+        const searchLower = search.toLowerCase();
+        return game.name.toLowerCase().includes(searchLower) ||
+            (game.description && game.description.toLowerCase().includes(searchLower));
+    });
 
-    // Arama filtrelemesi
-    const filteredGames = games.filter(game =>
-        game.name.toLowerCase().includes(search.toLowerCase()) ||
-        game.description.toLowerCase().includes(search.toLowerCase())
-    );
+    // Sayfalama işlemleri
+    const handleChangePage = (_: unknown, newPage: number) => {
+        setPage(newPage + 1); // Material-UI sayfalama 0-tabanlı, API'miz 1-tabanlı
+    };
+
+    const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+        setRowsPerPage(parseInt(event.target.value, 10));
+        setPage(1);
+    };
+
+    // Silme işlemleri
+    const handleDeleteClick = (gameId: number) => {
+        setGameToDelete(gameId);
+        setDeleteDialogOpen(true);
+    };
+
+    const handleDeleteConfirm = async () => {
+        if (gameToDelete === null) return;
+
+        const success = await deleteGame(gameToDelete);
+        if (success) {
+            setDeleteDialogOpen(false);
+            setGameToDelete(null);
+        }
+    };
+
+    const handleDeleteCancel = () => {
+        setDeleteDialogOpen(false);
+        setGameToDelete(null);
+    };
 
     // Oyun tipini Türkçe olarak gösterme
     const getGameTypeLabel = (type: string) => {
         switch (type) {
             case 'jeopardy':
-                return 'Jeopardy (Bilgi Yarışması)';
+                return 'Jeopardy';
             case 'wheel':
-                return 'Çarkıfelek';
+                return 'Bilgi Çarkı';
             default:
                 return type;
         }
-    };
-
-    // Oyun durumunu gösterme
-    const getStatusChip = (isActive: boolean) => {
-        return isActive
-            ? <Chip label="Aktif" color="success" size="small" />
-            : <Chip label="Pasif" color="error" size="small" />;
     };
 
     return (
@@ -113,7 +83,7 @@ const GameList = () => {
 
             <Paper sx={{ p: 3, mb: 3, borderRadius: 2 }}>
                 <Grid container spacing={2} alignItems="center">
-                    <Grid item xs={12} md={8}>
+                    <Grid item xs={12}>
                         <TextField
                             fullWidth
                             label="Oyun Ara"
@@ -130,99 +100,146 @@ const GameList = () => {
                         />
                     </Grid>
 
-                    <Grid item xs={12} md={4} sx={{ textAlign: { xs: 'left', md: 'right' } }}>
-                        <Button
-                            variant="contained"
-                            startIcon={<AddIcon />}
-                            component={Link}
-                            to="/games/add"
-                            sx={{
-                                py: 1.5,
-                                px: 3,
-                                bgcolor: '#1a1a27',
-                                '&:hover': { bgcolor: '#2a2a37' }
-                            }}
-                        >
-                            Yeni Oyun Ekle
-                        </Button>
-                    </Grid>
                 </Grid>
             </Paper>
 
+            {error && (
+                <Alert severity="error" sx={{ mb: 3 }}>
+                    {error}
+                </Alert>
+            )}
+
             {loading ? (
-                <Box sx={{ textAlign: 'center', py: 5 }}>
-                    <Typography>Yükleniyor...</Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+                    <CircularProgress />
                 </Box>
             ) : filteredGames.length === 0 ? (
-                <Box sx={{ textAlign: 'center', py: 5 }}>
+                <Paper sx={{ p: 4, textAlign: 'center', borderRadius: 2 }}>
                     <Typography>Oyun bulunamadı.</Typography>
-                </Box>
+                </Paper>
             ) : (
-                <Grid container spacing={3}>
-                    {filteredGames.map((game) => (
-                        <Grid item xs={12} sm={6} md={4} key={game.id}>
-                            <Card sx={{
-                                height: '100%',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                borderRadius: 2,
-                                transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
-                                '&:hover': {
-                                    transform: 'translateY(-5px)',
-                                    boxShadow: '0 8px 16px rgba(0,0,0,0.1)'
-                                }
-                            }}>
-                                <CardMedia
-                                    component="img"
-                                    height="180"
-                                    image={game.image || 'https://via.placeholder.com/300x180?text=No+Image'}
-                                    alt={game.name}
-                                />
-                                <CardContent sx={{ flexGrow: 1 }}>
-                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                                        <Typography variant="h6" component="div">
-                                            {game.name}
-                                        </Typography>
-                                        {getStatusChip(game.is_active)}
-                                    </Box>
-                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                                        {getGameTypeLabel(game.type)}
-                                    </Typography>
-                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                                        {game.description}
-                                    </Typography>
-                                    <Typography variant="body2" color="primary">
-                                        {game.questionCount} Soru
-                                    </Typography>
-                                </CardContent>
-                                <CardActions sx={{ justifyContent: 'space-between', p: 2 }}>
-                                    <Box>
-                                        <Tooltip title="Düzenle">
-                                            <IconButton color="info">
-                                                <EditIcon />
-                                            </IconButton>
-                                        </Tooltip>
-                                        <Tooltip title="Sil">
-                                            <IconButton color="error">
-                                                <DeleteIcon />
-                                            </IconButton>
-                                        </Tooltip>
-                                    </Box>
-                                    <Button
-                                        component={Link}
-                                        to={`/games/${game.id}`}
-                                        variant="outlined"
-                                        size="small"
-                                        endIcon={<PlayIcon />}
+                <>
+                    <Grid container spacing={3}>
+                        {filteredGames.map((game) => (
+                            <Grid item xs={12} sm={6} md={4} key={game.id}>
+                                <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', borderRadius: 2 }}>
+                                    <CardMedia
+                                        component="div"
+                                        sx={{
+                                            height: 140,
+                                            backgroundColor: game.type === 'jeopardy' ? '#3f51b5' : '#f50057',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            color: 'white',
+                                            fontSize: '1.5rem',
+                                            fontWeight: 'bold'
+                                        }}
                                     >
-                                        Detaylar
+                                        {getGameTypeLabel(game.type)}
+                                    </CardMedia>
+
+                                    <CardContent sx={{ flexGrow: 1 }}>
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 1 }}>
+                                            <Typography variant="h6" component="div" sx={{ fontWeight: 'bold' }}>
+                                                {game.name}
+                                            </Typography>
+                                            <Chip
+                                                label={game.is_active ? 'Aktif' : 'Pasif'}
+                                                color={game.is_active ? 'success' : 'default'}
+                                                size="small"
+                                            />
+                                        </Box>
+
+                                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                                            {game.description || 'Açıklama yok'}
+                                        </Typography>
+
+                                        <Typography variant="body2">
+                                            <strong>Soru Sayısı:</strong> {game.question_count || game.questions?.length || 0}
+                                        </Typography>
+
+                                        {game.creator && (
+                                            <Typography variant="body2">
+                                                <strong>Oluşturan:</strong> {game.creator.name}
+                                            </Typography>
+                                        )}
+                                    </CardContent>
+
+                                    <CardActions sx={{ p: 2, pt: 0 }}>
+                                        <Button
+                                            size="small"
+                                            startIcon={<ViewIcon />}
+                                            component={Link}
+                                            to={`/games/${game.id}`}
+                                        >
+                                            Detaylar
+                                        </Button>
+                                        <Button
+                                            size="small"
+                                            startIcon={<EditIcon />}
+                                            component={Link}
+                                            to={`/games/${game.id}/edit`}
+                                        >
+                                            Düzenle
+                                        </Button>
+                                        <Button
+                                        size="small"
+                                        color="error"
+                                        startIcon={<DeleteIcon />}
+                                        onClick={() => handleDeleteClick(game.id)}
+                                        >
+                                        Sil
                                     </Button>
                                 </CardActions>
                             </Card>
-                        </Grid>
-                    ))}
-                </Grid>
+                            </Grid>
+                            ))}
+                    </Grid>
+
+                    {!loading && pagination && (
+                    <Paper sx={{ mt: 3, borderRadius: 2 }}>
+                        <TablePagination
+                            component="div"
+                            count={pagination.total}
+                            rowsPerPage={rowsPerPage}
+                            page={pagination.current_page - 1} // API'den 1-tabanlı, MUI'de 0-tabanlı
+                            onPageChange={handleChangePage}
+                            onRowsPerPageChange={handleChangeRowsPerPage}
+                            rowsPerPageOptions={[6, 12, 24]}
+                            labelRowsPerPage="Sayfa başına oyun:"
+                            labelDisplayedRows={({ from, to, count }) => `${from}-${to} / ${count}`}
+                        />
+                    </Paper>
+                    )}
+                </>
             )}
+
+            {/* Silme Onay Dialogu */}
+            <Dialog
+                open={deleteDialogOpen}
+                onClose={handleDeleteCancel}
+            >
+                <DialogTitle>Oyunu Sil</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        Bu oyunu silmek istediğinize emin misiniz? Bu işlem geri alınamaz.
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleDeleteCancel} disabled={loading}>
+                        İptal
+                    </Button>
+                    <Button
+                        onClick={handleDeleteConfirm}
+                        color="error"
+                        disabled={loading}
+                        startIcon={loading ? <CircularProgress size={20} /> : null}
+                    >
+                        {loading ? 'Siliniyor...' : 'Sil'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 };

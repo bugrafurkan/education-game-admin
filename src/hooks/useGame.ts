@@ -1,65 +1,127 @@
 // src/hooks/useGame.ts
 import { useState, useEffect } from 'react';
-import { getGames, Game } from '../services/game.service';
 import axios, { AxiosError } from 'axios';
+import * as gameService from '../services/game.service';
+import { Game, GameQuestionAdd, IframeCodeResponse } from '../services/game.service';
 
-interface PaginationData {
-    total: number;
-    perPage: number;
-    currentPage: number;
-    lastPage: number;
-}
-
-interface ApiError {
+interface ApiErrorResponse {
     message: string;
     errors?: Record<string, string[]>;
 }
 
-export const useGame = (page = 1) => {
-    const [games, setGames] = useState<Game[]>([]);
+export const useGame = (id: number) => {
+    const [game, setGame] = useState<Game | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [pagination, setPagination] = useState<PaginationData>({
-        total: 0,
-        perPage: 10,
-        currentPage: 1,
-        lastPage: 1
-    });
+    const [iframeCode, setIframeCode] = useState<string | null>(null);
+    const [iframeLoading, setIframeLoading] = useState(false);
+    const [iframeError, setIframeError] = useState<string | null>(null);
 
-    // fetchGames fonksiyonunu useEffect dışına çıkardık
-    const fetchGames = async () => {
+    const fetchGame = async () => {
         try {
             setLoading(true);
-            const response = await getGames(page);
-            setGames(response.data);
-            setPagination({
-                total: response.total,
-                perPage: response.per_page,
-                currentPage: response.current_page,
-                lastPage: response.last_page
-            });
+            setError(null);
+            const data = await gameService.getGame(id);
+            setGame(data);
             setLoading(false);
         } catch (error) {
-            // Axios hatalarını daha spesifik işleyelim
             if (axios.isAxiosError(error)) {
-                const axiosError = error as AxiosError<ApiError>;
-                setError(axiosError.response?.data?.message || 'Oyunlar yüklenirken bir hata oluştu.');
+                const axiosError = error as AxiosError<ApiErrorResponse>;
+                setError(axiosError.response?.data?.message || 'Oyun bilgileri yüklenirken bir hata oluştu');
+                console.error('Error fetching game:', axiosError.response?.data);
             } else {
-                setError('Oyunlar yüklenirken beklenmeyen bir hata oluştu.');
+                setError('Oyun bilgileri yüklenirken beklenmeyen bir hata oluştu');
+                console.error('Unexpected error:', error);
             }
             setLoading(false);
         }
     };
 
     useEffect(() => {
-        fetchGames();
-    }, [fetchGames, page]);
+        fetchGame();
+    }, [id]);
+
+    // Soruyu oyundan çıkar
+    const removeQuestion = async (questionId: number): Promise<boolean> => {
+        if (!game) return false;
+
+        try {
+            setLoading(true);
+            await gameService.removeQuestionFromGame(game.id, questionId);
+            await fetchGame(); // Oyun bilgilerini yenile
+            return true;
+        } catch (error) {
+            if (axios.isAxiosError(error)) {
+                const axiosError = error as AxiosError<ApiErrorResponse>;
+                setError(axiosError.response?.data?.message || 'Soru oyundan çıkarılırken bir hata oluştu');
+                console.error('Error removing question:', axiosError.response?.data);
+            } else {
+                setError('Soru oyundan çıkarılırken beklenmeyen bir hata oluştu');
+                console.error('Unexpected error:', error);
+            }
+            setLoading(false);
+            return false;
+        }
+    };
+
+    // Oyuna soru ekle
+    const addQuestion = async (questionData: GameQuestionAdd): Promise<boolean> => {
+        if (!game) return false;
+
+        try {
+            setLoading(true);
+            await gameService.addQuestionToGame(game.id, questionData);
+            await fetchGame(); // Oyun bilgilerini yenile
+            return true;
+        } catch (error) {
+            if (axios.isAxiosError(error)) {
+                const axiosError = error as AxiosError<ApiErrorResponse>;
+                setError(axiosError.response?.data?.message || 'Soru oyuna eklenirken bir hata oluştu');
+                console.error('Error adding question:', axiosError.response?.data);
+            } else {
+                setError('Soru oyuna eklenirken beklenmeyen bir hata oluştu');
+                console.error('Unexpected error:', error);
+            }
+            setLoading(false);
+            return false;
+        }
+    };
+
+    // iframe kodunu al
+    const getIframeCode = async (): Promise<IframeCodeResponse | null> => {
+        if (!game) return null;
+
+        try {
+            setIframeLoading(true);
+            setIframeError(null);
+            const response = await gameService.getIframeCode(game.id);
+            setIframeCode(response.iframe_code);
+            setIframeLoading(false);
+            return response;
+        } catch (error) {
+            if (axios.isAxiosError(error)) {
+                const axiosError = error as AxiosError<ApiErrorResponse>;
+                setIframeError(axiosError.response?.data?.message || 'iframe kodu alınırken bir hata oluştu');
+                console.error('Error getting iframe code:', axiosError.response?.data);
+            } else {
+                setIframeError('iframe kodu alınırken beklenmeyen bir hata oluştu');
+                console.error('Unexpected error:', error);
+            }
+            setIframeLoading(false);
+            return null;
+        }
+    };
 
     return {
-        games,
+        game,
         loading,
         error,
-        pagination,
-        refresh: fetchGames  // Artık doğrudan fonksiyonu referans edebiliriz
+        iframeCode,
+        iframeLoading,
+        iframeError,
+        refresh: fetchGame,
+        removeQuestion,
+        addQuestion,
+        getIframeCode
     };
 };

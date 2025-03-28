@@ -1,5 +1,6 @@
 // src/services/game.service.ts
 import api from './api';
+import { Question } from './question.service';
 
 export interface Game {
     id: number;
@@ -7,21 +8,14 @@ export interface Game {
     type: 'jeopardy' | 'wheel';
     description?: string;
     config?: Record<string, unknown>;
-    created_by: number;
     is_active: boolean;
-    questions?: Question[];
-}
-
-export interface Question {
-    id: number;
-    question_text: string;
-    question_type: string;
-    pivot?: {
-        points: number;
-        order?: number;
-        category_label?: string;
-        special_effects?: string;
+    created_by: number;
+    creator?: {
+        id: number;
+        name: string;
     };
+    questions?: Question[];
+    question_count?: number;
 }
 
 export interface GameCreate {
@@ -40,7 +34,7 @@ export interface PaginatedResponse<T> {
     last_page: number;
 }
 
-export interface AddQuestionData {
+export interface GameQuestionAdd {
     question_id: number;
     points: number;
     order?: number;
@@ -48,7 +42,7 @@ export interface AddQuestionData {
     special_effects?: string;
 }
 
-export interface IframeResponse {
+export interface IframeCodeResponse {
     iframe_code: string;
     game_url: string;
 }
@@ -83,7 +77,7 @@ export const deleteGame = async (id: number): Promise<void> => {
 };
 
 // Oyuna soru ekle
-export const addQuestionToGame = async (gameId: number, questionData: AddQuestionData): Promise<{ message: string }> => {
+export const addQuestionToGame = async (gameId: number, questionData: GameQuestionAdd): Promise<{ message: string }> => {
     const response = await api.post<{ message: string }>(`/games/${gameId}/add-question`, questionData);
     return response.data;
 };
@@ -101,7 +95,7 @@ export const getGameConfig = async (gameId: number): Promise<Record<string, unkn
 };
 
 // iframe kodu al
-export const getGameIframeCode = async (gameId: number): Promise<IframeResponse> => {
-    const response = await api.get<IframeResponse>(`/games/${gameId}/iframe`);
+export const getIframeCode = async (gameId: number): Promise<IframeCodeResponse> => {
+    const response = await api.get<IframeCodeResponse>(`/games/${gameId}/iframe`);
     return response.data;
 };

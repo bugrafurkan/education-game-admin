@@ -2,9 +2,10 @@
 import { useState } from 'react';
 import {
     Box, Typography, Paper, Button, Grid, TextField, Switch,
-    FormControlLabel, Tabs, Tab, Divider, Alert, Snackbar
+    FormControlLabel, Tabs, Tab, Divider, Snackbar,
+    RadioGroup, Radio, FormControl, FormLabel
 } from '@mui/material';
-import { Save as SaveIcon } from '@mui/icons-material';
+import { Save as SaveIcon, Upload as UploadIcon } from '@mui/icons-material';
 
 interface TabPanelProps {
     children?: React.ReactNode;
@@ -42,14 +43,11 @@ const Settings = () => {
     const [logoUrl, setLogoUrl] = useState('/assets/logo.png');
     const [themeColor, setThemeColor] = useState('#1a1a27');
 
-    // Fernus entegrasyonu
-    const [fernusApiKey, setFernusApiKey] = useState('');
-    const [fernusApiUrl, setFernusApiUrl] = useState('https://api.fernus.example.com');
-    const [fernusEnabled, setFernusEnabled] = useState(true);
-
     // Reklam ayarları
     const [adsEnabled, setAdsEnabled] = useState(true);
-    const [defaultBanner, setDefaultBanner] = useState('/assets/default-banner.png');
+    const [adType, setAdType] = useState('image'); // 'image' veya 'video'
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
     const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
         setTabValue(newValue);
@@ -59,6 +57,7 @@ const Settings = () => {
         setSaving(true);
 
         // Simüle edilmiş API çağrısı
+        // Gerçek uygulamada burada bir FormData oluşturup dosyayı ve diğer verileri backend'e gönderebilirsiniz
         setTimeout(() => {
             setSaving(false);
             setShowSuccess(true);
@@ -67,6 +66,28 @@ const Settings = () => {
 
     const handleCloseSuccessMessage = () => {
         setShowSuccess(false);
+    };
+
+    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        if (event.target.files && event.target.files[0]) {
+            const file = event.target.files[0];
+
+            // Dosya tipini kontrol et
+            const isValidFileType = adType === 'image'
+                ? file.type.startsWith('image/')
+                : file.type.startsWith('video/');
+
+            if (!isValidFileType) {
+                alert(`Lütfen geçerli bir ${adType === 'image' ? 'görsel' : 'video'} dosyası seçin.`);
+                return;
+            }
+
+            setSelectedFile(file);
+
+            // Önizleme URL'i oluştur
+            const fileURL = URL.createObjectURL(file);
+            setPreviewUrl(fileURL);
+        }
     };
 
     return (
@@ -79,8 +100,8 @@ const Settings = () => {
                 <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
                     <Tabs value={tabValue} onChange={handleTabChange} aria-label="settings tabs">
                         <Tab label="Genel Ayarlar" id="settings-tab-0" aria-controls="settings-tabpanel-0" />
-                        <Tab label="Fernus Entegrasyonu" id="settings-tab-1" aria-controls="settings-tabpanel-1" />
-                        <Tab label="Reklam Ayarları" id="settings-tab-2" aria-controls="settings-tabpanel-2" />
+                        {/* Fernus Entegrasyonu sekmesi kaldırıldı */}
+                        <Tab label="Reklam Ayarları" id="settings-tab-1" aria-controls="settings-tabpanel-1" />
                     </Tabs>
                 </Box>
 
@@ -133,58 +154,6 @@ const Settings = () => {
                         <Grid container spacing={3}>
                             <Grid item xs={12}>
                                 <Typography variant="h6" gutterBottom>
-                                    Fernus Entegrasyonu
-                                </Typography>
-                                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                                    Fernus platformu ile entegrasyon ayarlarını yapılandırın.
-                                </Typography>
-
-                                <Alert severity="info" sx={{ mb: 3 }}>
-                                    Fernus, WebGL oyunlarını akıllı tahtalara dağıtmak için kullanılan bir platformdur.
-                                </Alert>
-
-                                <Grid container spacing={3}>
-                                    <Grid item xs={12}>
-                                        <FormControlLabel
-                                            control={
-                                                <Switch
-                                                    checked={fernusEnabled}
-                                                    onChange={(e) => setFernusEnabled(e.target.checked)}
-                                                />
-                                            }
-                                            label="Fernus Entegrasyonunu Etkinleştir"
-                                        />
-                                    </Grid>
-
-                                    <Grid item xs={12} md={6}>
-                                        <TextField
-                                            label="Fernus API Anahtarı"
-                                            fullWidth
-                                            value={fernusApiKey}
-                                            onChange={(e) => setFernusApiKey(e.target.value)}
-                                            disabled={!fernusEnabled}
-                                            type="password"
-                                        />
-                                    </Grid>
-
-                                    <Grid item xs={12} md={6}>
-                                        <TextField
-                                            label="Fernus API URL"
-                                            fullWidth
-                                            value={fernusApiUrl}
-                                            onChange={(e) => setFernusApiUrl(e.target.value)}
-                                            disabled={!fernusEnabled}
-                                        />
-                                    </Grid>
-                                </Grid>
-                            </Grid>
-                        </Grid>
-                    </TabPanel>
-
-                    <TabPanel value={tabValue} index={2}>
-                        <Grid container spacing={3}>
-                            <Grid item xs={12}>
-                                <Typography variant="h6" gutterBottom>
                                     Reklam Ayarları
                                 </Typography>
                                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
@@ -204,16 +173,75 @@ const Settings = () => {
                                         />
                                     </Grid>
 
-                                    <Grid item xs={12} md={6}>
-                                        <TextField
-                                            label="Varsayılan Banner URL"
-                                            fullWidth
-                                            value={defaultBanner}
-                                            onChange={(e) => setDefaultBanner(e.target.value)}
-                                            disabled={!adsEnabled}
-                                            helperText="Özel reklam yoksa gösterilecek varsayılan banner"
-                                        />
-                                    </Grid>
+                                    {adsEnabled && (
+                                        <>
+                                            <Grid item xs={12}>
+                                                <FormControl component="fieldset">
+                                                    <FormLabel component="legend">Reklam Tipi</FormLabel>
+                                                    <RadioGroup
+                                                        row
+                                                        value={adType}
+                                                        onChange={(e) => {
+                                                            setAdType(e.target.value);
+                                                            // Reklam tipi değiştiğinde seçili dosyayı sıfırla
+                                                            setSelectedFile(null);
+                                                            setPreviewUrl(null);
+                                                        }}
+                                                    >
+                                                        <FormControlLabel value="image" control={<Radio />} label="Görsel Reklam" />
+                                                        <FormControlLabel value="video" control={<Radio />} label="Video Reklam" />
+                                                    </RadioGroup>
+                                                </FormControl>
+                                            </Grid>
+
+                                            <Grid item xs={12}>
+                                                <Box sx={{ border: '1px dashed #ccc', p: 3, borderRadius: 2, textAlign: 'center' }}>
+                                                    <input
+                                                        accept={adType === 'image' ? "image/*" : "video/*"}
+                                                        style={{ display: 'none' }}
+                                                        id="ad-file-upload"
+                                                        type="file"
+                                                        onChange={handleFileChange}
+                                                    />
+                                                    <label htmlFor="ad-file-upload">
+                                                        <Button
+                                                            variant="outlined"
+                                                            component="span"
+                                                            startIcon={<UploadIcon />}
+                                                        >
+                                                            {adType === 'image' ? 'Görsel Seç' : 'Video Seç'}
+                                                        </Button>
+                                                    </label>
+                                                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                                        {selectedFile ? selectedFile.name : `Lütfen bir ${adType === 'image' ? 'görsel' : 'video'} dosyası seçin.`}
+                                                    </Typography>
+                                                </Box>
+                                            </Grid>
+
+                                            {previewUrl && (
+                                                <Grid item xs={12}>
+                                                    <Typography variant="subtitle2" gutterBottom>
+                                                        Önizleme:
+                                                    </Typography>
+                                                    <Box sx={{ mt: 1, maxWidth: '100%', textAlign: 'center' }}>
+                                                        {adType === 'image' ? (
+                                                            <img
+                                                                src={previewUrl}
+                                                                alt="Reklam önizleme"
+                                                                style={{ maxWidth: '100%', maxHeight: '200px' }}
+                                                            />
+                                                        ) : (
+                                                            <video
+                                                                src={previewUrl}
+                                                                controls
+                                                                style={{ maxWidth: '100%', maxHeight: '200px' }}
+                                                            />
+                                                        )}
+                                                    </Box>
+                                                </Grid>
+                                            )}
+                                        </>
+                                    )}
                                 </Grid>
                             </Grid>
                         </Grid>

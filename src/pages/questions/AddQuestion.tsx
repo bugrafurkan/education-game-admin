@@ -139,7 +139,7 @@ const AddQuestion = () => {
         };
 
         fetchQuestion();
-    }, [isEdit, questionId]);
+    }, [isEdit, questionId,choices]);
 
     // Oyun listesini yükle
     useEffect(() => {

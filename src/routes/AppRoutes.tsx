@@ -11,6 +11,7 @@ import GameDetail from '../pages/games/GameDetail';
 import ExportList from '../pages/exports/ExportList';
 import CreateExport from '../pages/exports/CreateExport';
 import Settings from '../pages/settings/Settings'
+import Advertisements from '../pages/advertisements/Advertisements'; // Yeni reklam sayfası import'u
 
 // AuthGuard: Kimlik doğrulama gerektiren rotalar için koruma
 interface AuthGuardProps {
@@ -73,6 +74,7 @@ const AppRoutes = () => {
                 <Route path="exports" element={<ExportList />} />
                 <Route path="exports/create" element={<CreateExport />} />
                 <Route path="settings" element={<Settings />} />
+                <Route path="advertisements" element={<Advertisements />} /> {/* Yeni reklam sayfası */}
                 {/* Other protected routes will go here */}
             </Route>
 

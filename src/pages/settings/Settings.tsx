@@ -1,11 +1,13 @@
 // src/pages/settings/Settings.tsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
     Box, Typography, Paper, Button, Grid, TextField, Switch,
-    FormControlLabel, Tabs, Tab, Divider, Snackbar,
-    RadioGroup, Radio, FormControl, FormLabel
+    FormControlLabel, Tabs, Tab, Divider, Alert, Snackbar,
+    RadioGroup, Radio, FormControl, FormLabel, CircularProgress
 } from '@mui/material';
 import { Save as SaveIcon, Upload as UploadIcon } from '@mui/icons-material';
+import { useSettings } from '../../hooks/useSettings';
+import { Settings as SettingsType } from '../../services/settings.service';
 
 interface TabPanelProps {
     children?: React.ReactNode;
@@ -35,33 +37,65 @@ const TabPanel = (props: TabPanelProps) => {
 
 const Settings = () => {
     const [tabValue, setTabValue] = useState(0);
-    const [saving, setSaving] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
+    const { settings, loading, error, updateSettings, isSubmitting } = useSettings();
 
-    // Genel ayarlar
-    const [appName, setAppName] = useState('Eğitim Oyun Platformu');
-    const [logoUrl, setLogoUrl] = useState('/assets/logo.png');
-    const [themeColor, setThemeColor] = useState('#1a1a27');
-
-    // Reklam ayarları
-    const [adsEnabled, setAdsEnabled] = useState(true);
-    const [adType, setAdType] = useState('image'); // 'image' veya 'video'
+    // Form state
+    const [appName, setAppName] = useState('');
+    const [logoUrl, setLogoUrl] = useState('');
+    const [themeColor, setThemeColor] = useState('');
+    const [adsEnabled, setAdsEnabled] = useState(false);
+    const [adType, setAdType] = useState<'image' | 'video'>('image');
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+    // Ayarlar yüklendiğinde form state'ini güncelle
+    useEffect(() => {
+        if (settings) {
+            // Genel ayarlar
+            setAppName(settings.general.app_name);
+            setLogoUrl(settings.general.logo_url);
+            setThemeColor(settings.general.theme_color);
+
+            // Reklam ayarları
+            setAdsEnabled(settings.advertisements.ads_enabled);
+            setAdType(settings.advertisements.ad_type);
+
+            // Eğer kaydedilmiş bir reklam dosyası varsa önizleme göster
+            if (settings.advertisements.ad_file_url) {
+                setPreviewUrl(settings.advertisements.ad_file_url);
+            }
+        }
+    }, [settings]);
 
     const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
         setTabValue(newValue);
     };
 
-    const handleSaveSettings = () => {
-        setSaving(true);
+    const handleSaveSettings = async () => {
+        const newSettings: Partial<SettingsType> = {
+            general: {
+                app_name: appName,
+                logo_url: logoUrl,
+                theme_color: themeColor
+            },
+            advertisements: {
+                ads_enabled: adsEnabled,
+                ad_type: adType
+            }
+        };
 
-        // Simüle edilmiş API çağrısı
-        // Gerçek uygulamada burada bir FormData oluşturup dosyayı ve diğer verileri backend'e gönderebilirsiniz
-        setTimeout(() => {
-            setSaving(false);
+        // Eğer yeni bir dosya seçilmişse ekle
+        if (selectedFile) {
+            newSettings.advertisements!.ad_file = selectedFile;
+        }
+
+        const success = await updateSettings(newSettings);
+        if (success) {
             setShowSuccess(true);
-        }, 1000);
+            // Dosya seçimi temizleme (kayıt başarılı ise)
+            setSelectedFile(null);
+        }
     };
 
     const handleCloseSuccessMessage = () => {
@@ -90,6 +124,22 @@ const Settings = () => {
         }
     };
 
+    if (loading) {
+        return (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px' }}>
+                <CircularProgress />
+            </Box>
+        );
+    }
+
+    if (error) {
+        return (
+            <Alert severity="error" sx={{ mt: 2 }}>
+                Ayarlar yüklenirken bir hata oluştu: {error.message}
+            </Alert>
+        );
+    }
+
     return (
         <Box>
             <Typography variant="h4" gutterBottom sx={{ mb: 4, fontWeight: 'bold' }}>
@@ -100,7 +150,6 @@ const Settings = () => {
                 <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
                     <Tabs value={tabValue} onChange={handleTabChange} aria-label="settings tabs">
                         <Tab label="Genel Ayarlar" id="settings-tab-0" aria-controls="settings-tabpanel-0" />
-                        {/* Fernus Entegrasyonu sekmesi kaldırıldı */}
                         <Tab label="Reklam Ayarları" id="settings-tab-1" aria-controls="settings-tabpanel-1" />
                     </Tabs>
                 </Box>
@@ -182,10 +231,10 @@ const Settings = () => {
                                                         row
                                                         value={adType}
                                                         onChange={(e) => {
-                                                            setAdType(e.target.value);
+                                                            setAdType(e.target.value as 'image' | 'video');
                                                             // Reklam tipi değiştiğinde seçili dosyayı sıfırla
                                                             setSelectedFile(null);
-                                                            setPreviewUrl(null);
+                                                            setPreviewUrl(settings?.advertisements.ad_file_url || null);
                                                         }}
                                                     >
                                                         <FormControlLabel value="image" control={<Radio />} label="Görsel Reklam" />
@@ -213,7 +262,12 @@ const Settings = () => {
                                                         </Button>
                                                     </label>
                                                     <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                                                        {selectedFile ? selectedFile.name : `Lütfen bir ${adType === 'image' ? 'görsel' : 'video'} dosyası seçin.`}
+                                                        {selectedFile
+                                                            ? selectedFile.name
+                                                            : settings?.advertisements.ad_file_url
+                                                                ? 'Mevcut reklam dosyası. Değiştirmek için yeni dosya seçin.'
+                                                                : `Lütfen bir ${adType === 'image' ? 'görsel' : 'video'} dosyası seçin.`
+                                                        }
                                                     </Typography>
                                                 </Box>
                                             </Grid>
@@ -254,7 +308,7 @@ const Settings = () => {
                             variant="contained"
                             startIcon={<SaveIcon />}
                             onClick={handleSaveSettings}
-                            disabled={saving}
+                            disabled={isSubmitting}
                             sx={{
                                 py: 1.5,
                                 px: 3,
@@ -262,7 +316,7 @@ const Settings = () => {
                                 '&:hover': { bgcolor: '#2a2a37' }
                             }}
                         >
-                            {saving ? 'Kaydediliyor...' : 'Ayarları Kaydet'}
+                            {isSubmitting ? 'Kaydediliyor...' : 'Ayarları Kaydet'}
                         </Button>
                     </Box>
                 </Box>

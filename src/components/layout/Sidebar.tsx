@@ -8,7 +8,9 @@ import {
     Dashboard as DashboardIcon,
     QuestionAnswer as QuestionIcon,
     Games as GameIcon,
-    Settings as SettingsIcon
+    Settings as SettingsIcon,
+    Campaign as CampaignIcon
+
 } from '@mui/icons-material';
 
 interface SidebarProps {
@@ -25,6 +27,7 @@ const Sidebar = ({ open, onClose, variant }: SidebarProps) => {
         { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
         { text: 'Sorular', icon: <QuestionIcon />, path: '/questions' },
         { text: 'Oyunlar', icon: <GameIcon />, path: '/games' },
+        { text: 'Reklamlar', icon: <CampaignIcon />, path: '/advertisements' }, // Yeni reklam menüsü
         { text: 'Ayarlar', icon: <SettingsIcon />, path: '/settings' },
     ];
 

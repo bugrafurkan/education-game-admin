@@ -6,6 +6,7 @@ export interface DashboardStats {
     gameCount: number;
     categoryCount: number;
     exportCount: number;
+    advertisementCount: number;
     recentQuestions: {
         id: number;
         question_text: string;

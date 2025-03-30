@@ -9,11 +9,11 @@ import {
     QuestionAnswer as QuestionIcon,
     Games as GameIcon,
     School as SchoolIcon,
-    CloudUpload as ExportIcon,
     Add as AddIcon,
     ViewList as ViewListIcon,
     Gamepad as GamepadIcon,
-    CloudDownload as CloudDownloadIcon
+    CloudDownload as CloudDownloadIcon,
+    Campaign as CampaignIcon // Reklam ikonu olarak Campaign kullanıyoruz
 } from '@mui/icons-material';
 import { useDashboard } from '../../hooks/useDashboard';
 
@@ -42,6 +42,7 @@ const Dashboard = () => {
         gameCount: 0,
         categoryCount: 0,
         exportCount: 0,
+        advertisementCount: 0,
         recentQuestions: [],
         recentGames: []
     };
@@ -63,9 +64,9 @@ const Dashboard = () => {
             icon: <SchoolIcon sx={{ fontSize: 40 }} color="warning" />
         },
         {
-            title: 'Exports',
-            value: dashboardStats.exportCount,
-            icon: <ExportIcon sx={{ fontSize: 40 }} color="error" />
+            title: 'Reklamlar',
+            value: dashboardStats.advertisementCount || 0, // Reklam sayısı istatistiği
+            icon: <CampaignIcon sx={{ fontSize: 40 }} color="info" /> // Reklam ikonu
         },
     ];
 
@@ -186,7 +187,7 @@ const Dashboard = () => {
                         <Divider />
                         <CardContent>
                             <Grid container spacing={2}>
-                                <Grid item xs={12} sm={6} md={3}>
+                                <Grid item xs={12} sm={6} md={2.4}>
                                     <Button
                                         variant="contained"
                                         fullWidth
@@ -198,7 +199,7 @@ const Dashboard = () => {
                                         Yeni Soru Ekle
                                     </Button>
                                 </Grid>
-                                <Grid item xs={12} sm={6} md={3}>
+                                <Grid item xs={12} sm={6} md={2.4}>
                                     <Button
                                         variant="outlined"
                                         fullWidth
@@ -210,7 +211,7 @@ const Dashboard = () => {
                                         Soruları Listele
                                     </Button>
                                 </Grid>
-                                <Grid item xs={12} sm={6} md={3}>
+                                <Grid item xs={12} sm={6} md={2.4}>
                                     <Button
                                         variant="outlined"
                                         fullWidth
@@ -222,7 +223,19 @@ const Dashboard = () => {
                                         Oyunları Görüntüle
                                     </Button>
                                 </Grid>
-                                <Grid item xs={12} sm={6} md={3}>
+                                <Grid item xs={12} sm={6} md={2.4}>
+                                    <Button
+                                        variant="outlined"
+                                        fullWidth
+                                        startIcon={<CampaignIcon />}
+                                        component={Link}
+                                        to="/advertisements"
+                                        sx={{ py: 1.5 }}
+                                    >
+                                        Reklamları Yönet
+                                    </Button>
+                                </Grid>
+                                <Grid item xs={12} sm={6} md={2.4}>
                                     <Button
                                         variant="outlined"
                                         fullWidth

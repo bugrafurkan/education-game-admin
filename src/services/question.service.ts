@@ -24,8 +24,14 @@ export interface Question {
     difficulty: 'easy' | 'medium' | 'hard';
     image_path?: string;
     metadata?: Record<string, unknown>;
+    user_id?: number;
     answers: Answer[];
     category?: Category;
+    user?: {
+        id: number;
+        name: string;
+        email: string;
+    };
 }
 
 export interface QuestionCreate {
@@ -43,6 +49,7 @@ export interface QuestionFilter {
     type?: string;
     difficulty?: string;
     category_id?: number;
+    user_id?: number;
 }
 
 export interface PaginatedResponse<T> {

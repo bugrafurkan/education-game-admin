@@ -58,6 +58,12 @@ const AddQuestion = () => {
     const [categoryId, setCategoryId] = useState('');
     const [gameId, setGameId] = useState(gameIdFromUrl || '');
 
+    // Resim yükleme için state'ler
+    const [imagePath, setImagePath] = useState<string | null>(null);
+    const [imageFile, setImageFile] = useState<File | null>(null);
+    const [imageLoading, setImageLoading] = useState(false);
+    const [imageError, setImageError] = useState<string | null>(null);
+
     // Cevap verileri
     const [correctAnswer, setCorrectAnswer] = useState('');
     const [trueOrFalse, setTrueOrFalse] = useState('true');
@@ -88,6 +94,11 @@ const AddQuestion = () => {
                     setQuestionText(question.question_text);
                     setDifficulty(question.difficulty);
                     setCategoryId(question.category_id.toString());
+
+                    // Resim yolunu ayarla
+                    if (question.image_path) {
+                        setImagePath(question.image_path);
+                    }
 
                     // Cevapları doldur
                     if (question.question_type === 'multiple_choice') {
@@ -128,7 +139,7 @@ const AddQuestion = () => {
         };
 
         fetchQuestion();
-    }, [isEdit, questionId]);
+    }, [isEdit, questionId,choices]);
 
     // Oyun listesini yükle
     useEffect(() => {
@@ -205,6 +216,37 @@ const AddQuestion = () => {
         ));
     };
 
+    // Resim yükleme fonksiyonu
+    const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        // Dosya boyutu kontrolü (2MB)
+        if (file.size > 2 * 1024 * 1024) {
+            setImageError("Dosya boyutu 2MB'dan küçük olmalıdır.");
+            return;
+        }
+
+        // Dosya tipi kontrolü
+        if (!file.type.startsWith('image/')) {
+            setImageError("Sadece resim dosyaları yüklenebilir.");
+            return;
+        }
+
+        setImageFile(file);
+        setImageError(null);
+
+        // Önizleme URL'i oluştur
+        const objectUrl = URL.createObjectURL(file);
+        setImagePath(objectUrl);
+    };
+
+    // Resmi kaldırma fonksiyonu
+    const handleRemoveImage = () => {
+        setImagePath(null);
+        setImageFile(null);
+    };
+
     // Formu gönder
     const handleSubmit = async () => {
         try {
@@ -222,6 +264,31 @@ const AddQuestion = () => {
                 difficulty: difficulty as 'easy' | 'medium' | 'hard',
                 answers
             };
+
+            // Resim dosyası varsa, önce onu yükle
+            if (imageFile) {
+                setImageLoading(true);
+                try {
+                    const uploadResponse = await questionService.uploadImage(imageFile);
+                    questionData.image_path = uploadResponse.url;
+                } catch (error) {
+                    if (axios.isAxiosError(error)) {
+                        const axiosError = error as AxiosError<ApiErrorResponse>;
+                        setImageError(axiosError.response?.data?.message || 'Resim yüklenirken bir hata oluştu');
+                        console.error('Error uploading image:', axiosError.response?.data);
+                    } else {
+                        setImageError('Resim yüklenirken beklenmeyen bir hata oluştu');
+                        console.error('Unexpected image upload error:', error);
+                    }
+                    setLoading(false);
+                    setImageLoading(false);
+                    return; // Hata varsa formu göndermeyi durdur
+                }
+                setImageLoading(false);
+            } else if (imagePath && isEdit) {
+                // Düzenleme sırasında mevcut resim yolu
+                questionData.image_path = imagePath;
+            }
 
             let question;
 
@@ -354,6 +421,66 @@ const AddQuestion = () => {
                                     onChange={(e) => setQuestionText(e.target.value)}
                                     required
                                 />
+                            </Grid>
+
+                            <Grid item xs={12}>
+                                <Typography variant="subtitle1" sx={{ mb: 1 }}>
+                                    Soru Resmi (Opsiyonel)
+                                </Typography>
+
+                                {imagePath && (
+                                    <Box sx={{ mb: 2, position: 'relative', width: 'fit-content' }}>
+                                        <img
+                                            src={imagePath}
+                                            alt="Soru resmi"
+                                            style={{
+                                                maxWidth: '100%',
+                                                maxHeight: '200px',
+                                                border: '1px solid #ddd',
+                                                borderRadius: '4px'
+                                            }}
+                                        />
+                                        <Button
+                                            variant="contained"
+                                            color="error"
+                                            size="small"
+                                            onClick={handleRemoveImage}
+                                            sx={{
+                                                position: 'absolute',
+                                                top: 5,
+                                                right: 5,
+                                                minWidth: '30px',
+                                                width: '30px',
+                                                height: '30px',
+                                                p: 0
+                                            }}
+                                        >
+                                            X
+                                        </Button>
+                                    </Box>
+                                )}
+
+                                <Button
+                                    variant="outlined"
+                                    component="label"
+                                    sx={{ mr: 2 }}
+                                >
+                                    Resim Seç
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        hidden
+                                        onChange={handleImageUpload}
+                                    />
+                                </Button>
+
+                                {imageLoading && <CircularProgress size={20} sx={{ ml: 2 }} />}
+
+                                {imageError && (
+                                    <Alert severity="error" sx={{ mt: 1 }}>
+                                        {imageError}
+                                    </Alert>
+                                )}
                             </Grid>
 
                             <Grid item xs={12} sm={6}>

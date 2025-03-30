@@ -5,7 +5,7 @@ import {
     Table, TableHead, TableRow, TableCell, TableBody, TableContainer,
     TablePagination, Chip, IconButton, Grid, MenuItem, Select, FormControl,
     InputLabel, SelectChangeEvent, Dialog, DialogActions, DialogContent,
-    DialogContentText, DialogTitle, CircularProgress, Alert
+    DialogContentText, DialogTitle, CircularProgress, Alert, Tooltip
 } from '@mui/material';
 import {
     Add as AddIcon,
@@ -200,23 +200,25 @@ const QuestionList = () => {
                         <TableHead sx={{ bgcolor: '#f5f8fa' }}>
                             <TableRow>
                                 <TableCell width="5%">#</TableCell>
-                                <TableCell width="40%">Soru</TableCell>
-                                <TableCell width="15%">Soru Tipi</TableCell>
-                                <TableCell width="10%">Zorluk</TableCell>
-                                <TableCell width="15%">Kategori</TableCell>
+                                <TableCell width="7%">Resim</TableCell>
+                                <TableCell width="28%">Soru</TableCell>
+                                <TableCell width="13%">Soru Tipi</TableCell>
+                                <TableCell width="8%">Zorluk</TableCell>
+                                <TableCell width="12%">Kategori</TableCell>
+                                <TableCell width="12%">Ekleyen</TableCell>
                                 <TableCell width="15%">İşlemler</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
                             {loading ? (
                                 <TableRow>
-                                    <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
+                                    <TableCell colSpan={8} align="center" sx={{ py: 3 }}>
                                         <CircularProgress size={24} />
                                     </TableCell>
                                 </TableRow>
                             ) : questions.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
+                                    <TableCell colSpan={8} align="center" sx={{ py: 3 }}>
                                         Soru bulunamadı.
                                     </TableCell>
                                 </TableRow>
@@ -224,6 +226,37 @@ const QuestionList = () => {
                                 questions.map((question) => (
                                     <TableRow key={question.id} hover>
                                         <TableCell>{question.id}</TableCell>
+                                        <TableCell>
+                                            {question.image_path ? (
+                                                <img
+                                                    src={question.image_path}
+                                                    alt="Soru resmi"
+                                                    style={{
+                                                        width: '50px',
+                                                        height: '50px',
+                                                        objectFit: 'cover',
+                                                        border: '1px solid #ddd',
+                                                        borderRadius: '4px'
+                                                    }}
+                                                />
+                                            ) : (
+                                                <Box
+                                                    sx={{
+                                                        width: '50px',
+                                                        height: '50px',
+                                                        bgcolor: '#f0f0f0',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        border: '1px solid #ddd',
+                                                        borderRadius: '4px',
+                                                        color: '#999'
+                                                    }}
+                                                >
+                                                    N/A
+                                                </Box>
+                                            )}
+                                        </TableCell>
                                         <TableCell>{question.question_text}</TableCell>
                                         <TableCell>{getQuestionTypeLabel(question.question_type)}</TableCell>
                                         <TableCell>
@@ -234,6 +267,13 @@ const QuestionList = () => {
                                             />
                                         </TableCell>
                                         <TableCell>{question.category?.name || '-'}</TableCell>
+                                        <TableCell>
+                                            {question.user ? (
+                                                <Tooltip title={question.user.email}>
+                                                    <span>{question.user.name}</span>
+                                                </Tooltip>
+                                            ) : '-'}
+                                        </TableCell>
                                         <TableCell>
                                             <IconButton
                                                 color="primary"

@@ -6,12 +6,12 @@ import {
     TablePagination, CircularProgress, Alert, Dialog, DialogActions,
     DialogContent, DialogContentText, DialogTitle
 } from '@mui/material';
+
 import {
     Search as SearchIcon,
-    Visibility as ViewIcon,
-    Edit as EditIcon,
-    Delete as DeleteIcon
+    Visibility as ViewIcon
 } from '@mui/icons-material';
+
 import { Link } from 'react-router-dom';
 import { useGames } from '../../hooks/useGames';
 
@@ -43,11 +43,6 @@ const GameList = () => {
     };
 
     // Silme işlemleri
-    const handleDeleteClick = (gameId: number) => {
-        setGameToDelete(gameId);
-        setDeleteDialogOpen(true);
-    };
-
     const handleDeleteConfirm = async () => {
         if (gameToDelete === null) return;
 
@@ -175,22 +170,6 @@ const GameList = () => {
                                         >
                                             Detaylar
                                         </Button>
-                                        <Button
-                                            size="small"
-                                            startIcon={<EditIcon />}
-                                            component={Link}
-                                            to={`/games/${game.id}/edit`}
-                                        >
-                                            Düzenle
-                                        </Button>
-                                        <Button
-                                        size="small"
-                                        color="error"
-                                        startIcon={<DeleteIcon />}
-                                        onClick={() => handleDeleteClick(game.id)}
-                                        >
-                                        Sil
-                                    </Button>
                                 </CardActions>
                             </Card>
                             </Grid>

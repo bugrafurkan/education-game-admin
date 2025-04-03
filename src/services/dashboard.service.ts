@@ -7,6 +7,7 @@ export interface DashboardStats {
     categoryCount: number;
     exportCount: number;
     advertisementCount: number;
+    questionGroupCount: number;
     recentQuestions: {
         id: number;
         question_text: string;

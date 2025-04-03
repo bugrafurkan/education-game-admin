@@ -2,7 +2,7 @@
 import axios from 'axios';
 
 // API temel URL'si - .env dosyasından alınabilir
-const API_URL = 'http://localhost:8000/api';
+const API_URL = 'https://ariyayin.broosmedia.com/public/api';
 
 // axios örneğini oluştur
 const api = axios.create({

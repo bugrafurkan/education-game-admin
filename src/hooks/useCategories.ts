@@ -1,47 +1,62 @@
 // src/hooks/useCategories.ts
-import { useState, useEffect } from 'react';
-import axios, { AxiosError } from 'axios';
+import { useState, useEffect, useCallback } from 'react';
 import * as categoryService from '../services/category.service';
-import { Category } from '../services/question.service';
 
-interface ApiErrorResponse {
-    message: string;
-    errors?: Record<string, string[]>;
-}
-
-export const useCategories = (grade?: string, subject?: string) => {
-    const [categories, setCategories] = useState<Category[]>([]);
+export const useCategories = () => {
+    const [categories, setCategories] = useState<categoryService.Category[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    const fetchCategories = async () => {
+    const fetchCategories = useCallback(async () => {
         try {
             setLoading(true);
-            setError(null);
-            const data = await categoryService.getCategoriesByFilter(grade, subject);
-            setCategories(data);
+            const response = await categoryService.getCategories();
+            setCategories(response);
             setLoading(false);
-        } catch (error) {
-            if (axios.isAxiosError(error)) {
-                const axiosError = error as AxiosError<ApiErrorResponse>;
-                setError(axiosError.response?.data?.message || 'Kategoriler yüklenirken bir hata oluştu');
-                console.error('Error fetching categories:', axiosError.response?.data);
-            } else {
-                setError('Kategoriler yüklenirken beklenmeyen bir hata oluştu');
-                console.error('Unexpected error:', error);
-            }
+        } catch (err) {
+            console.error('Error fetching categories:', err);
+            setError('Kategoriler yüklenirken bir hata oluştu.');
             setLoading(false);
         }
-    };
+    }, []);
 
     useEffect(() => {
         fetchCategories();
-    }, [grade, subject]);
+    }, [fetchCategories]);
+
+    const deleteCategory = async (id: number): Promise<boolean> => {
+        try {
+            await categoryService.deleteCategory(id);
+            // Silme başarılıysa tüm kategorileri yeniden yükle
+            await fetchCategories();
+            return true;
+        } catch (err) {
+            console.error('Error deleting category:', err);
+            setError('Kategori silinirken bir hata oluştu.');
+            return false;
+        }
+    };
+
+    const filterCategories = async (grade?: string, subject?: string): Promise<categoryService.Category[]> => {
+        try {
+            setLoading(true);
+            const filteredCategories = await categoryService.filterCategories(grade, subject);
+            setLoading(false);
+            return filteredCategories;
+        } catch (err) {
+            console.error('Error filtering categories:', err);
+            setError('Kategoriler filtrelenirken bir hata oluştu.');
+            setLoading(false);
+            return [];
+        }
+    };
 
     return {
         categories,
         loading,
         error,
-        refresh: fetchCategories
+        deleteCategory,
+        filterCategories,
+        refreshCategories: fetchCategories
     };
 };

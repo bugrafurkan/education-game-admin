@@ -5,7 +5,7 @@ import { CssBaseline } from '@mui/material';
 
 function App() {
     return (
-        <BrowserRouter>
+        <BrowserRouter basename="/public">
             <CssBaseline />
             <AppRoutes />
         </BrowserRouter>

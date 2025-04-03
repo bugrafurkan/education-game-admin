@@ -1,6 +1,23 @@
 // src/services/category.service.ts
 import api from './api';
-import { Category } from './question.service';
+
+
+export interface Category {
+    id: number;
+    name: string;
+    grade: string;
+    subject: string;
+    unit?: string;
+    description?: string;
+}
+
+export interface CategoryCreate {
+    name: string;
+    grade: string;
+    subject: string;
+    unit?: string;
+    description?: string;
+}
 
 // Tüm kategorileri getir
 export const getCategories = async (): Promise<Category[]> => {
@@ -20,14 +37,20 @@ export const getCategoriesByFilter = async (grade?: string, subject?: string): P
     return response.data;
 };
 
+// Tek bir kategoriyi getir
+export const getCategory = async (id: number): Promise<Category> => {
+    const response = await api.get<Category>(`/categories/${id}`);
+    return response.data;
+};
+
 // Yeni kategori oluştur
-export const createCategory = async (categoryData: Omit<Category, 'id'>): Promise<Category> => {
+export const createCategory = async (categoryData: CategoryCreate): Promise<Category> => {
     const response = await api.post<Category>('/categories', categoryData);
     return response.data;
 };
 
 // Kategoriyi güncelle
-export const updateCategory = async (id: number, categoryData: Partial<Omit<Category, 'id'>>): Promise<Category> => {
+export const updateCategory = async (id: number, categoryData: Partial<CategoryCreate>): Promise<Category> => {
     const response = await api.put<Category>(`/categories/${id}`, categoryData);
     return response.data;
 };
@@ -35,4 +58,10 @@ export const updateCategory = async (id: number, categoryData: Partial<Omit<Cate
 // Kategoriyi sil
 export const deleteCategory = async (id: number): Promise<void> => {
     await api.delete(`/categories/${id}`);
+};
+
+// Sınıf ve ders bazında filtreleme
+export const filterCategories = async (grade?: string, subject?: string): Promise<Category[]> => {
+    const response = await api.get<Category[]>(`/categories/filter/${grade || ''}/${subject || ''}`);
+    return response.data;
 };

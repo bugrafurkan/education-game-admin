@@ -5,17 +5,14 @@ import {
     Box, Typography, Paper, Button, Grid, Chip,
     List, ListItem, ListItemText, ListItemIcon, ListItemSecondaryAction,
     IconButton, Tabs, Tab, Alert, CircularProgress, Dialog,
-    DialogTitle, DialogContent, DialogContentText, DialogActions, TextField
+    DialogTitle, DialogContent, DialogContentText, DialogActions
 } from '@mui/material';
 import {
     QuestionAnswer as QuestionIcon,
-    Settings as SettingsIcon,
     Add as AddIcon,
     Delete as DeleteIcon,
     Edit as EditIcon,
-    ArrowBack as BackIcon,
-    CloudDownload as ExportIcon,
-    Share as ShareIcon
+    ArrowBack as BackIcon
 } from '@mui/icons-material';
 import { useGame } from '../../hooks/useGame';
 import axios, { AxiosError } from 'axios';
@@ -58,8 +55,7 @@ const GameDetail = () => {
     const gameId = parseInt(id || '0');
 
     const {
-        game, loading, error,  removeQuestion,
-        getIframeCode, iframeCode, iframeLoading, iframeError
+        game, loading, error,  removeQuestion
     } = useGame(gameId);
 
     const [tabValue, setTabValue] = useState(0);
@@ -111,11 +107,7 @@ const GameDetail = () => {
     };
 
     // iframe kodunu al
-    const handleGetIframeCode = async () => {
-        await getIframeCode();
-    };
-
-    // Oyun tipini Türkçe olarak gösterme
+// Oyun tipini Türkçe olarak gösterme
     const getGameTypeLabel = (type: string) => {
         switch (type) {
             case 'jeopardy':
@@ -197,15 +189,6 @@ const GameDetail = () => {
                 >
                     Soru Ekle
                 </Button>
-                <Button
-                    variant="outlined"
-                    startIcon={<EditIcon />}
-                    component={Link}
-                    to={`/games/${game.id}/edit`}
-                    sx={{ mr: 1 }}
-                >
-                    Düzenle
-                </Button>
             </Box>
 
             <Paper sx={{ p: 3, mb: 3, borderRadius: 2 }}>
@@ -266,75 +249,6 @@ const GameDetail = () => {
                             )}
                         </Grid>
                     </Grid>
-
-                    <Grid item xs={12} md={6}>
-                        <Typography variant="h6" gutterBottom>
-                            Paylaşım ve Export
-                        </Typography>
-
-                        <Box sx={{ mb: 3 }}>
-                            <Button
-                                fullWidth
-                                variant="outlined"
-                                startIcon={<ShareIcon />}
-                                onClick={handleGetIframeCode}
-                                disabled={iframeLoading}
-                                sx={{ mb: 2 }}
-                            >
-                                {iframeLoading ? 'Yükleniyor...' : 'iframe Kodu Al'}
-                            </Button>
-
-                            {iframeError && (
-                                <Alert severity="error" sx={{ mb: 2 }}>
-                                    {iframeError}
-                                </Alert>
-                            )}
-
-                            {iframeCode && (
-                                <TextField
-                                    fullWidth
-                                    multiline
-                                    rows={3}
-                                    value={iframeCode}
-                                    variant="outlined"
-                                    InputProps={{
-                                        readOnly: true,
-                                    }}
-                                    sx={{ mb: 2 }}
-                                />
-                            )}
-
-                            <Button
-                                fullWidth
-                                variant="outlined"
-                                startIcon={<ExportIcon />}
-                                component={Link}
-                                to={`/exports/create?gameId=${game.id}`}
-                            >
-                                WebGL Export
-                            </Button>
-                        </Box>
-
-                        <Typography variant="h6" gutterBottom>
-                            Hızlı İşlemler
-                        </Typography>
-
-                        <Alert severity="info" sx={{ mb: 2 }}>
-                            Oyunun ön izlemesini görmek için "Ön İzleme" butonuna tıklayabilirsiniz.
-                        </Alert>
-
-                        <Button
-                            fullWidth
-                            variant="contained"
-                            color="primary"
-                            sx={{ mb: 2 }}
-                            component="a"
-                            href={`/api/game-access/${game.id}`}
-                            target="_blank"
-                        >
-                            Oyun Ön İzleme
-                        </Button>
-                    </Grid>
                 </Grid>
             </Paper>
 
@@ -342,7 +256,6 @@ const GameDetail = () => {
                 <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
                     <Tabs value={tabValue} onChange={handleTabChange} aria-label="game tabs">
                         <Tab label="Sorular" id="game-tab-0" aria-controls="game-tabpanel-0" />
-                        <Tab label="Ayarlar" id="game-tab-1" aria-controls="game-tabpanel-1" />
                     </Tabs>
                 </Box>
 
@@ -424,50 +337,6 @@ const GameDetail = () => {
                                 ))
                             )}
                         </List>
-                    </TabPanel>
-
-                    <TabPanel value={tabValue} index={1}>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                            <Typography variant="h6">
-                                Oyun Ayarları
-                            </Typography>
-
-                            <Button
-                                variant="outlined"
-                                startIcon={<SettingsIcon />}
-                                component={Link}
-                                to={`/games/${game.id}/settings`}
-                                size="small"
-                            >
-                                Ayarları Düzenle
-                            </Button>
-                        </Box>
-
-                        <Grid container spacing={3}>
-                            {game.config ? (
-                                Object.entries(game.config).map(([key, value]) => (
-                                    <Grid item xs={12} sm={6} key={key}>
-                                        <Paper sx={{ p: 2, borderRadius: 2 }}>
-                                            <Typography variant="subtitle1" gutterBottom>
-                                                {key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                                            </Typography>
-                                            <Typography variant="body1">
-                                                {typeof value === 'boolean'
-                                                    ? (value ? 'Evet' : 'Hayır')
-                                                    : (String(value) || '-')
-                                                }
-                                            </Typography>
-                                        </Paper>
-                                    </Grid>
-                                ))
-                            ) : (
-                                <Grid item xs={12}>
-                                    <Alert severity="info">
-                                        Bu oyun için henüz özel ayar tanımlanmamış.
-                                    </Alert>
-                                </Grid>
-                            )}
-                        </Grid>
                     </TabPanel>
                 </Box>
             </Paper>

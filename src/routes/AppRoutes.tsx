@@ -12,6 +12,12 @@ import ExportList from '../pages/exports/ExportList';
 import CreateExport from '../pages/exports/CreateExport';
 import Settings from '../pages/settings/Settings'
 import Advertisements from '../pages/advertisements/Advertisements'; // Yeni reklam sayfası import'u
+import QuestionGroupList from '../pages/question-groups/QuestionGroupList';
+import AddQuestionGroup from '../pages/question-groups/AddQuestionGroup';
+import QuestionGroupDetail from '../pages/question-groups/QuestionGroupDetail';
+import EditQuestionGroup from '../pages/question-groups/EditQuestionGroup';
+import CategoryList from '../pages/categories/CategoryList';
+import AddEditCategory from '../pages/categories/AddEditCategory';
 
 // AuthGuard: Kimlik doğrulama gerektiren rotalar için koruma
 interface AuthGuardProps {
@@ -75,6 +81,13 @@ const AppRoutes = () => {
                 <Route path="exports/create" element={<CreateExport />} />
                 <Route path="settings" element={<Settings />} />
                 <Route path="advertisements" element={<Advertisements />} /> {/* Yeni reklam sayfası */}
+                <Route path="question-groups" element={<QuestionGroupList />} />
+                <Route path="question-groups/add" element={<AddQuestionGroup />} />
+                <Route path="question-groups/:id" element={<QuestionGroupDetail />} />
+                <Route path="question-groups/:id/edit" element={<EditQuestionGroup />} />
+                <Route path="categories" element={<CategoryList />} />
+                <Route path="categories/add" element={<AddEditCategory />} />
+                <Route path="categories/:id/edit" element={<AddEditCategory />} />
                 {/* Other protected routes will go here */}
             </Route>
 

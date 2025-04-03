@@ -9,8 +9,9 @@ import {
     QuestionAnswer as QuestionIcon,
     Games as GameIcon,
     Settings as SettingsIcon,
-    Campaign as CampaignIcon
-
+    Campaign as CampaignIcon,
+    LibraryBooks as LibraryBooksIcon,
+    Category as CategoryIcon,
 } from '@mui/icons-material';
 
 interface SidebarProps {
@@ -27,7 +28,9 @@ const Sidebar = ({ open, onClose, variant }: SidebarProps) => {
         { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
         { text: 'Sorular', icon: <QuestionIcon />, path: '/questions' },
         { text: 'Oyunlar', icon: <GameIcon />, path: '/games' },
-        { text: 'Reklamlar', icon: <CampaignIcon />, path: '/advertisements' }, // Yeni reklam menüsü
+        { text: 'Soru Grupları', icon: <LibraryBooksIcon />, path: '/question-groups' },
+        { text: 'Kategoriler', icon: <CategoryIcon />, path: '/categories' },
+        { text: 'Reklamlar', icon: <CampaignIcon />, path: '/advertisements' },
         { text: 'Ayarlar', icon: <SettingsIcon />, path: '/settings' },
     ];
 

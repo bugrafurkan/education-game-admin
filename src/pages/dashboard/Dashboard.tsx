@@ -13,7 +13,8 @@ import {
     ViewList as ViewListIcon,
     Gamepad as GamepadIcon,
     CloudDownload as CloudDownloadIcon,
-    Campaign as CampaignIcon // Reklam ikonu olarak Campaign kullanıyoruz
+    Campaign as CampaignIcon,
+    LibraryBooks as LibraryBooksIcon
 } from '@mui/icons-material';
 import { useDashboard } from '../../hooks/useDashboard';
 
@@ -43,6 +44,7 @@ const Dashboard = () => {
         categoryCount: 0,
         exportCount: 0,
         advertisementCount: 0,
+        questionGroupCount: 0,
         recentQuestions: [],
         recentGames: []
     };
@@ -62,6 +64,11 @@ const Dashboard = () => {
             title: 'Kategoriler',
             value: dashboardStats.categoryCount,
             icon: <SchoolIcon sx={{ fontSize: 40 }} color="warning" />
+        },
+        {
+            title: 'Soru Grupları',
+            value: dashboardStats.questionGroupCount || 0, // Soru grupları sayısı
+            icon: <LibraryBooksIcon sx={{ fontSize: 40 }} color="secondary" /> // Mor renk kullanıyoruz
         },
         {
             title: 'Reklamlar',
@@ -209,6 +216,18 @@ const Dashboard = () => {
                                         sx={{ py: 1.5 }}
                                     >
                                         Soruları Listele
+                                    </Button>
+                                </Grid>
+                                <Grid item xs={12} sm={6} md={2}>
+                                    <Button
+                                        variant="outlined"
+                                        fullWidth
+                                        startIcon={<LibraryBooksIcon />}
+                                        component={Link}
+                                        to="/question-groups"
+                                        sx={{ py: 1.5 }}
+                                    >
+                                        Soru Grupları
                                     </Button>
                                 </Grid>
                                 <Grid item xs={12} sm={6} md={2.4}>

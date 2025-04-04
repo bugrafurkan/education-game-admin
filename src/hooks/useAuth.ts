@@ -1,20 +1,34 @@
 // src/hooks/useAuth.ts
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as authService from '../services/auth.service';
 
 export const useAuth = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [userRole, setUserRole] = useState<string | null>(null);
     const navigate = useNavigate();
+
+    useEffect(() => {
+        // Component mount olduğunda role'ü session storage'dan al
+        const role = sessionStorage.getItem('user_role');
+        setUserRole(role);
+    }, []);
 
     const login = async (email: string, password: string) => {
         try {
             setLoading(true);
             setError(null);
             const data = await authService.login(email, password);
-            setLoading(false);
             const role = data.user?.role;
+
+            // Kullanıcı rolünü session storage'a kaydet
+            if (role) {
+                sessionStorage.setItem('user_role', role);
+                setUserRole(role);
+            }
+
+            setLoading(false);
 
             if (role === 'editor') {
                 navigate('/user-management');
@@ -22,8 +36,10 @@ export const useAuth = () => {
                 navigate('/');
             }
             return data;
-        } catch (err: any) {
-            const errorMessage = err.response?.data?.message || 'Giriş başarısız';
+        } catch (err: unknown) {
+            const errorMessage = err instanceof Error
+                ? err.message
+                : (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Giriş başarısız';
             setError(errorMessage);
             setLoading(false);
             throw err;
@@ -34,10 +50,15 @@ export const useAuth = () => {
         try {
             setLoading(true);
             await authService.logout();
+            // Kullanıcı rolünü temizle
+            sessionStorage.removeItem('user_role');
+            setUserRole(null);
             setLoading(false);
             navigate('/login');
-        } catch (err: any) {
-            const errorMessage = err.response?.data?.message || 'Çıkış başarısız';
+        } catch (err: unknown) {
+            const errorMessage = err instanceof Error
+                ? err.message
+                : (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Çıkış başarısız';
             setError(errorMessage);
             setLoading(false);
         }
@@ -48,6 +69,7 @@ export const useAuth = () => {
         logout,
         loading,
         error,
+        userRole,
         isAuthenticated: authService.isAuthenticated()
     };
 };

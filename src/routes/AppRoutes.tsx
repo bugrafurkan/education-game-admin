@@ -18,6 +18,7 @@ import QuestionGroupDetail from '../pages/question-groups/QuestionGroupDetail';
 import EditQuestionGroup from '../pages/question-groups/EditQuestionGroup';
 import CategoryList from '../pages/categories/CategoryList';
 import AddEditCategory from '../pages/categories/AddEditCategory';
+import UserManagement from "../pages/UserManagement.tsx";
 
 // AuthGuard: Kimlik doğrulama gerektiren rotalar için koruma
 interface AuthGuardProps {
@@ -88,6 +89,8 @@ const AppRoutes = () => {
                 <Route path="categories" element={<CategoryList />} />
                 <Route path="categories/add" element={<AddEditCategory />} />
                 <Route path="categories/:id/edit" element={<AddEditCategory />} />
+                <Route path="/user-management" element={<UserManagement />} />
+
                 {/* Other protected routes will go here */}
             </Route>
 

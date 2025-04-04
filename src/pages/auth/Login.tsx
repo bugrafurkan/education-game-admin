@@ -266,7 +266,6 @@ const Login = () => {
                                         required
                                     >
                                         <MenuItem value="admin">Admin</MenuItem>
-                                        <MenuItem value="editor">Editör</MenuItem>
                                         <MenuItem value="viewer">İzleyici</MenuItem>
                                     </Select>
                                 </FormControl>

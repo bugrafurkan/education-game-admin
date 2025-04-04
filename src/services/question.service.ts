@@ -48,8 +48,9 @@ export interface QuestionFilter {
     search?: string;
     type?: string;
     difficulty?: string;
-    category_id?: number;
+    category_id?: string | number;
     user_id?: number;
+    per_page?: number;  // Sayfa başına soru sayısı parametresi ekledik
 }
 
 export interface PaginatedResponse<T> {

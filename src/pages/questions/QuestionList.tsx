@@ -1,5 +1,5 @@
 // src/pages/questions/QuestionList.tsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
     Box, Typography, Paper, Button, TextField, InputAdornment,
     Table, TableHead, TableRow, TableCell, TableBody, TableContainer,
@@ -12,55 +12,188 @@ import {
     Search as SearchIcon,
     Edit as EditIcon,
     Delete as DeleteIcon,
-    Visibility as ViewIcon
+    Visibility as ViewIcon,
+    FilterList as FilterIcon
 } from '@mui/icons-material';
 import { Link } from 'react-router-dom';
 import { useQuestions } from '../../hooks/useQuestions';
-import { QuestionFilter } from '../../services/question.service';
+import { Category, QuestionFilter } from '../../services/question.service';
+import { useCategories } from '../../hooks/useCategories';
 
 const QuestionList = () => {
-    const [page, setPage] = useState(1);
-    const [rowsPerPage, setRowsPerPage] = useState(10);
-    const [search, setSearch] = useState('');
+    const [page, setPage] = useState(0); // Material-UI pagination 0-based
+    const [searchText, setSearchText] = useState('');
     const [typeFilter, setTypeFilter] = useState<string>('');
     const [difficultyFilter, setDifficultyFilter] = useState<string>('');
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [questionToDelete, setQuestionToDelete] = useState<number | null>(null);
 
+    // Kategori filtreleri için state'ler
+    const [gradeFilter, setGradeFilter] = useState<string>('');
+    const [subjectFilter, setSubjectFilter] = useState<string>('');
+    const [unitFilter, setUnitFilter] = useState<string>('');
+    const [categoryFilter, setCategoryFilter] = useState<string>('');
+
+    // Kategorileri ve filtrelenmiş kategorileri almak için hook'lar
+    const { categories, loading: categoriesLoading } = useCategories();
+
+    // Filtreleme için unique değerleri tutacak state'ler
+    const [grades, setGrades] = useState<string[]>([]);
+    const [subjects, setSubjects] = useState<string[]>([]);
+    const [units, setUnits] = useState<string[]>([]);
+    const [filteredCategories, setFilteredCategories] = useState<Category[]>([]);
+
     // API filtreleri
     const filters: QuestionFilter = {
-        search: search || undefined,
+        search: searchText || undefined,
         type: typeFilter || undefined,
-        difficulty: difficultyFilter || undefined
+        difficulty: difficultyFilter || undefined,
+        category_id: categoryFilter || undefined
     };
 
     // Hook ile soruları yükle
-    const { questions, loading, error, pagination, deleteQuestion } = useQuestions(page, filters);
+    const { questions, loading, error, pagination, fetchPage, deleteQuestion } = useQuestions(page + 1, filters);
+
+    // Kategori filtreleme bilgilerini yükle
+    useEffect(() => {
+        if (categories.length > 0) {
+            // Tüm unique sınıfları bul
+            const uniqueGrades = Array.from(new Set(categories.map(cat => cat.grade))).filter(Boolean);
+            setGrades(uniqueGrades as string[]);
+        }
+    }, [categories]);
+
+    // Sınıf değiştiğinde dersleri filtrele
+    useEffect(() => {
+        if (categories.length > 0 && gradeFilter) {
+            // Seçilen sınıfa göre dersleri filtrele
+            const filteredSubjects = Array.from(
+                new Set(
+                    categories
+                        .filter(cat => cat.grade === gradeFilter)
+                        .map(cat => cat.subject)
+                )
+            ).filter(Boolean);
+
+            setSubjects(filteredSubjects as string[]);
+            setSubjectFilter(''); // Sınıf değiştiğinde ders filtresini sıfırla
+            setUnitFilter(''); // Sınıf değiştiğinde ünite filtresini sıfırla
+            setCategoryFilter(''); // Sınıf değiştiğinde kategori filtresini sıfırla
+        } else {
+            setSubjects([]);
+        }
+    }, [categories, gradeFilter]);
+
+    // Ders değiştiğinde üniteleri filtrele
+    useEffect(() => {
+        if (categories.length > 0 && gradeFilter && subjectFilter) {
+            // Seçilen sınıf ve derse göre üniteleri filtrele
+            const filteredUnits = Array.from(
+                new Set(
+                    categories
+                        .filter(cat => cat.grade === gradeFilter && cat.subject === subjectFilter)
+                        .map(cat => cat.unit)
+                )
+            ).filter(Boolean);
+
+            setUnits(filteredUnits as string[]);
+            setUnitFilter(''); // Ders değiştiğinde ünite filtresini sıfırla
+            setCategoryFilter(''); // Ders değiştiğinde kategori filtresini sıfırla
+        } else {
+            setUnits([]);
+        }
+    }, [categories, gradeFilter, subjectFilter]);
+
+    // Ünite değiştiğinde kategorileri filtrele
+    useEffect(() => {
+        if (categories.length > 0 && gradeFilter && subjectFilter) {
+            let filtered = categories.filter(
+                cat => cat.grade === gradeFilter && cat.subject === subjectFilter
+            );
+
+            if (unitFilter) {
+                filtered = filtered.filter(cat => cat.unit === unitFilter);
+            }
+
+            setFilteredCategories(filtered);
+            setCategoryFilter(''); // Ünite değiştiğinde kategori filtresini sıfırla
+        } else {
+            setFilteredCategories([]);
+        }
+    }, [categories, gradeFilter, subjectFilter, unitFilter]);
 
     // Filtre değişikliklerini yönet
     const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setSearch(e.target.value);
-        setPage(1); // Filtreleme yapıldığında ilk sayfaya dön
+        setSearchText(e.target.value);
     };
 
     const handleTypeChange = (event: SelectChangeEvent) => {
         setTypeFilter(event.target.value);
-        setPage(1);
+        setPage(0); // Filtre değiştiğinde ilk sayfaya dön
+        fetchPage(1); // API 1-based
     };
 
     const handleDifficultyChange = (event: SelectChangeEvent) => {
         setDifficultyFilter(event.target.value);
-        setPage(1);
+        setPage(0);
+        fetchPage(1);
+    };
+
+    // Kategori filtre değişikliklerini yönet
+    const handleGradeChange = (event: SelectChangeEvent) => {
+        setGradeFilter(event.target.value);
+        setPage(0);
+        fetchPage(1);
+    };
+
+    const handleSubjectChange = (event: SelectChangeEvent) => {
+        setSubjectFilter(event.target.value);
+        setPage(0);
+        fetchPage(1);
+    };
+
+    const handleUnitChange = (event: SelectChangeEvent) => {
+        setUnitFilter(event.target.value);
+        setPage(0);
+        fetchPage(1);
+    };
+
+    const handleCategoryChange = (event: SelectChangeEvent) => {
+        setCategoryFilter(event.target.value);
+        setPage(0);
+        fetchPage(1);
+    };
+
+    // Tüm filtreleri sıfırla
+    const handleResetFilters = () => {
+        setSearchText('');
+        setTypeFilter('');
+        setDifficultyFilter('');
+        setGradeFilter('');
+        setSubjectFilter('');
+        setUnitFilter('');
+        setCategoryFilter('');
+        setPage(0);
+        fetchPage(1);
+    };
+
+    // Arama butonuna tıklandığında
+    const handleSearch = () => {
+        setPage(0);
+        fetchPage(1);
     };
 
     // Sayfalama işlemleri
     const handleChangePage = (_: unknown, newPage: number) => {
-        setPage(newPage + 1); // Material-UI sayfalama 0-tabanlı, API'miz 1-tabanlı
+        setPage(newPage);
+        fetchPage(newPage + 1); // API 1-based, Material-UI 0-based
     };
 
     const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
-        setRowsPerPage(parseInt(event.target.value, 10));
-        setPage(1);
+        parseInt(event.target.value, 10);
+// Backend'e yeni per_page değeriyle istek gönder
+        fetchPage(1); // İlk sayfaya dön
+        setPage(0);
     };
 
     // Silme işlemleri
@@ -112,6 +245,11 @@ const QuestionList = () => {
         }
     };
 
+    // Herhangi bir filtre aktif mi kontrol et
+    const isAnyFilterActive = () => {
+        return searchText || typeFilter || difficultyFilter || gradeFilter || subjectFilter || unitFilter || categoryFilter;
+    };
+
     return (
         <Box>
             <Typography variant="h4" gutterBottom sx={{ mb: 4, fontWeight: 'bold' }}>
@@ -125,19 +263,29 @@ const QuestionList = () => {
                             fullWidth
                             label="Soru Ara"
                             variant="outlined"
-                            value={search}
+                            value={searchText}
                             onChange={handleSearchChange}
+                            onKeyPress={(e) => {
+                                if (e.key === 'Enter') {
+                                    handleSearch();
+                                }
+                            }}
                             InputProps={{
                                 startAdornment: (
                                     <InputAdornment position="start">
                                         <SearchIcon />
                                     </InputAdornment>
                                 ),
+                                endAdornment: (
+                                    <InputAdornment position="end">
+                                        <Button onClick={handleSearch}>Ara</Button>
+                                    </InputAdornment>
+                                )
                             }}
                         />
                     </Grid>
 
-                    <Grid item xs={12} md={2}>
+                    <Grid item xs={12} md={3}>
                         <FormControl fullWidth>
                             <InputLabel>Soru Tipi</InputLabel>
                             <Select
@@ -169,7 +317,7 @@ const QuestionList = () => {
                         </FormControl>
                     </Grid>
 
-                    <Grid item xs={12} md={4} sx={{ textAlign: { xs: 'left', md: 'right' } }}>
+                    <Grid item xs={12} md={3} sx={{ textAlign: { xs: 'left', md: 'right' } }}>
                         <Button
                             variant="contained"
                             startIcon={<AddIcon />}
@@ -184,6 +332,103 @@ const QuestionList = () => {
                         >
                             Yeni Soru Ekle
                         </Button>
+                    </Grid>
+
+                    {/* Kategori Filtreleri */}
+                    <Grid item xs={12}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                            <FilterIcon sx={{ mr: 1 }} />
+                            <Typography variant="subtitle1">Kategori Filtreleri</Typography>
+                            {isAnyFilterActive() && (
+                                <Button
+                                    size="small"
+                                    variant="outlined"
+                                    color="error"
+                                    onClick={handleResetFilters}
+                                    sx={{ ml: 2 }}
+                                >
+                                    Filtreleri Temizle
+                                </Button>
+                            )}
+                        </Box>
+
+                        <Grid container spacing={2}>
+                            <Grid item xs={12} sm={6} md={3}>
+                                <FormControl fullWidth size="small">
+                                    <InputLabel>Sınıf</InputLabel>
+                                    <Select
+                                        value={gradeFilter}
+                                        label="Sınıf"
+                                        onChange={handleGradeChange}
+                                    >
+                                        <MenuItem value="">Tümü</MenuItem>
+                                        {categoriesLoading ? (
+                                            <MenuItem disabled>Yükleniyor...</MenuItem>
+                                        ) : (
+                                            grades.map((grade) => (
+                                                <MenuItem key={grade} value={grade}>
+                                                    {grade}
+                                                </MenuItem>
+                                            ))
+                                        )}
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+
+                            <Grid item xs={12} sm={6} md={3}>
+                                <FormControl fullWidth size="small" disabled={!gradeFilter}>
+                                    <InputLabel>Ders</InputLabel>
+                                    <Select
+                                        value={subjectFilter}
+                                        label="Ders"
+                                        onChange={handleSubjectChange}
+                                    >
+                                        <MenuItem value="">Tümü</MenuItem>
+                                        {subjects.map((subject) => (
+                                            <MenuItem key={subject} value={subject}>
+                                                {subject}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+
+                            <Grid item xs={12} sm={6} md={3}>
+                                <FormControl fullWidth size="small" disabled={!subjectFilter}>
+                                    <InputLabel>Ünite</InputLabel>
+                                    <Select
+                                        value={unitFilter}
+                                        label="Ünite"
+                                        onChange={handleUnitChange}
+                                    >
+                                        <MenuItem value="">Tümü</MenuItem>
+                                        {units.map((unit) => (
+                                            <MenuItem key={unit} value={unit}>
+                                                {unit}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+
+                            <Grid item xs={12} sm={6} md={3}>
+                                <FormControl fullWidth size="small" disabled={!subjectFilter}>
+                                    <InputLabel>Kategori</InputLabel>
+                                    <Select
+                                        value={categoryFilter}
+                                        label="Kategori"
+                                        onChange={handleCategoryChange}
+                                    >
+                                        <MenuItem value="">Tümü</MenuItem>
+                                        {filteredCategories.map((category) => (
+                                            <MenuItem key={category.id} value={category.id.toString()}>
+                                                {category.name}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+                        </Grid>
                     </Grid>
                 </Grid>
             </Paper>
@@ -266,7 +511,15 @@ const QuestionList = () => {
                                                 size="small"
                                             />
                                         </TableCell>
-                                        <TableCell>{question.category?.name || '-'}</TableCell>
+                                        <TableCell>
+                                            <Tooltip title={
+                                                question.category ?
+                                                    `${question.category.grade || '-'} / ${question.category.subject || '-'} / ${question.category.unit || '-'}` :
+                                                    'Kategori bilgisi yok'
+                                            }>
+                                                <span>{question.category?.name || '-'}</span>
+                                            </Tooltip>
+                                        </TableCell>
                                         <TableCell>
                                             {question.user ? (
                                                 <Tooltip title={question.user.email}>
@@ -308,11 +561,11 @@ const QuestionList = () => {
 
                 {!loading && pagination && (
                     <TablePagination
-                        rowsPerPageOptions={[5, 10, 25]}
+                        rowsPerPageOptions={[10, 20, 50]}
                         component="div"
                         count={pagination.total}
-                        rowsPerPage={rowsPerPage}
-                        page={pagination.current_page - 1} // API'den 1-tabanlı, MUI'de 0-tabanlı
+                        rowsPerPage={pagination.per_page}
+                        page={page}
                         onPageChange={handleChangePage}
                         onRowsPerPageChange={handleChangeRowsPerPage}
                         labelRowsPerPage="Sayfa başına satır:"

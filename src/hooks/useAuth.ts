@@ -14,7 +14,13 @@ export const useAuth = () => {
             setError(null);
             const data = await authService.login(email, password);
             setLoading(false);
-            navigate('/');
+            const role = data.user?.role;
+
+            if (role === 'editor') {
+                navigate('/user-management');
+            } else {
+                navigate('/');
+            }
             return data;
         } catch (err: any) {
             const errorMessage = err.response?.data?.message || 'Giriş başarısız';

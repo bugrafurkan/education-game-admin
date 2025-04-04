@@ -1,8 +1,8 @@
 // src/pages/advertisements/Advertisements.tsx
 import { useState } from 'react';
 import {
-    Box, Typography, Paper, Button,  TextField,
-    FormControlLabel,  Alert, Snackbar, CircularProgress,
+    Box, Typography, Paper, Button, TextField,
+    FormControlLabel, Alert, Snackbar, CircularProgress,
     IconButton, RadioGroup,
     Radio, FormControl, FormLabel, Dialog, DialogTitle,
     DialogContent, DialogActions, Chip, Table, TableBody,
@@ -32,6 +32,8 @@ const Advertisements = () => {
     const [adName, setAdName] = useState('');
     const [adType, setAdType] = useState<'image' | 'video'>('image');
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [grade, setGrade] = useState('');
+    const [subject, setSubject] = useState('');
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
     const handleOpenDialog = () => {
@@ -47,22 +49,20 @@ const Advertisements = () => {
         setAdName('');
         setAdType('image');
         setSelectedFile(null);
+        setGrade('');
+        setSubject('');
     };
 
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         if (event.target.files && event.target.files[0]) {
             const file = event.target.files[0];
-
-            // Dosya tipini kontrol et
             const isValidFileType = adType === 'image'
                 ? file.type.startsWith('image/')
                 : file.type.startsWith('video/');
-
             if (!isValidFileType) {
                 alert(`Lütfen geçerli bir ${adType === 'image' ? 'görsel' : 'video'} dosyası seçin.`);
                 return;
             }
-
             setSelectedFile(file);
         }
     };
@@ -72,13 +72,11 @@ const Advertisements = () => {
             alert('Lütfen bir reklam adı girin.');
             return;
         }
-
         if (!selectedFile) {
             alert('Lütfen bir dosya seçin.');
             return;
         }
-
-        const success = await addAdvertisement(adName, adType, selectedFile);
+        const success = await addAdvertisement(adName, adType, selectedFile, grade, subject);
         if (success) {
             setSuccessMessage('Reklam başarıyla eklendi.');
             handleCloseDialog();
@@ -88,9 +86,7 @@ const Advertisements = () => {
     const handleToggleStatus = async (id: number, currentStatus: boolean) => {
         const success = await toggleAdvertisementStatus(id, !currentStatus);
         if (success) {
-            setSuccessMessage(
-                `Reklam ${!currentStatus ? 'aktifleştirildi' : 'deaktif edildi'}.`
-            );
+            setSuccessMessage(`Reklam ${!currentStatus ? 'aktifleştirildi' : 'deaktif edildi'}.`);
         }
     };
 
@@ -110,11 +106,8 @@ const Advertisements = () => {
     const formatDate = (dateString: string) => {
         const date = new Date(dateString);
         return date.toLocaleDateString('tr-TR', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
+            year: 'numeric', month: 'long', day: 'numeric',
+            hour: '2-digit', minute: '2-digit'
         });
     };
 
@@ -136,12 +129,7 @@ const Advertisements = () => {
                     variant="contained"
                     startIcon={<AddIcon />}
                     onClick={handleOpenDialog}
-                    sx={{
-                        py: 1.5,
-                        px: 3,
-                        bgcolor: '#1a1a27',
-                        '&:hover': { bgcolor: '#2a2a37' }
-                    }}
+                    sx={{ py: 1.5, px: 3, bgcolor: '#1a1a27', '&:hover': { bgcolor: '#2a2a37' } }}
                 >
                     Yeni Reklam Ekle
                 </Button>
@@ -158,12 +146,7 @@ const Advertisements = () => {
                     <Typography variant="h6" color="text.secondary">
                         Henüz reklam eklenmemiş
                     </Typography>
-                    <Button
-                        variant="outlined"
-                        startIcon={<AddIcon />}
-                        onClick={handleOpenDialog}
-                        sx={{ mt: 2 }}
-                    >
+                    <Button variant="outlined" startIcon={<AddIcon />} onClick={handleOpenDialog} sx={{ mt: 2 }}>
                         İlk Reklamı Ekle
                     </Button>
                 </Paper>
@@ -172,53 +155,33 @@ const Advertisements = () => {
                     <Table>
                         <TableHead>
                             <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                                <TableCell width="40%">Reklam Adı</TableCell>
-                                <TableCell width="15%">Tür</TableCell>
-                                <TableCell width="15%">Durum</TableCell>
+                                <TableCell width="25%">Reklam Adı</TableCell>
+                                <TableCell width="10%">Tür</TableCell>
+                                <TableCell width="10%">Durum</TableCell>
+                                <TableCell width="15%">Sınıf</TableCell>
+                                <TableCell width="15%">Ders</TableCell>
                                 <TableCell width="15%">Eklenme Tarihi</TableCell>
-                                <TableCell width="15%" align="right">İşlemler</TableCell>
+                                <TableCell width="10%" align="right">İşlemler</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
                             {advertisements.map((ad) => (
                                 <TableRow key={ad.id} hover>
+                                    <TableCell><Typography>{ad.name}</Typography></TableCell>
                                     <TableCell>
-                                        <Typography variant="body1">{ad.name}</Typography>
+                                        <Chip label={ad.type === 'image' ? 'Görsel' : 'Video'} color={ad.type === 'image' ? 'primary' : 'secondary'} size="small" />
                                     </TableCell>
                                     <TableCell>
-                                        <Chip
-                                            label={ad.type === 'image' ? 'Görsel' : 'Video'}
-                                            color={ad.type === 'image' ? 'primary' : 'secondary'}
-                                            size="small"
-                                        />
+                                        <Chip label={ad.is_active ? 'Aktif' : 'Pasif'} color={ad.is_active ? 'success' : 'default'} size="small" />
                                     </TableCell>
-                                    <TableCell>
-                                        <Chip
-                                            label={ad.is_active ? 'Aktif' : 'Pasif'}
-                                            color={ad.is_active ? 'success' : 'default'}
-                                            size="small"
-                                        />
-                                    </TableCell>
-                                    <TableCell>
-                                        <Typography variant="body2" color="text.secondary">
-                                            {formatDate(ad.created_at)}
-                                        </Typography>
-                                    </TableCell>
+                                    <TableCell>{ad.grade || '-'}</TableCell>
+                                    <TableCell>{ad.subject || '-'}</TableCell>
+                                    <TableCell><Typography variant="body2" color="text.secondary">{formatDate(ad.created_at)}</Typography></TableCell>
                                     <TableCell align="right">
-                                        <IconButton
-                                            color={ad.is_active ? 'primary' : 'default'}
-                                            onClick={() => handleToggleStatus(ad.id, ad.is_active)}
-                                            title={ad.is_active ? 'Pasif Yap' : 'Aktif Yap'}
-                                            size="small"
-                                        >
+                                        <IconButton color={ad.is_active ? 'primary' : 'default'} onClick={() => handleToggleStatus(ad.id, ad.is_active)} size="small">
                                             {ad.is_active ? <VisibilityIcon /> : <VisibilityOffIcon />}
                                         </IconButton>
-                                        <IconButton
-                                            color="error"
-                                            onClick={() => handleDelete(ad.id)}
-                                            title="Sil"
-                                            size="small"
-                                        >
+                                        <IconButton color="error" onClick={() => handleDelete(ad.id)} size="small">
                                             <DeleteIcon />
                                         </IconButton>
                                     </TableCell>
@@ -229,18 +192,13 @@ const Advertisements = () => {
                 </TableContainer>
             )}
 
-            {/* Yeni Reklam Ekleme Dialog */}
             <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
                 <DialogTitle>Yeni Reklam Ekle</DialogTitle>
                 <DialogContent>
                     <Box sx={{ pt: 1 }}>
-                        <TextField
-                            label="Reklam Adı"
-                            fullWidth
-                            value={adName}
-                            onChange={(e) => setAdName(e.target.value)}
-                            margin="normal"
-                        />
+                        <TextField label="Reklam Adı" fullWidth value={adName} onChange={(e) => setAdName(e.target.value)} margin="normal" />
+                        <TextField label="Sınıf (Grade)" fullWidth value={grade} onChange={(e) => setGrade(e.target.value)} margin="normal" />
+                        <TextField label="Ders (Subject)" fullWidth value={subject} onChange={(e) => setSubject(e.target.value)} margin="normal" />
 
                         <FormControl component="fieldset" sx={{ mt: 2, mb: 1 }}>
                             <FormLabel component="legend">Reklam Tipi</FormLabel>
@@ -266,11 +224,7 @@ const Advertisements = () => {
                                 onChange={handleFileChange}
                             />
                             <label htmlFor="ad-file-upload">
-                                <Button
-                                    variant="outlined"
-                                    component="span"
-                                    startIcon={<UploadIcon />}
-                                >
+                                <Button variant="outlined" component="span" startIcon={<UploadIcon />}>
                                     {adType === 'image' ? 'Görsel Seç' : 'Video Seç'}
                                 </Button>
                             </label>
@@ -281,17 +235,12 @@ const Advertisements = () => {
                     </Box>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={handleCloseDialog} color="inherit">
-                        İptal
-                    </Button>
+                    <Button onClick={handleCloseDialog} color="inherit">İptal</Button>
                     <Button
                         onClick={handleSubmit}
                         variant="contained"
                         disabled={isSubmitting || !selectedFile || !adName.trim()}
-                        sx={{
-                            bgcolor: '#1a1a27',
-                            '&:hover': { bgcolor: '#2a2a37' }
-                        }}
+                        sx={{ bgcolor: '#1a1a27', '&:hover': { bgcolor: '#2a2a37' } }}
                     >
                         {isSubmitting ? 'Kaydediliyor...' : 'Kaydet'}
                     </Button>

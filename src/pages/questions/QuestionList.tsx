@@ -17,12 +17,13 @@ import {
 } from '@mui/icons-material';
 import { Link } from 'react-router-dom';
 import { useQuestions } from '../../hooks/useQuestions';
-import { Category, QuestionFilter } from '../../services/question.service';
+import { QuestionFilter,Category } from '../../services/question.service';
 import { useCategories } from '../../hooks/useCategories';
 
 const QuestionList = () => {
-    const [page, setPage] = useState(0); // Material-UI pagination 0-based
-    const [searchText, setSearchText] = useState('');
+    const [page, setPage] = useState(1);
+    const [rowsPerPage, setRowsPerPage] = useState(10);
+    const [search, setSearch] = useState('');
     const [typeFilter, setTypeFilter] = useState<string>('');
     const [difficultyFilter, setDifficultyFilter] = useState<string>('');
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -35,7 +36,7 @@ const QuestionList = () => {
     const [categoryFilter, setCategoryFilter] = useState<string>('');
 
     // Kategorileri ve filtrelenmiş kategorileri almak için hook'lar
-    const { categories, loading: categoriesLoading } = useCategories();
+    const { categories, loading: categoriesLoading} = useCategories();
 
     // Filtreleme için unique değerleri tutacak state'ler
     const [grades, setGrades] = useState<string[]>([]);
@@ -45,14 +46,14 @@ const QuestionList = () => {
 
     // API filtreleri
     const filters: QuestionFilter = {
-        search: searchText || undefined,
+        search: search || undefined,
         type: typeFilter || undefined,
         difficulty: difficultyFilter || undefined,
-        category_id: categoryFilter || undefined
+        category_id: categoryFilter ? Number(categoryFilter) : undefined
     };
 
     // Hook ile soruları yükle
-    const { questions, loading, error, pagination, fetchPage, deleteQuestion } = useQuestions(page + 1, filters);
+    const { questions, loading, error, pagination, deleteQuestion } = useQuestions(page, filters);
 
     // Kategori filtreleme bilgilerini yükle
     useEffect(() => {
@@ -124,76 +125,61 @@ const QuestionList = () => {
 
     // Filtre değişikliklerini yönet
     const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setSearchText(e.target.value);
+        setSearch(e.target.value);
+        setPage(1); // Filtreleme yapıldığında ilk sayfaya dön
     };
 
     const handleTypeChange = (event: SelectChangeEvent) => {
         setTypeFilter(event.target.value);
-        setPage(0); // Filtre değiştiğinde ilk sayfaya dön
-        fetchPage(1); // API 1-based
+        setPage(1);
     };
 
     const handleDifficultyChange = (event: SelectChangeEvent) => {
         setDifficultyFilter(event.target.value);
-        setPage(0);
-        fetchPage(1);
+        setPage(1);
     };
 
     // Kategori filtre değişikliklerini yönet
     const handleGradeChange = (event: SelectChangeEvent) => {
         setGradeFilter(event.target.value);
-        setPage(0);
-        fetchPage(1);
+        setPage(1);
     };
 
     const handleSubjectChange = (event: SelectChangeEvent) => {
         setSubjectFilter(event.target.value);
-        setPage(0);
-        fetchPage(1);
+        setPage(1);
     };
 
     const handleUnitChange = (event: SelectChangeEvent) => {
         setUnitFilter(event.target.value);
-        setPage(0);
-        fetchPage(1);
+        setPage(1);
     };
 
     const handleCategoryChange = (event: SelectChangeEvent) => {
         setCategoryFilter(event.target.value);
-        setPage(0);
-        fetchPage(1);
+        setPage(1);
     };
 
     // Tüm filtreleri sıfırla
     const handleResetFilters = () => {
-        setSearchText('');
+        setSearch('');
         setTypeFilter('');
         setDifficultyFilter('');
         setGradeFilter('');
         setSubjectFilter('');
         setUnitFilter('');
         setCategoryFilter('');
-        setPage(0);
-        fetchPage(1);
-    };
-
-    // Arama butonuna tıklandığında
-    const handleSearch = () => {
-        setPage(0);
-        fetchPage(1);
+        setPage(1);
     };
 
     // Sayfalama işlemleri
     const handleChangePage = (_: unknown, newPage: number) => {
-        setPage(newPage);
-        fetchPage(newPage + 1); // API 1-based, Material-UI 0-based
+        setPage(newPage + 1); // Material-UI sayfalama 0-tabanlı, API'miz 1-tabanlı
     };
 
     const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
-        parseInt(event.target.value, 10);
-// Backend'e yeni per_page değeriyle istek gönder
-        fetchPage(1); // İlk sayfaya dön
-        setPage(0);
+        setRowsPerPage(parseInt(event.target.value, 10));
+        setPage(1);
     };
 
     // Silme işlemleri
@@ -247,7 +233,7 @@ const QuestionList = () => {
 
     // Herhangi bir filtre aktif mi kontrol et
     const isAnyFilterActive = () => {
-        return searchText || typeFilter || difficultyFilter || gradeFilter || subjectFilter || unitFilter || categoryFilter;
+        return search || typeFilter || difficultyFilter || gradeFilter || subjectFilter || unitFilter || categoryFilter;
     };
 
     return (
@@ -263,29 +249,19 @@ const QuestionList = () => {
                             fullWidth
                             label="Soru Ara"
                             variant="outlined"
-                            value={searchText}
+                            value={search}
                             onChange={handleSearchChange}
-                            onKeyPress={(e) => {
-                                if (e.key === 'Enter') {
-                                    handleSearch();
-                                }
-                            }}
                             InputProps={{
                                 startAdornment: (
                                     <InputAdornment position="start">
                                         <SearchIcon />
                                     </InputAdornment>
                                 ),
-                                endAdornment: (
-                                    <InputAdornment position="end">
-                                        <Button onClick={handleSearch}>Ara</Button>
-                                    </InputAdornment>
-                                )
                             }}
                         />
                     </Grid>
 
-                    <Grid item xs={12} md={3}>
+                    <Grid item xs={12} md={2}>
                         <FormControl fullWidth>
                             <InputLabel>Soru Tipi</InputLabel>
                             <Select
@@ -317,7 +293,7 @@ const QuestionList = () => {
                         </FormControl>
                     </Grid>
 
-                    <Grid item xs={12} md={3} sx={{ textAlign: { xs: 'left', md: 'right' } }}>
+                    <Grid item xs={12} md={4} sx={{ textAlign: { xs: 'left', md: 'right' } }}>
                         <Button
                             variant="contained"
                             startIcon={<AddIcon />}
@@ -336,9 +312,8 @@ const QuestionList = () => {
 
                     {/* Kategori Filtreleri */}
                     <Grid item xs={12}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                            <FilterIcon sx={{ mr: 1 }} />
-                            <Typography variant="subtitle1">Kategori Filtreleri</Typography>
+                        <Typography variant="subtitle1" sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                            <FilterIcon sx={{ mr: 1 }} /> Kategori Filtreleri
                             {isAnyFilterActive() && (
                                 <Button
                                     size="small"
@@ -350,7 +325,7 @@ const QuestionList = () => {
                                     Filtreleri Temizle
                                 </Button>
                             )}
-                        </Box>
+                        </Typography>
 
                         <Grid container spacing={2}>
                             <Grid item xs={12} sm={6} md={3}>
@@ -561,11 +536,11 @@ const QuestionList = () => {
 
                 {!loading && pagination && (
                     <TablePagination
-                        rowsPerPageOptions={[10, 20, 50]}
+                        rowsPerPageOptions={[5, 10, 25]}
                         component="div"
                         count={pagination.total}
-                        rowsPerPage={pagination.per_page}
-                        page={page}
+                        rowsPerPage={rowsPerPage}
+                        page={pagination.current_page - 1} // API'den 1-tabanlı, MUI'de 0-tabanlı
                         onPageChange={handleChangePage}
                         onRowsPerPageChange={handleChangeRowsPerPage}
                         labelRowsPerPage="Sayfa başına satır:"

@@ -1,4 +1,5 @@
 import api from './api';
+import { UserFormData } from '../types/user';
 
 export const getUsers = async () => {
     const response = await api.get('/users');
@@ -7,5 +8,15 @@ export const getUsers = async () => {
 
 export const deleteUser = async (userId: number) => {
     const response = await api.delete(`/users/${userId}`);
+    return response.data;
+};
+
+export const getUser = async (userId: number) => {
+    const response = await api.get(`/user/${userId}`);
+    return response.data;
+};
+
+export const updateUser = async (id: number, formData: UserFormData) => {
+    const response = await api.put(`/user-update/${id}`, formData);
     return response.data;
 };

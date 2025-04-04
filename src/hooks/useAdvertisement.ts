@@ -13,7 +13,7 @@ interface UseAdvertisementsReturn {
     loading: boolean;
     error: Error | null;
     refreshAdvertisements: () => Promise<void>;
-    addAdvertisement: (name: string, type: 'image' | 'video', file: File) => Promise<boolean>;
+    addAdvertisement: (name: string, type: 'image' | 'video', file: File, grade: string, subject:string) => Promise<boolean>;
     toggleAdvertisementStatus: (id: number, isActive: boolean) => Promise<boolean>;
     removeAdvertisement: (id: number) => Promise<boolean>;
     isSubmitting: boolean;
@@ -48,11 +48,13 @@ export const useAdvertisements = (): UseAdvertisementsReturn => {
     const addAdvertisement = async (
         name: string,
         type: 'image' | 'video',
-        file: File
+        file: File,
+        grade?: string,
+        subject?: string
     ): Promise<boolean> => {
         setIsSubmitting(true);
         try {
-            const newAd = await createAdvertisement(name, type, file);
+            const newAd = await createAdvertisement(name, type, file, grade, subject);
             setAdvertisements((prevAds) => [newAd, ...prevAds]);
             return true;
         } catch (err) {
@@ -62,6 +64,7 @@ export const useAdvertisements = (): UseAdvertisementsReturn => {
             setIsSubmitting(false);
         }
     };
+
 
     // Reklam durumunu değiştir (aktif/pasif)
     const toggleAdvertisementStatus = async (id: number, isActive: boolean): Promise<boolean> => {

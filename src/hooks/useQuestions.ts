@@ -1,65 +1,71 @@
 // src/hooks/useQuestions.ts
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
+import axios, { AxiosError } from 'axios';
 import * as questionService from '../services/question.service';
+import { Question, QuestionFilter, PaginatedResponse } from '../services/question.service';
 
-interface UseQuestionsReturn {
-    questions: questionService.Question[];
-    loading: boolean;
-    error: string | null;
-    deleteQuestion: (id: number) => Promise<boolean>;
-    refreshQuestions: () => Promise<void>;
-    pagination: questionService.PaginatedResponse<questionService.Question> | null;
-    fetchPage: (pageNumber: number) => Promise<void>;
+interface ApiErrorResponse {
+    message: string;
+    errors?: Record<string, string[]>;
 }
 
-export const useQuestions = (
-    initialPage: number = 1,
-    filters: questionService.QuestionFilter = {}
-): UseQuestionsReturn => {
-    const [questions, setQuestions] = useState<questionService.Question[]>([]);
-    const [pagination, setPagination] = useState<questionService.PaginatedResponse<questionService.Question> | null>(null);
+export const useQuestions = (page = 1, filters: QuestionFilter = {}) => {
+    const [questions, setQuestions] = useState<Question[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [currentPage, setCurrentPage] = useState(initialPage);
+    const [pagination, setPagination] = useState<Omit<PaginatedResponse<never>, 'data'>>({
+        total: 0,
+        per_page: 10,
+        current_page: 1,
+        last_page: 1
+    });
 
-    // Belirli bir sayfayı getiren fonksiyon
-    const fetchPage = useCallback(async (page: number) => {
+    const fetchQuestions = async () => {
         try {
             setLoading(true);
-            setCurrentPage(page);
-
-            // Sayfa başına makul bir miktar soru getir (örn. 10 veya 20)
-            const response = await questionService.getQuestions(page, { ...filters, per_page: 20 });
-
-            setQuestions(response.data);
-            setPagination(response);
             setError(null);
-        } catch (err) {
-            console.error('Error fetching questions:', err);
-            setError('Sorular yüklenirken bir hata oluştu.');
-        } finally {
+            const response = await questionService.getQuestions(page, filters);
+            setQuestions(response.data);
+            setPagination({
+                total: response.total,
+                per_page: response.per_page,
+                current_page: response.current_page,
+                last_page: response.last_page
+            });
+            setLoading(false);
+        } catch (error) {
+            if (axios.isAxiosError(error)) {
+                const axiosError = error as AxiosError<ApiErrorResponse>;
+                setError(axiosError.response?.data?.message || 'Sorular yüklenirken bir hata oluştu');
+                console.error('Error fetching questions:', axiosError.response?.data);
+            } else {
+                setError('Sorular yüklenirken beklenmeyen bir hata oluştu');
+                console.error('Unexpected error:', error);
+            }
             setLoading(false);
         }
-    }, [filters]);
+    };
 
-    // İlk yüklemede ve filtreler değiştiğinde ilk sayfayı getir
     useEffect(() => {
-        fetchPage(initialPage);
-    }, [fetchPage, initialPage]);
+        fetchQuestions();
+    }, [page, JSON.stringify(filters)]); // filters değiştiğinde yeniden yükle
 
     // Soru silme işlemi
     const deleteQuestion = async (id: number): Promise<boolean> => {
         try {
             setLoading(true);
             await questionService.deleteQuestion(id);
-
-            // Silme başarılıysa mevcut sayfayı yeniden yükle
-            await fetchPage(currentPage);
-
+            await fetchQuestions(); // Listeyi yenile
             return true;
-        } catch (err) {
-            console.error('Error deleting question:', err);
-            setError('Soru silinirken bir hata oluştu.');
+        } catch (error) {
+            if (axios.isAxiosError(error)) {
+                const axiosError = error as AxiosError<ApiErrorResponse>;
+                setError(axiosError.response?.data?.message || 'Soru silinirken bir hata oluştu');
+                console.error('Error deleting question:', axiosError.response?.data);
+            } else {
+                setError('Soru silinirken beklenmeyen bir hata oluştu');
+                console.error('Unexpected error:', error);
+            }
             setLoading(false);
             return false;
         }
@@ -69,9 +75,8 @@ export const useQuestions = (
         questions,
         loading,
         error,
-        deleteQuestion,
-        refreshQuestions: () => fetchPage(currentPage),
         pagination,
-        fetchPage
+        refresh: fetchQuestions,
+        deleteQuestion
     };
 };

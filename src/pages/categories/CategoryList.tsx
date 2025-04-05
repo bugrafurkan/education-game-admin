@@ -86,7 +86,7 @@ const CategoryList = () => {
             </Typography>
 
             <Paper sx={{ p: 3, mb: 3, borderRadius: 2 }}>
-                <Grid container spacing={2} alignItems="center">
+                <Grid container spacing={2} alignItems="center" >
                     <Grid item xs={12} md={4}>
                         <TextField
                             fullWidth
@@ -161,7 +161,7 @@ const CategoryList = () => {
                 </Alert>
             )}
 
-            <Paper sx={{ borderRadius: 2 }}>
+            <Paper sx={{  overflowX: 'auto',borderRadius: 2 }}>
                 <TableContainer>
                     <Table>
                         <TableHead sx={{ bgcolor: '#f5f8fa' }}>

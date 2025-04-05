@@ -30,15 +30,12 @@ const Sidebar = ({ open, onClose, variant }: SidebarProps) => {
     const [userRole, setUserRole] = useState<string | null>(null);
 
     useEffect(() => {
-        // Kullanıcı rolünü sessionStorage'dan al
         const role = sessionStorage.getItem('user_role');
         setUserRole(role);
     }, [isAuthenticated]);
 
-    // Menü öğelerini tanımla
-    const menuItems = [
+    const allMenuItems = [
         { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
-        { text: 'Kullanıcı Yönetimi', icon: <PeopleIcon />, path: '/user-management' },
         { text: 'Sorular', icon: <QuestionIcon />, path: '/questions' },
         { text: 'Oyunlar', icon: <GameIcon />, path: '/games' },
         { text: 'Soru Grupları', icon: <LibraryBooksIcon />, path: '/question-groups' },
@@ -46,6 +43,12 @@ const Sidebar = ({ open, onClose, variant }: SidebarProps) => {
         { text: 'Reklamlar', icon: <CampaignIcon />, path: '/advertisements' },
         { text: 'Ayarlar', icon: <SettingsIcon />, path: '/settings' },
     ];
+
+    const editorOnlyItems = [
+        { text: 'Kullanıcı Yönetimi', icon: <PeopleIcon />, path: '/user-management' },
+    ];
+
+    const menuItemsToRender = userRole === 'editor' ? editorOnlyItems : allMenuItems;
 
     return (
         <Drawer
@@ -70,46 +73,34 @@ const Sidebar = ({ open, onClose, variant }: SidebarProps) => {
             </Box>
             <Divider sx={{ borderColor: 'rgba(255,255,255,0.1)' }} />
 
-            {/* Eğer kullanıcı editor rolünde değilse menü öğelerini göster */}
-            {userRole !== 'editor' && (
-                <List>
-                    {menuItems.map((item) => (
-                        <ListItem key={item.text} disablePadding>
-                            <ListItemButton
-                                component={Link}
-                                to={item.path}
-                                selected={location.pathname === item.path}
-                                sx={{
-                                    '&.Mui-selected': {
-                                        backgroundColor: 'rgba(255,255,255,0.1)',
-                                        color: '#fff',
-                                        '&:hover': {
-                                            backgroundColor: 'rgba(255,255,255,0.15)',
-                                        },
-                                    },
+            <List>
+                {menuItemsToRender.map((item) => (
+                    <ListItem key={item.text} disablePadding>
+                        <ListItemButton
+                            component={Link}
+                            to={item.path}
+                            selected={location.pathname === item.path}
+                            sx={{
+                                '&.Mui-selected': {
+                                    backgroundColor: 'rgba(255,255,255,0.1)',
+                                    color: '#fff',
                                     '&:hover': {
-                                        backgroundColor: 'rgba(255,255,255,0.05)',
+                                        backgroundColor: 'rgba(255,255,255,0.15)',
                                     },
-                                }}
-                            >
-                                <ListItemIcon sx={{ color: 'inherit' }}>
-                                    {item.icon}
-                                </ListItemIcon>
-                                <ListItemText primary={item.text} />
-                            </ListItemButton>
-                        </ListItem>
-                    ))}
-                </List>
-            )}
-
-            {/* Editor rolü için boş alan bırak */}
-            {userRole === 'editor' && (
-                <Box sx={{ p: 3, color: 'rgba(255,255,255,0.5)', textAlign: 'center', mt: 2 }}>
-                    <Typography variant="body2">
-                        Editör rolü için sınırlı erişim
-                    </Typography>
-                </Box>
-            )}
+                                },
+                                '&:hover': {
+                                    backgroundColor: 'rgba(255,255,255,0.05)',
+                                },
+                            }}
+                        >
+                            <ListItemIcon sx={{ color: 'inherit' }}>
+                                {item.icon}
+                            </ListItemIcon>
+                            <ListItemText primary={item.text} />
+                        </ListItemButton>
+                    </ListItem>
+                ))}
+            </List>
         </Drawer>
     );
 };

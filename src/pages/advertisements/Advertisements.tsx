@@ -151,7 +151,7 @@ const Advertisements = () => {
                     </Button>
                 </Paper>
             ) : (
-                <TableContainer component={Paper} sx={{ borderRadius: 2 }}>
+                <TableContainer component={Paper} sx={{ borderRadius: 2, overflowX: 'auto' }}>
                     <Table>
                         <TableHead>
                             <TableRow sx={{ backgroundColor: '#f5f5f5' }}>

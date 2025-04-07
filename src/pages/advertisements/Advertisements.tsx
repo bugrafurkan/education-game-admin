@@ -3,19 +3,32 @@ import { useState } from 'react';
 import {
     Box, Typography, Paper, Button, TextField,
     FormControlLabel, Alert, Snackbar, CircularProgress,
-    IconButton, RadioGroup,
-    Radio, FormControl, FormLabel, Dialog, DialogTitle,
-    DialogContent, DialogActions, Chip, Table, TableBody,
-    TableCell, TableContainer, TableHead, TableRow
+    IconButton, RadioGroup, Radio, FormControl, FormLabel,
+    Dialog, DialogTitle, DialogContent, DialogActions,
+    Chip, Table, TableBody, TableCell, TableContainer,
+    TableHead, TableRow, Tooltip
 } from '@mui/material';
 import {
     Add as AddIcon,
     Upload as UploadIcon,
     Delete as DeleteIcon,
+    Edit as EditIcon,
     Visibility as VisibilityIcon,
     VisibilityOff as VisibilityOffIcon
 } from '@mui/icons-material';
 import { useAdvertisements } from '../../hooks/useAdvertisement';
+import { Advertisement } from '../../services/advertisement.service';
+
+// React DatePicker kullanımı
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
+import { registerLocale, setDefaultLocale } from "react-datepicker";
+import { tr } from 'date-fns/locale';
+import './datepicker-custom.css'; // Özel CSS dosyası (oluşturmanız gerekecek)
+
+// Türkçe dil desteği ekleme
+registerLocale('tr', tr);
+setDefaultLocale('tr');
 
 const Advertisements = () => {
     const {
@@ -23,20 +36,40 @@ const Advertisements = () => {
         loading,
         error,
         addAdvertisement,
+        updateAdDetails,
         toggleAdvertisementStatus,
         removeAdvertisement,
         isSubmitting
     } = useAdvertisements();
 
     const [openDialog, setOpenDialog] = useState(false);
+    const [isEditMode, setIsEditMode] = useState(false);
+    const [currentAd, setCurrentAd] = useState<Advertisement | null>(null);
+
     const [adName, setAdName] = useState('');
     const [adType, setAdType] = useState<'image' | 'video'>('image');
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [startDate, setStartDate] = useState<Date | null>(null);
+    const [endDate, setEndDate] = useState<Date | null>(null);
     const [grade, setGrade] = useState('');
     const [subject, setSubject] = useState('');
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-    const handleOpenDialog = () => {
+    const handleOpenDialog = (isEdit = false, ad?: Advertisement) => {
+        if (isEdit && ad) {
+            setIsEditMode(true);
+            setCurrentAd(ad);
+            setAdName(ad.name);
+            setAdType(ad.type);
+            setStartDate(ad.start_date ? new Date(ad.start_date) : null);
+            setEndDate(ad.end_date ? new Date(ad.end_date) : null);
+            setGrade(ad.grade || '');
+            setSubject(ad.subject || '');
+        } else {
+            setIsEditMode(false);
+            setCurrentAd(null);
+            resetForm();
+        }
         setOpenDialog(true);
     };
 
@@ -49,8 +82,26 @@ const Advertisements = () => {
         setAdName('');
         setAdType('image');
         setSelectedFile(null);
+        setStartDate(null);
+        setEndDate(null);
         setGrade('');
         setSubject('');
+        setIsEditMode(false);
+        setCurrentAd(null);
+    };
+
+    // Tarihi değiştirme işleyicileri
+    const handleStartDateChange = (date: Date | null) => {
+        setStartDate(date);
+
+        // Eğer bitiş tarihi varsa ve yeni başlangıç tarihinden önceyse bitiş tarihini sıfırla
+        if (date && endDate && date > endDate) {
+            setEndDate(null);
+        }
+    };
+
+    const handleEndDateChange = (date: Date | null) => {
+        setEndDate(date);
     };
 
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -72,14 +123,48 @@ const Advertisements = () => {
             alert('Lütfen bir reklam adı girin.');
             return;
         }
-        if (!selectedFile) {
-            alert('Lütfen bir dosya seçin.');
+
+        if (!startDate) {
+            alert('Lütfen bir başlangıç tarihi seçin.');
             return;
         }
-        const success = await addAdvertisement(adName, adType, selectedFile, grade, subject);
-        if (success) {
-            setSuccessMessage('Reklam başarıyla eklendi.');
-            handleCloseDialog();
+
+        // Eğer düzenleme modundaysak
+        if (isEditMode && currentAd) {
+            const success = await updateAdDetails(currentAd.id, {
+                name: adName,
+                start_date: startDate.toISOString(),
+                end_date: endDate ? endDate.toISOString() : null,
+                grade: grade || undefined,
+                subject: subject || undefined
+            });
+
+            if (success) {
+                setSuccessMessage('Reklam başarıyla güncellendi.');
+                handleCloseDialog();
+            }
+        }
+        // Yeni reklam ekleme
+        else {
+            if (!selectedFile) {
+                alert('Lütfen bir dosya seçin.');
+                return;
+            }
+
+            const success = await addAdvertisement(
+                adName,
+                adType,
+                selectedFile,
+                startDate.toISOString(),
+                endDate ? endDate.toISOString() : null,
+                grade || undefined,
+                subject || undefined
+            );
+
+            if (success) {
+                setSuccessMessage('Reklam başarıyla eklendi.');
+                handleCloseDialog();
+            }
         }
     };
 
@@ -104,10 +189,12 @@ const Advertisements = () => {
     };
 
     const formatDate = (dateString: string) => {
+        if (!dateString) return '-';
         const date = new Date(dateString);
         return date.toLocaleDateString('tr-TR', {
-            year: 'numeric', month: 'long', day: 'numeric',
-            hour: '2-digit', minute: '2-digit'
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
         });
     };
 
@@ -128,10 +215,10 @@ const Advertisements = () => {
                 <Button
                     variant="contained"
                     startIcon={<AddIcon />}
-                    onClick={handleOpenDialog}
+                    onClick={() => handleOpenDialog()}
                     sx={{ py: 1.5, px: 3, bgcolor: '#1a1a27', '&:hover': { bgcolor: '#2a2a37' } }}
                 >
-                    Yeni Reklam Ekle
+                    YENİ REKLAM EKLE
                 </Button>
             </Box>
 
@@ -146,7 +233,7 @@ const Advertisements = () => {
                     <Typography variant="h6" color="text.secondary">
                         Henüz reklam eklenmemiş
                     </Typography>
-                    <Button variant="outlined" startIcon={<AddIcon />} onClick={handleOpenDialog} sx={{ mt: 2 }}>
+                    <Button variant="outlined" startIcon={<AddIcon />} onClick={() => handleOpenDialog()} sx={{ mt: 2 }}>
                         İlk Reklamı Ekle
                     </Button>
                 </Paper>
@@ -155,13 +242,14 @@ const Advertisements = () => {
                     <Table>
                         <TableHead>
                             <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                                <TableCell width="25%">Reklam Adı</TableCell>
+                                <TableCell width="20%">Reklam Adı</TableCell>
                                 <TableCell width="10%">Tür</TableCell>
                                 <TableCell width="10%">Durum</TableCell>
-                                <TableCell width="15%">Sınıf</TableCell>
-                                <TableCell width="15%">Ders</TableCell>
-                                <TableCell width="15%">Eklenme Tarihi</TableCell>
-                                <TableCell width="10%" align="right">İşlemler</TableCell>
+                                <TableCell width="10%">Sınıf</TableCell>
+                                <TableCell width="10%">Ders</TableCell>
+                                <TableCell width="13%">Başlangıç Tarihi</TableCell>
+                                <TableCell width="13%">Bitiş Tarihi</TableCell>
+                                <TableCell width="14%" align="right">İşlemler</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
@@ -176,14 +264,28 @@ const Advertisements = () => {
                                     </TableCell>
                                     <TableCell>{ad.grade || '-'}</TableCell>
                                     <TableCell>{ad.subject || '-'}</TableCell>
-                                    <TableCell><Typography variant="body2" color="text.secondary">{formatDate(ad.created_at)}</Typography></TableCell>
+                                    <TableCell><Typography variant="body2">{formatDate(ad.start_date)}</Typography></TableCell>
+                                    <TableCell><Typography variant="body2">{ad.end_date ? formatDate(ad.end_date) : '-'}</Typography></TableCell>
                                     <TableCell align="right">
-                                        <IconButton color={ad.is_active ? 'primary' : 'default'} onClick={() => handleToggleStatus(ad.id, ad.is_active)} size="small">
-                                            {ad.is_active ? <VisibilityIcon /> : <VisibilityOffIcon />}
-                                        </IconButton>
-                                        <IconButton color="error" onClick={() => handleDelete(ad.id)} size="small">
-                                            <DeleteIcon />
-                                        </IconButton>
+                                        <Tooltip title={ad.is_active ? "Devre Dışı Bırak" : "Aktifleştir"}>
+                                            <IconButton
+                                                color={ad.is_active ? "success" : "default"}
+                                                onClick={() => handleToggleStatus(ad.id, ad.is_active)}
+                                                size="small"
+                                            >
+                                                {ad.is_active ? <VisibilityIcon /> : <VisibilityOffIcon />}
+                                            </IconButton>
+                                        </Tooltip>
+                                        <Tooltip title="Düzenle">
+                                            <IconButton color="primary" onClick={() => handleOpenDialog(true, ad)} size="small">
+                                                <EditIcon />
+                                            </IconButton>
+                                        </Tooltip>
+                                        <Tooltip title="Sil">
+                                            <IconButton color="error" onClick={() => handleDelete(ad.id)} size="small">
+                                                <DeleteIcon />
+                                            </IconButton>
+                                        </Tooltip>
                                     </TableCell>
                                 </TableRow>
                             ))}
@@ -193,45 +295,96 @@ const Advertisements = () => {
             )}
 
             <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
-                <DialogTitle>Yeni Reklam Ekle</DialogTitle>
+                <DialogTitle>{isEditMode ? 'Reklamı Düzenle' : 'Yeni Reklam Ekle'}</DialogTitle>
                 <DialogContent>
                     <Box sx={{ pt: 1 }}>
-                        <TextField label="Reklam Adı" fullWidth value={adName} onChange={(e) => setAdName(e.target.value)} margin="normal" />
-                        <TextField label="Sınıf (Grade)" fullWidth value={grade} onChange={(e) => setGrade(e.target.value)} margin="normal" />
-                        <TextField label="Ders (Subject)" fullWidth value={subject} onChange={(e) => setSubject(e.target.value)} margin="normal" />
+                        <TextField
+                            label="Reklam Adı"
+                            fullWidth
+                            value={adName}
+                            onChange={(e) => setAdName(e.target.value)}
+                            margin="normal"
+                        />
 
-                        <FormControl component="fieldset" sx={{ mt: 2, mb: 1 }}>
-                            <FormLabel component="legend">Reklam Tipi</FormLabel>
-                            <RadioGroup
-                                row
-                                value={adType}
-                                onChange={(e) => {
-                                    setAdType(e.target.value as 'image' | 'video');
-                                    setSelectedFile(null);
-                                }}
-                            >
-                                <FormControlLabel value="image" control={<Radio />} label="Görsel Reklam" />
-                                <FormControlLabel value="video" control={<Radio />} label="Video Reklam" />
-                            </RadioGroup>
-                        </FormControl>
-
-                        <Box sx={{ border: '1px dashed #ccc', p: 3, borderRadius: 2, textAlign: 'center', mt: 2 }}>
-                            <input
-                                accept={adType === 'image' ? "image/*" : "video/*"}
-                                style={{ display: 'none' }}
-                                id="ad-file-upload"
-                                type="file"
-                                onChange={handleFileChange}
+                        <Box sx={{ mt: 2, mb: 1 }}>
+                            <FormLabel component="legend" sx={{ mb: 1 }}>Başlangıç Tarihi</FormLabel>
+                            <DatePicker
+                                selected={startDate}
+                                onChange={handleStartDateChange}
+                                dateFormat="dd/MM/yyyy"
+                                placeholderText="Başlangıç Tarihi"
+                                className="custom-datepicker"
+                                locale="tr"
+                                wrapperClassName="datepicker-wrapper"
+                                maxDate={endDate || undefined} // Eğer endDate varsa, onu maksimum değer olarak ayarla
                             />
-                            <label htmlFor="ad-file-upload">
-                                <Button variant="outlined" component="span" startIcon={<UploadIcon />}>
-                                    {adType === 'image' ? 'Görsel Seç' : 'Video Seç'}
-                                </Button>
-                            </label>
-                            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                                {selectedFile ? selectedFile.name : `Lütfen bir ${adType === 'image' ? 'görsel' : 'video'} dosyası seçin.`}
-                            </Typography>
                         </Box>
+
+                        <Box sx={{ mt: 2, mb: 1 }}>
+                            <FormLabel component="legend" sx={{ mb: 1 }}>Bitiş Tarihi (Opsiyonel)</FormLabel>
+                            <DatePicker
+                                selected={endDate}
+                                onChange={handleEndDateChange}
+                                dateFormat="dd/MM/yyyy"
+                                placeholderText="Bitiş Tarihi (Opsiyonel)"
+                                className="custom-datepicker"
+                                locale="tr"
+                                wrapperClassName="datepicker-wrapper"
+                                minDate={startDate || undefined} // Eğer startDate varsa, onu minimum değer olarak ayarla
+                            />
+                        </Box>
+
+                        <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
+                            <TextField
+                                label="Sınıf (Grade)"
+                                fullWidth
+                                value={grade}
+                                onChange={(e) => setGrade(e.target.value)}
+                            />
+                            <TextField
+                                label="Ders (Subject)"
+                                fullWidth
+                                value={subject}
+                                onChange={(e) => setSubject(e.target.value)}
+                            />
+                        </Box>
+
+                        {!isEditMode && (
+                            <>
+                                <FormControl component="fieldset" sx={{ mt: 2, mb: 1 }}>
+                                    <FormLabel component="legend">Reklam Tipi</FormLabel>
+                                    <RadioGroup
+                                        row
+                                        value={adType}
+                                        onChange={(e) => {
+                                            setAdType(e.target.value as 'image' | 'video');
+                                            setSelectedFile(null);
+                                        }}
+                                    >
+                                        <FormControlLabel value="image" control={<Radio />} label="Görsel Reklam" />
+                                        <FormControlLabel value="video" control={<Radio />} label="Video Reklam" />
+                                    </RadioGroup>
+                                </FormControl>
+
+                                <Box sx={{ border: '1px dashed #ccc', p: 3, borderRadius: 2, textAlign: 'center', mt: 2 }}>
+                                    <input
+                                        accept={adType === 'image' ? "image/*" : "video/*"}
+                                        style={{ display: 'none' }}
+                                        id="ad-file-upload"
+                                        type="file"
+                                        onChange={handleFileChange}
+                                    />
+                                    <label htmlFor="ad-file-upload">
+                                        <Button variant="outlined" component="span" startIcon={<UploadIcon />}>
+                                            {adType === 'image' ? 'Görsel Seç' : 'Video Seç'}
+                                        </Button>
+                                    </label>
+                                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                        {selectedFile ? selectedFile.name : `Lütfen bir ${adType === 'image' ? 'görsel' : 'video'} dosyası seçin.`}
+                                    </Typography>
+                                </Box>
+                            </>
+                        )}
                     </Box>
                 </DialogContent>
                 <DialogActions>
@@ -239,7 +392,7 @@ const Advertisements = () => {
                     <Button
                         onClick={handleSubmit}
                         variant="contained"
-                        disabled={isSubmitting || !selectedFile || !adName.trim()}
+                        disabled={isSubmitting || (!isEditMode && !selectedFile) || !adName.trim() || !startDate}
                         sx={{ bgcolor: '#1a1a27', '&:hover': { bgcolor: '#2a2a37' } }}
                     >
                         {isSubmitting ? 'Kaydediliyor...' : 'Kaydet'}

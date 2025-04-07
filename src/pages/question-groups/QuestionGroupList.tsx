@@ -36,14 +36,7 @@ const QuestionGroupList = () => {
     const fetchGroups = async () => {
         setLoading(true);
         try {
-            const response = await questionGroupService.getQuestionGroups(page, {
-                per_page: rowsPerPage,
-                search,
-                question_type: questionType,
-                game_id: gameId,
-                sort: sortField,
-                direction: sortDirection
-            });
+            const response = await questionGroupService.getQuestionGroups(page);
             setGroups(response.data);
             setTotalItems(response.total);
         } catch (e) {

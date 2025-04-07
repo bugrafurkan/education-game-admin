@@ -5,12 +5,13 @@ export interface GeneralSettings {
     app_name: string;
     logo_url: string;
     theme_color: string;
+    logo_file?: File; // Logo dosyası yükleme için
 }
 
 export interface AdvertisementSettings {
     ads_enabled: boolean;
     ad_type: 'image' | 'video';
-    ad_file?: File; // Dosya yükleme durumunda kullanılacak
+    ad_file?: File; // Reklam dosyası yükleme için
     ad_file_url?: string; // API'den gelecek, kaydedilmiş dosya yolu
 }
 
@@ -27,32 +28,30 @@ export const getSettings = async (): Promise<Settings> => {
 
 // Ayarları güncelle
 export const updateSettings = async (settingsData: Partial<Settings>): Promise<Settings> => {
-    // Eğer dosya içeriyorsa FormData kullan
-    if (settingsData.advertisements?.ad_file) {
+    // Logo dosyası içeriyorsa FormData kullan
+    if (settingsData.general?.logo_file) {
         const formData = new FormData();
 
         // Genel ayarları ekle
         if (settingsData.general) {
-            formData.append('app_name', settingsData.general.app_name);
-            formData.append('logo_url', settingsData.general.logo_url);
-            formData.append('theme_color', settingsData.general.theme_color);
+            if (settingsData.general.app_name) {
+                formData.append('app_name', settingsData.general.app_name);
+            }
+            if (settingsData.general.logo_url) {
+                formData.append('logo_url', settingsData.general.logo_url);
+            }
+            if (settingsData.general.theme_color) {
+                formData.append('theme_color', settingsData.general.theme_color);
+            }
+            // Logo dosyasını ekle
+            formData.append('logo_file', settingsData.general.logo_file);
         }
 
-        // Advertisement ayarları ekle
-        if (settingsData.advertisements) {
-            formData.append('ads_enabled', String(settingsData.advertisements.ads_enabled));
-            formData.append('ad_type', settingsData.advertisements.ad_type);
-
-            // Dosyayı ekle
-            formData.append('ad_file', settingsData.advertisements.ad_file);
-        }
-
-        const response = await api.post<Settings>('/settings/upload', formData, {
+        const response = await api.post<Settings>('/settings/uploadLogo', formData, {
             headers: {
                 'Content-Type': 'multipart/form-data'
             }
         });
-
         return response.data;
     } else {
         // Dosya yoksa normal JSON formatında gönder

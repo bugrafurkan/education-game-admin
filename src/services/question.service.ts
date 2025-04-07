@@ -7,6 +7,7 @@ export interface Category {
     grade: string;
     subject: string;
     unit?: string;
+    description?: string;
 }
 
 export interface Answer {
@@ -50,7 +51,12 @@ export interface QuestionFilter {
     difficulty?: string;
     category_id?: number;
     user_id?: number;
+    grade?: string;
+    subject?: string;
+    unit?: string;
+    konu?: string;
 }
+
 
 export interface PaginatedResponse<T> {
     data: T[];

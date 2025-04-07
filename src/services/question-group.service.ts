@@ -77,14 +77,7 @@ export interface EligibleQuestionsParams {
 }
 
 // Tüm soru gruplarını getir
-export const getQuestionGroups = async (page = 1, p0: {
-    per_page: number;
-    search: string;
-    question_type: string;
-    game_id: string;
-    sort: string;
-    direction: "asc" | "desc";
-}): Promise<PaginatedResponse<QuestionGroup>> => {
+export const getQuestionGroups = async (page = 1): Promise<PaginatedResponse<QuestionGroup>> => {
     const response = await api.get<PaginatedResponse<QuestionGroup>>('/question-groups', {
         params: { page }
     });

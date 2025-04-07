@@ -13,7 +13,8 @@ interface UseAdvertisementsReturn {
     loading: boolean;
     error: Error | null;
     refreshAdvertisements: () => Promise<void>;
-    addAdvertisement: (name: string, type: 'image' | 'video', file: File, grade: string, subject:string) => Promise<boolean>;
+    addAdvertisement: (name: string, type: 'image' | 'video', file: File, start_date: string, end_date: string | null, grade?: string, subject?: string) => Promise<boolean>;
+    updateAdDetails: (id: number, data: { name?: string; is_active?: boolean; start_date?: string; end_date?: string | null; grade?: string; subject?: string; }) => Promise<boolean>;
     toggleAdvertisementStatus: (id: number, isActive: boolean) => Promise<boolean>;
     removeAdvertisement: (id: number) => Promise<boolean>;
     isSubmitting: boolean;
@@ -49,12 +50,14 @@ export const useAdvertisements = (): UseAdvertisementsReturn => {
         name: string,
         type: 'image' | 'video',
         file: File,
+        start_date: string,
+        end_date: string | null,
         grade?: string,
         subject?: string
     ): Promise<boolean> => {
         setIsSubmitting(true);
         try {
-            const newAd = await createAdvertisement(name, type, file, grade, subject);
+            const newAd = await createAdvertisement(name, type, file, start_date, end_date, grade, subject);
             setAdvertisements((prevAds) => [newAd, ...prevAds]);
             return true;
         } catch (err) {
@@ -65,6 +68,32 @@ export const useAdvertisements = (): UseAdvertisementsReturn => {
         }
     };
 
+    // Reklam detaylarını güncelle
+    const updateAdDetails = async (
+        id: number,
+        data: {
+            name?: string;
+            is_active?: boolean;
+            start_date?: string;
+            end_date?: string | null;
+            grade?: string;
+            subject?: string;
+        }
+    ): Promise<boolean> => {
+        setIsSubmitting(true);
+        try {
+            const updatedAd = await updateAdvertisement(id, data);
+            setAdvertisements((prevAds) =>
+                prevAds.map((ad) => (ad.id === id ? updatedAd : ad))
+            );
+            return true;
+        } catch (err) {
+            setError(err instanceof Error ? err : new Error('Reklam güncellenirken bir hata oluştu'));
+            return false;
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
 
     // Reklam durumunu değiştir (aktif/pasif)
     const toggleAdvertisementStatus = async (id: number, isActive: boolean): Promise<boolean> => {
@@ -98,6 +127,7 @@ export const useAdvertisements = (): UseAdvertisementsReturn => {
         error,
         refreshAdvertisements: fetchAdvertisements,
         addAdvertisement,
+        updateAdDetails,
         toggleAdvertisementStatus,
         removeAdvertisement,
         isSubmitting,

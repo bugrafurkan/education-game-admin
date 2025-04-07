@@ -20,6 +20,14 @@ import CategoryList from '../pages/categories/CategoryList';
 import AddEditCategory from '../pages/categories/AddEditCategory';
 import UserManagement from "../pages/user-management/UserManagement.tsx";
 import UserAddEdit from "../pages/user-management/UserAddEdit.tsx";
+import GradeList from "../pages/grades/GradeList.tsx";
+import AddEditGrade from "../pages/grades/AddEditGrade.tsx";
+import SubjectList from "../pages/subjects/SubjectList.tsx";
+import AddEditSubject from "../pages/subjects/AddEditSubject.tsx";
+import UnitList from "../pages/units/UnitList.tsx";
+import AddEditUnit from "../pages/units/AddEditUnit.tsx";
+import TopicList from "../pages/topics/TopicList.tsx";
+import AddEditTopic from "../pages/topics/AddEditTopic.tsx";
 
 // AuthGuard: Kimlik doğrulama gerektiren rotalar için koruma
 interface AuthGuardProps {
@@ -93,6 +101,19 @@ const AppRoutes = () => {
                 <Route path="/user-management" element={<UserManagement />} />
                 <Route path="/user-management/add" element={<UserAddEdit  />} />
                 <Route path="/user-management/edit/:id" element={<UserAddEdit  />} />
+                <Route path="/grades" element={<GradeList />} />
+                <Route path="/grades/add" element={<AddEditGrade />} />
+                <Route path="/grades/edit/:id" element={<AddEditGrade />} />
+                <Route path="/subjects" element={<SubjectList />} />
+                <Route path="/subjects/add" element={<AddEditSubject />} />
+                <Route path="/subjects/edit/:id" element={<AddEditSubject />} />
+                <Route path="/units" element={<UnitList />} />
+                <Route path="/units/add" element={<AddEditUnit />} />
+                <Route path="/units/edit/:id" element={<AddEditUnit />} />
+                <Route path="/topics" element={<TopicList />} />
+                <Route path="/topics/add" element={<AddEditTopic />} />
+                <Route path="/topics/edit/:id" element={<AddEditTopic />} />
+
                 {/* Other protected routes will go here */}
             </Route>
 

@@ -1,42 +1,23 @@
 // src/pages/settings/Settings.tsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
-    Box, Typography, Paper, Button, Grid, TextField, Switch,
-    FormControlLabel, Tabs, Tab, Divider, Alert, Snackbar,
-    RadioGroup, Radio, FormControl, FormLabel, CircularProgress
+    Box, Typography, Paper, Button, TextField,
+    Alert, Snackbar, CircularProgress,
+    Popover, ClickAwayListener
 } from '@mui/material';
-import { Save as SaveIcon, Upload as UploadIcon } from '@mui/icons-material';
+import { Refresh as RefreshIcon } from '@mui/icons-material';
 import { useSettings } from '../../hooks/useSettings';
 import { Settings as SettingsType } from '../../services/settings.service';
+import './settings.css'; // CSS dosyasını ekleyin
 
-interface TabPanelProps {
-    children?: React.ReactNode;
-    value: number;
-    index: number;
-}
-
-const TabPanel = (props: TabPanelProps) => {
-    const { children, value, index, ...other } = props;
-
-    return (
-        <div
-            role="tabpanel"
-            hidden={value !== index}
-            id={`settings-tabpanel-${index}`}
-            aria-labelledby={`settings-tab-${index}`}
-            {...other}
-        >
-            {value === index && (
-                <Box sx={{ pt: 3 }}>
-                    {children}
-                </Box>
-            )}
-        </div>
-    );
-};
+// Renk seçicinin çeşitli ön tanımlı renkleri
+const predefinedColors = [
+    '#1a1a27', '#2c3e50', '#3498db', '#2ecc71', '#e74c3c', '#f39c12',
+    '#9b59b6', '#1abc9c', '#34495e', '#16a085', '#27ae60', '#2980b9',
+    '#8e44ad', '#f1c40f', '#e67e22', '#d35400', '#c0392b', '#7f8c8d'
+];
 
 const Settings = () => {
-    const [tabValue, setTabValue] = useState(0);
     const [showSuccess, setShowSuccess] = useState(false);
     const { settings, loading, error, updateSettings, isSubmitting } = useSettings();
 
@@ -44,57 +25,127 @@ const Settings = () => {
     const [appName, setAppName] = useState('');
     const [logoUrl, setLogoUrl] = useState('');
     const [themeColor, setThemeColor] = useState('');
-    const [adsEnabled, setAdsEnabled] = useState(false);
-    const [adType, setAdType] = useState<'image' | 'video'>('image');
-    const [selectedFile, setSelectedFile] = useState<File | null>(null);
-    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+    const [selectedLogoFile, setSelectedLogoFile] = useState<File | null>(null);
+    const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null);
+
+    // Renk seçici için state ve ref
+    const [colorAnchorEl, setColorAnchorEl] = useState<HTMLElement | null>(null);
+    const [customColor, setCustomColor] = useState('');
+    const logoDropRef = useRef<HTMLDivElement>(null);
+
+    // Renk seçici popover için
+    const handleColorClick = (event: React.MouseEvent<HTMLElement>) => {
+        setColorAnchorEl(event.currentTarget);
+        setCustomColor(themeColor || '#1a1a27');
+    };
+
+    const handleColorClose = () => {
+        setColorAnchorEl(null);
+    };
+
+    const handleColorSelect = (color: string) => {
+        setThemeColor(color);
+        handleColorClose();
+    };
 
     // Ayarlar yüklendiğinde form state'ini güncelle
     useEffect(() => {
         if (settings) {
             // Genel ayarlar
-            setAppName(settings.general.app_name);
-            setLogoUrl(settings.general.logo_url);
-            setThemeColor(settings.general.theme_color);
+            setAppName(settings.general?.app_name || '');
+            setLogoUrl(settings.general?.logo_url || '');
+            setThemeColor(settings.general?.theme_color || '#1a1a27');
 
-            // Reklam ayarları
-            setAdsEnabled(settings.advertisements.ads_enabled);
-            setAdType(settings.advertisements.ad_type);
-
-            // Eğer kaydedilmiş bir reklam dosyası varsa önizleme göster
-            if (settings.advertisements.ad_file_url) {
-                setPreviewUrl(settings.advertisements.ad_file_url);
+            // Eğer kaydedilmiş bir logo dosyası varsa önizleme göster
+            if (settings.general?.logo_url) {
+                setLogoPreviewUrl(settings.general.logo_url);
             }
         }
     }, [settings]);
 
-    const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
-        setTabValue(newValue);
-    };
+    // Logo sürükle-bırak için useEffect
+    useEffect(() => {
+        const logoDropArea = logoDropRef.current;
+        if (logoDropArea) {
+            const preventDefault = (e: Event) => {
+                e.preventDefault();
+                e.stopPropagation();
+            };
 
-    const handleSaveSettings = async () => {
+            const handleLogoDrop = (e: DragEvent) => {
+                preventDefault(e);
+                logoDropArea.classList.remove('drag-over');
+
+                if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                    const file = e.dataTransfer.files[0];
+
+                    // Dosya tipini kontrol et
+                    if (!file.type.startsWith('image/')) {
+                        alert(`Lütfen geçerli bir görsel dosyası seçin.`);
+                        return;
+                    }
+
+                    setSelectedLogoFile(file);
+                    const fileURL = URL.createObjectURL(file);
+                    setLogoPreviewUrl(fileURL);
+                }
+            };
+
+            const handleDragOver = (e: DragEvent) => {
+                preventDefault(e);
+                logoDropArea.classList.add('drag-over');
+            };
+
+            const handleDragLeave = (e: DragEvent) => {
+                preventDefault(e);
+                logoDropArea.classList.remove('drag-over');
+            };
+
+            logoDropArea.addEventListener('dragover', handleDragOver);
+            logoDropArea.addEventListener('dragleave', handleDragLeave);
+            logoDropArea.addEventListener('drop', handleLogoDrop);
+
+            return () => {
+                logoDropArea.removeEventListener('dragover', handleDragOver);
+                logoDropArea.removeEventListener('dragleave', handleDragLeave);
+                logoDropArea.removeEventListener('drop', handleLogoDrop);
+            };
+        }
+    }, []);
+
+    const handleSaveGeneralSettings = async () => {
         const newSettings: Partial<SettingsType> = {
             general: {
                 app_name: appName,
                 logo_url: logoUrl,
                 theme_color: themeColor
-            },
-            advertisements: {
-                ads_enabled: adsEnabled,
-                ad_type: adType
             }
         };
 
-        // Eğer yeni bir dosya seçilmişse ekle
-        if (selectedFile) {
-            newSettings.advertisements!.ad_file = selectedFile;
+        // Eğer yeni bir logo dosyası seçilmişse ekle
+        if (selectedLogoFile) {
+            newSettings.general!.logo_file = selectedLogoFile;
         }
 
         const success = await updateSettings(newSettings);
         if (success) {
             setShowSuccess(true);
-            // Dosya seçimi temizleme (kayıt başarılı ise)
-            setSelectedFile(null);
+            setSelectedLogoFile(null);
+        }
+    };
+
+    const handleUpdateTheme = async () => {
+        const newSettings: Partial<SettingsType> = {
+            general: {
+                theme_color: themeColor,
+                app_name: appName,
+                logo_url: logoUrl
+            }
+        };
+
+        const success = await updateSettings(newSettings);
+        if (success) {
+            setShowSuccess(true);
         }
     };
 
@@ -102,25 +153,21 @@ const Settings = () => {
         setShowSuccess(false);
     };
 
-    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const handleLogoFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         if (event.target.files && event.target.files[0]) {
             const file = event.target.files[0];
 
             // Dosya tipini kontrol et
-            const isValidFileType = adType === 'image'
-                ? file.type.startsWith('image/')
-                : file.type.startsWith('video/');
-
-            if (!isValidFileType) {
-                alert(`Lütfen geçerli bir ${adType === 'image' ? 'görsel' : 'video'} dosyası seçin.`);
+            if (!file.type.startsWith('image/')) {
+                alert(`Lütfen geçerli bir görsel dosyası seçin.`);
                 return;
             }
 
-            setSelectedFile(file);
+            setSelectedLogoFile(file);
 
             // Önizleme URL'i oluştur
             const fileURL = URL.createObjectURL(file);
-            setPreviewUrl(fileURL);
+            setLogoPreviewUrl(fileURL);
         }
     };
 
@@ -141,184 +188,206 @@ const Settings = () => {
     }
 
     return (
-        <Box>
+        <Box sx={{ maxWidth: 800, mx: 'auto' }}>
             <Typography variant="h4" gutterBottom sx={{ mb: 4, fontWeight: 'bold' }}>
-                Sistem Ayarları
+                Genel Ayarlar
             </Typography>
 
-            <Paper sx={{ borderRadius: 2 }}>
-                <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-                    <Tabs value={tabValue} onChange={handleTabChange} aria-label="settings tabs">
-                        <Tab label="Genel Ayarlar" id="settings-tab-0" aria-controls="settings-tabpanel-0" />
-                        <Tab label="Reklam Ayarları" id="settings-tab-1" aria-controls="settings-tabpanel-1" />
-                    </Tabs>
+            {/* Logo Yönetimi */}
+            <Paper sx={{ p: 3, mb: 4, borderRadius: 2 }}>
+                <Typography variant="h6" gutterBottom fontWeight="bold">
+                    Logo Yönetimi
+                </Typography>
+
+                <Box sx={{ mb: 3 }}>
+                    <Typography variant="subtitle1" gutterBottom>
+                        Logo Yükle
+                    </Typography>
+                    <Box
+                        ref={logoDropRef}
+                        className="drop-zone"
+                        sx={{
+                            border: '1px dashed #ccc',
+                            borderRadius: 1,
+                            p: 1,
+                            width: '100%',
+                            mb: 2,
+                            display: 'flex',
+                            alignItems: 'center'
+                        }}
+                    >
+                        <Box sx={{ flexGrow: 1, p: 1 }}>
+                            {selectedLogoFile
+                                ? selectedLogoFile.name
+                                : settings?.general?.logo_url
+                                    ? 'Mevcut logo (değiştirmek için sürükleyin veya gözata tıklayın)'
+                                    : 'Dosya seçin veya buraya sürükleyin.'}
+                        </Box>
+                        <input
+                            accept="image/*"
+                            style={{ display: 'none' }}
+                            id="logo-file-upload"
+                            type="file"
+                            onChange={handleLogoFileChange}
+                        />
+                        <label htmlFor="logo-file-upload">
+                            <Button
+                                variant="outlined"
+                                component="span"
+                                size="medium"
+                            >
+                                Gözat...
+                            </Button>
+                        </label>
+                    </Box>
+
+                    <Typography variant="subtitle1" gutterBottom>
+                        Logo Etiketi
+                    </Typography>
+                    <TextField
+                        fullWidth
+                        placeholder="Örn: Arı Yayıncılık"
+                        variant="outlined"
+                        size="small"
+                        value={appName}
+                        onChange={(e) => setAppName(e.target.value)}
+                        sx={{ mb: 2 }}
+                    />
+
+                    {logoPreviewUrl && (
+                        <Box sx={{ mt: 2, mb: 2 }}>
+                            <Typography variant="subtitle2" gutterBottom>
+                                Önizleme:
+                            </Typography>
+                            <img
+                                src={logoPreviewUrl}
+                                alt="Logo önizleme"
+                                style={{ maxWidth: '200px', maxHeight: '80px' }}
+                            />
+                        </Box>
+                    )}
+
+                    <Button
+                        variant="contained"
+                        color="primary"
+                        onClick={handleSaveGeneralSettings}
+                        disabled={isSubmitting}
+                        size="medium"
+                        sx={{ mt: 1, bgcolor: '#38a169', '&:hover': { bgcolor: '#2f855a' } }}
+                    >
+                        Kaydet
+                    </Button>
                 </Box>
+            </Paper>
 
-                <Box sx={{ p: 3 }}>
-                    <TabPanel value={tabValue} index={0}>
-                        <Grid container spacing={3}>
-                            <Grid item xs={12}>
-                                <Typography variant="h6" gutterBottom>
-                                    Genel Ayarlar
-                                </Typography>
-                                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                                    Platformun genel görünüm ve işleyiş ayarlarını yapılandırın.
-                                </Typography>
+            {/* Panel Ayarları */}
+            <Paper sx={{ p: 3, mb: 4, borderRadius: 2 }}>
+                <Typography variant="h6" gutterBottom fontWeight="bold">
+                    Panel Ayarları
+                </Typography>
 
-                                <Grid container spacing={3}>
-                                    <Grid item xs={12} md={6}>
-                                        <TextField
-                                            label="Platform Adı"
-                                            fullWidth
-                                            value={appName}
-                                            onChange={(e) => setAppName(e.target.value)}
-                                        />
-                                    </Grid>
-
-                                    <Grid item xs={12} md={6}>
-                                        <TextField
-                                            label="Logo URL"
-                                            fullWidth
-                                            value={logoUrl}
-                                            onChange={(e) => setLogoUrl(e.target.value)}
-                                            helperText="Logo için tam URL adresi"
-                                        />
-                                    </Grid>
-
-                                    <Grid item xs={12} md={6}>
-                                        <TextField
-                                            label="Tema Rengi"
-                                            fullWidth
-                                            value={themeColor}
-                                            onChange={(e) => setThemeColor(e.target.value)}
-                                            helperText="HEX formatında renk kodu (örn: #1a1a27)"
-                                        />
-                                    </Grid>
-                                </Grid>
-                            </Grid>
-                        </Grid>
-                    </TabPanel>
-
-                    <TabPanel value={tabValue} index={1}>
-                        <Grid container spacing={3}>
-                            <Grid item xs={12}>
-                                <Typography variant="h6" gutterBottom>
-                                    Reklam Ayarları
-                                </Typography>
-                                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                                    Online oyunlarda gösterilecek reklamların ayarlarını yapılandırın.
-                                </Typography>
-
-                                <Grid container spacing={3}>
-                                    <Grid item xs={12}>
-                                        <FormControlLabel
-                                            control={
-                                                <Switch
-                                                    checked={adsEnabled}
-                                                    onChange={(e) => setAdsEnabled(e.target.checked)}
-                                                />
-                                            }
-                                            label="Reklamları Etkinleştir"
-                                        />
-                                    </Grid>
-
-                                    {adsEnabled && (
-                                        <>
-                                            <Grid item xs={12}>
-                                                <FormControl component="fieldset">
-                                                    <FormLabel component="legend">Reklam Tipi</FormLabel>
-                                                    <RadioGroup
-                                                        row
-                                                        value={adType}
-                                                        onChange={(e) => {
-                                                            setAdType(e.target.value as 'image' | 'video');
-                                                            // Reklam tipi değiştiğinde seçili dosyayı sıfırla
-                                                            setSelectedFile(null);
-                                                            setPreviewUrl(settings?.advertisements.ad_file_url || null);
-                                                        }}
-                                                    >
-                                                        <FormControlLabel value="image" control={<Radio />} label="Görsel Reklam" />
-                                                        <FormControlLabel value="video" control={<Radio />} label="Video Reklam" />
-                                                    </RadioGroup>
-                                                </FormControl>
-                                            </Grid>
-
-                                            <Grid item xs={12}>
-                                                <Box sx={{ border: '1px dashed #ccc', p: 3, borderRadius: 2, textAlign: 'center' }}>
-                                                    <input
-                                                        accept={adType === 'image' ? "image/*" : "video/*"}
-                                                        style={{ display: 'none' }}
-                                                        id="ad-file-upload"
-                                                        type="file"
-                                                        onChange={handleFileChange}
-                                                    />
-                                                    <label htmlFor="ad-file-upload">
-                                                        <Button
-                                                            variant="outlined"
-                                                            component="span"
-                                                            startIcon={<UploadIcon />}
-                                                        >
-                                                            {adType === 'image' ? 'Görsel Seç' : 'Video Seç'}
-                                                        </Button>
-                                                    </label>
-                                                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                                                        {selectedFile
-                                                            ? selectedFile.name
-                                                            : settings?.advertisements.ad_file_url
-                                                                ? 'Mevcut reklam dosyası. Değiştirmek için yeni dosya seçin.'
-                                                                : `Lütfen bir ${adType === 'image' ? 'görsel' : 'video'} dosyası seçin.`
-                                                        }
-                                                    </Typography>
-                                                </Box>
-                                            </Grid>
-
-                                            {previewUrl && (
-                                                <Grid item xs={12}>
-                                                    <Typography variant="subtitle2" gutterBottom>
-                                                        Önizleme:
-                                                    </Typography>
-                                                    <Box sx={{ mt: 1, maxWidth: '100%', textAlign: 'center' }}>
-                                                        {adType === 'image' ? (
-                                                            <img
-                                                                src={previewUrl}
-                                                                alt="Reklam önizleme"
-                                                                style={{ maxWidth: '100%', maxHeight: '200px' }}
-                                                            />
-                                                        ) : (
-                                                            <video
-                                                                src={previewUrl}
-                                                                controls
-                                                                style={{ maxWidth: '100%', maxHeight: '200px' }}
-                                                            />
-                                                        )}
-                                                    </Box>
-                                                </Grid>
-                                            )}
-                                        </>
-                                    )}
-                                </Grid>
-                            </Grid>
-                        </Grid>
-                    </TabPanel>
-
-                    <Divider sx={{ my: 3 }} />
-
-                    <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                        <Button
-                            variant="contained"
-                            startIcon={<SaveIcon />}
-                            onClick={handleSaveSettings}
-                            disabled={isSubmitting}
+                <Box sx={{ mb: 3 }}>
+                    <Typography variant="subtitle1" gutterBottom>
+                        Tema Rengi
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                        <Box
+                            onClick={handleColorClick}
                             sx={{
-                                py: 1.5,
-                                px: 3,
-                                bgcolor: '#1a1a27',
-                                '&:hover': { bgcolor: '#2a2a37' }
+                                width: '40px',
+                                height: '40px',
+                                borderRadius: '4px',
+                                bgcolor: themeColor || '#1a1a27',
+                                border: '1px solid #ccc',
+                                cursor: 'pointer',
+                                mr: 2
+                            }}
+                        />
+
+                        <TextField
+                            value={themeColor || '#1a1a27'}
+                            onChange={(e) => setThemeColor(e.target.value)}
+                            placeholder="#RRGGBB"
+                            size="small"
+                            sx={{ width: '120px', mr: 2 }}
+                        />
+
+                        <Popover
+                            open={Boolean(colorAnchorEl)}
+                            anchorEl={colorAnchorEl}
+                            onClose={handleColorClose}
+                            anchorOrigin={{
+                                vertical: 'bottom',
+                                horizontal: 'left',
                             }}
                         >
-                            {isSubmitting ? 'Kaydediliyor...' : 'Ayarları Kaydet'}
-                        </Button>
+                            <ClickAwayListener onClickAway={handleColorClose}>
+                                <Box sx={{ p: 2, width: '280px' }}>
+                                    <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                                        Öntanımlı Renkler
+                                    </Typography>
+                                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+                                        {predefinedColors.map((color) => (
+                                            <Box
+                                                key={color}
+                                                onClick={() => handleColorSelect(color)}
+                                                sx={{
+                                                    width: '30px',
+                                                    height: '30px',
+                                                    bgcolor: color,
+                                                    borderRadius: '3px',
+                                                    cursor: 'pointer',
+                                                    border: themeColor === color ? '2px solid black' : '1px solid #ddd',
+                                                }}
+                                            />
+                                        ))}
+                                    </Box>
+
+                                    <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                                        Özel Renk
+                                    </Typography>
+                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                        <input
+                                            type="color"
+                                            value={customColor}
+                                            onChange={(e) => setCustomColor(e.target.value)}
+                                            style={{
+                                                width: '40px',
+                                                height: '30px',
+                                                padding: 0,
+                                                marginRight: '8px'
+                                            }}
+                                        />
+                                        <TextField
+                                            value={customColor}
+                                            onChange={(e) => setCustomColor(e.target.value)}
+                                            size="small"
+                                            sx={{ flexGrow: 1 }}
+                                        />
+                                        <Button
+                                            size="small"
+                                            sx={{ ml: 1 }}
+                                            onClick={() => handleColorSelect(customColor)}
+                                        >
+                                            Uygula
+                                        </Button>
+                                    </Box>
+                                </Box>
+                            </ClickAwayListener>
+                        </Popover>
                     </Box>
+
+                    <Button
+                        variant="contained"
+                        color="primary"
+                        onClick={handleUpdateTheme}
+                        disabled={isSubmitting}
+                        size="medium"
+                        startIcon={<RefreshIcon />}
+                        sx={{ mt: 1, bgcolor: '#3182ce', '&:hover': { bgcolor: '#2b6cb0' } }}
+                    >
+                        Güncelle
+                    </Button>
                 </Box>
             </Paper>
 

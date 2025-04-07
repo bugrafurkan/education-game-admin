@@ -10,6 +10,8 @@ export interface Advertisement {
     is_active: boolean;
     created_at: string;
     updated_at: string;
+    start_date: string;
+    end_date: string | null;
     grade?: string;
     subject?: string;
 }
@@ -25,6 +27,8 @@ export const createAdvertisement = async (
     name: string,
     type: 'image' | 'video',
     file: File,
+    start_date: string,
+    end_date?: string | null,
     grade?: string,
     subject?: string
 ): Promise<Advertisement> => {
@@ -32,6 +36,8 @@ export const createAdvertisement = async (
     formData.append('name', name);
     formData.append('type', type);
     formData.append('file', file);
+    formData.append('start_date', start_date);
+    if (end_date) formData.append('end_date', end_date);
     if (grade) formData.append('grade', grade);
     if (subject) formData.append('subject', subject);
 
@@ -44,7 +50,6 @@ export const createAdvertisement = async (
     return response.data;
 };
 
-
 // Reklam detaylarını getir
 export const getAdvertisement = async (id: number): Promise<Advertisement> => {
     const response = await api.get<Advertisement>(`/advertisements/${id}`);
@@ -54,7 +59,14 @@ export const getAdvertisement = async (id: number): Promise<Advertisement> => {
 // Reklam bilgilerini güncelle
 export const updateAdvertisement = async (
     id: number,
-    data: { name?: string; is_active?: boolean }
+    data: {
+        name?: string;
+        is_active?: boolean;
+        grade?: string;
+        subject?: string;
+        start_date?: string;
+        end_date?: string | null;
+    }
 ): Promise<Advertisement> => {
     const response = await api.put<Advertisement>(`/advertisements/${id}`, data);
     return response.data;

@@ -8,18 +8,24 @@ import { Link } from 'react-router-dom';
 import {
     QuestionAnswer as QuestionIcon,
     Games as GameIcon,
-    School as SchoolIcon,
     Add as AddIcon,
     ViewList as ViewListIcon,
     Gamepad as GamepadIcon,
-    CloudDownload as CloudDownloadIcon,
     Campaign as CampaignIcon,
-    LibraryBooks as LibraryBooksIcon
+    Home as HomeIcon,
+    Category as CategoryIcon,
+    FolderSpecial as FolderSpecialIcon,
+    Group as GroupIcon
 } from '@mui/icons-material';
+
 import { useDashboard } from '../../hooks/useDashboard';
+import { useUsers } from '../../hooks/useUsers';
+import { useQuestionGroups } from '../../hooks/useQuestionGroups';
 
 const Dashboard = () => {
     const { stats, loading, error } = useDashboard();
+    const { users } = useUsers();
+    const { questionGroups } = useQuestionGroups();
 
     if (loading) {
         return (
@@ -56,31 +62,37 @@ const Dashboard = () => {
             icon: <QuestionIcon sx={{ fontSize: 40 }} color="primary" />
         },
         {
-            title: 'Oyun Sayısı',
+            title: 'Toplam Oyun Sayısı',
             value: dashboardStats.gameCount,
             icon: <GameIcon sx={{ fontSize: 40 }} color="success" />
         },
         {
             title: 'Kategoriler',
             value: dashboardStats.categoryCount,
-            icon: <SchoolIcon sx={{ fontSize: 40 }} color="warning" />
+            icon: <CategoryIcon sx={{ fontSize: 40 }} color="warning" />
         },
         {
-            title: 'Soru Grupları',
+            title: 'Etkinlikler',
             value: dashboardStats.questionGroupCount || 0, // Soru grupları sayısı
-            icon: <LibraryBooksIcon sx={{ fontSize: 40 }} color="secondary" /> // Mor renk kullanıyoruz
+            icon: <FolderSpecialIcon sx={{ fontSize: 40 }} color="secondary" /> // Mor renk kullanıyoruz
         },
         {
             title: 'Reklamlar',
             value: dashboardStats.advertisementCount || 0, // Reklam sayısı istatistiği
             icon: <CampaignIcon sx={{ fontSize: 40 }} color="info" /> // Reklam ikonu
         },
+        {
+            title: 'Toplam Kullanıcı',
+            value: users.length,
+            icon: <GroupIcon sx={{ fontSize: 40 }} color="error" />
+        },
     ];
 
     return (
         <Box>
-            <Typography variant="h4" gutterBottom sx={{ mb: 4, fontWeight: 'bold' }}>
-                Dashboard
+            <HomeIcon color="primary" sx={{ fontSize: 34 }} />
+            <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
+                Ana Sayfa
             </Typography>
 
             <Grid container spacing={3}>
@@ -125,7 +137,7 @@ const Dashboard = () => {
                                 </Typography>
                             ) : (
                                 <List>
-                                    {dashboardStats.recentQuestions.map((question) => (
+                                    {dashboardStats.recentQuestions.slice(0, 3).map((question) => (
                                         <ListItem
                                             key={question.id}
                                             component={Link}
@@ -154,7 +166,7 @@ const Dashboard = () => {
 
                 <Grid item xs={12} md={6}>
                     <Card sx={{ borderRadius: 2, height: '100%' }}>
-                        <CardHeader title="Son Oyunlar" />
+                        <CardHeader title="Son Etkinlikler" />
                         <Divider />
                         <CardContent>
                             {dashboardStats.recentGames.length === 0 ? (
@@ -163,11 +175,11 @@ const Dashboard = () => {
                                 </Typography>
                             ) : (
                                 <List>
-                                    {dashboardStats.recentGames.map((game) => (
+                                    {questionGroups.slice(0, 3).map((group) => (
                                         <ListItem
-                                            key={game.id}
+                                            key={group.id}
                                             component={Link}
-                                            to={`/games/${game.id}`}
+                                            to={`/question-groups/${group.id}`}
                                             sx={{
                                                 textDecoration: 'none',
                                                 color: 'inherit',
@@ -175,8 +187,8 @@ const Dashboard = () => {
                                             }}
                                         >
                                             <ListItemText
-                                                primary={game.name}
-                                                secondary={`Tip: ${game.type === 'jeopardy' ? 'Jeopardy' : 'Bilgi Çarkı'}`}
+                                                primary={group.name}
+                                                secondary={`Eklenme: ${new Date(group.created_at).toLocaleDateString()}`}
                                             />
                                         </ListItem>
                                     ))}
@@ -222,12 +234,12 @@ const Dashboard = () => {
                                     <Button
                                         variant="outlined"
                                         fullWidth
-                                        startIcon={<LibraryBooksIcon />}
+                                        startIcon={<FolderSpecialIcon />}
                                         component={Link}
                                         to="/question-groups"
                                         sx={{ py: 1.5 }}
                                     >
-                                        Soru Grupları
+                                        Etkinlikleri Yönet
                                     </Button>
                                 </Grid>
                                 <Grid item xs={12} sm={6} md={2.4}>
@@ -252,18 +264,6 @@ const Dashboard = () => {
                                         sx={{ py: 1.5 }}
                                     >
                                         Reklamları Yönet
-                                    </Button>
-                                </Grid>
-                                <Grid item xs={12} sm={6} md={2.4}>
-                                    <Button
-                                        variant="outlined"
-                                        fullWidth
-                                        startIcon={<CloudDownloadIcon />}
-                                        component={Link}
-                                        to="/exports"
-                                        sx={{ py: 1.5 }}
-                                    >
-                                        Export İşlemleri
                                     </Button>
                                 </Grid>
                             </Grid>

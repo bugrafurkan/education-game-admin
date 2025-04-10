@@ -17,26 +17,28 @@ import {
 } from '@mui/icons-material';
 import { Link } from 'react-router-dom';
 import { useCategories } from '../../hooks/useCategories';
+import { useEducationStructure } from '../../hooks/useEducationStructure';
 
 const CategoryList = () => {
     const [search, setSearch] = useState('');
-    const [gradeFilter, setGradeFilter] = useState<string>('');
-    const [subjectFilter, setSubjectFilter] = useState<string>('');
+    const [gradeFilter, setGradeFilter] = useState<number | ''>('');
+    const [subjectFilter, setSubjectFilter] = useState<number | ''>('');
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [categoryToDelete, setCategoryToDelete] = useState<number | null>(null);
 
-    // Hook ile kategorileri yükle
+    // Hook ile kategorileri ve eğitim yapısını yükle
     const { categories, loading, error, deleteCategory } = useCategories();
+    const { grades, subjects, loading: educationLoading } = useEducationStructure();
 
     // Filtrelenmiş kategorileri bul
     const filteredCategories = categories.filter(category => {
         const searchMatch = search.trim() === '' ||
             category.name.toLowerCase().includes(search.toLowerCase()) ||
-            category.grade.toLowerCase().includes(search.toLowerCase()) ||
-            category.subject.toLowerCase().includes(search.toLowerCase());
+            (category.grade?.name || '').toLowerCase().includes(search.toLowerCase()) ||
+            (category.subject?.name || '').toLowerCase().includes(search.toLowerCase());
 
-        const gradeMatch = gradeFilter === '' || category.grade === gradeFilter;
-        const subjectMatch = subjectFilter === '' || category.subject === subjectFilter;
+        const gradeMatch = gradeFilter === '' || category.grade_id === gradeFilter;
+        const subjectMatch = subjectFilter === '' || category.subject_id === subjectFilter;
 
         return searchMatch && gradeMatch && subjectMatch;
     });
@@ -46,12 +48,12 @@ const CategoryList = () => {
         setSearch(e.target.value);
     };
 
-    const handleGradeChange = (event: SelectChangeEvent) => {
-        setGradeFilter(event.target.value);
+    const handleGradeChange = (event: SelectChangeEvent<number | ''>) => {
+        setGradeFilter(event.target.value as number | '');
     };
 
-    const handleSubjectChange = (event: SelectChangeEvent) => {
-        setSubjectFilter(event.target.value);
+    const handleSubjectChange = (event: SelectChangeEvent<number | ''>) => {
+        setSubjectFilter(event.target.value as number | '');
     };
 
     // Silme işlemleri
@@ -74,10 +76,6 @@ const CategoryList = () => {
         setDeleteDialogOpen(false);
         setCategoryToDelete(null);
     };
-
-    // Benzersiz sınıf ve ders listelerini çıkar
-    const uniqueGrades = Array.from(new Set(categories.map(cat => cat.grade)));
-    const uniqueSubjects = Array.from(new Set(categories.map(cat => cat.subject)));
 
     return (
         <Box>
@@ -113,8 +111,8 @@ const CategoryList = () => {
                                 onChange={handleGradeChange}
                             >
                                 <MenuItem value="">Tümü</MenuItem>
-                                {uniqueGrades.map((grade) => (
-                                    <MenuItem key={grade} value={grade}>{grade}</MenuItem>
+                                {grades.map((grade) => (
+                                    <MenuItem key={grade.id} value={grade.id}>{grade.name}</MenuItem>
                                 ))}
                             </Select>
                         </FormControl>
@@ -129,8 +127,8 @@ const CategoryList = () => {
                                 onChange={handleSubjectChange}
                             >
                                 <MenuItem value="">Tümü</MenuItem>
-                                {uniqueSubjects.map((subject) => (
-                                    <MenuItem key={subject} value={subject}>{subject}</MenuItem>
+                                {subjects.map((subject) => (
+                                    <MenuItem key={subject.id} value={subject.id}>{subject.name}</MenuItem>
                                 ))}
                             </Select>
                         </FormControl>
@@ -161,7 +159,7 @@ const CategoryList = () => {
                 </Alert>
             )}
 
-            <Paper sx={{  overflowX: 'auto',borderRadius: 2 }}>
+            <Paper sx={{ overflowX: 'auto', borderRadius: 2 }}>
                 <TableContainer>
                     <Table>
                         <TableHead sx={{ bgcolor: '#f5f8fa' }}>
@@ -170,12 +168,12 @@ const CategoryList = () => {
                                 <TableCell width="25%">Kategori Adı</TableCell>
                                 <TableCell width="15%">Sınıf</TableCell>
                                 <TableCell width="15%">Ders</TableCell>
-                                <TableCell width="25%">Ünite / Açıklama</TableCell>
+                                <TableCell width="25%">Ünite / Konu</TableCell>
                                 <TableCell width="15%">İşlemler</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {loading ? (
+                            {loading || educationLoading ? (
                                 <TableRow>
                                     <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
                                         <CircularProgress size={24} />
@@ -195,7 +193,7 @@ const CategoryList = () => {
                                         <TableCell>
                                             <Chip
                                                 icon={<SchoolIcon />}
-                                                label={category.grade}
+                                                label={category.grade?.name || 'Belirsiz'}
                                                 variant="outlined"
                                                 size="small"
                                                 color="primary"
@@ -204,13 +202,13 @@ const CategoryList = () => {
                                         <TableCell>
                                             <Chip
                                                 icon={<MenuBookIcon />}
-                                                label={category.subject}
+                                                label={category.subject?.name || 'Belirsiz'}
                                                 variant="outlined"
                                                 size="small"
                                                 color="secondary"
                                             />
                                         </TableCell>
-                                        <TableCell>{category.unit || category.description || '-'}</TableCell>
+                                        <TableCell>{category.unit?.name || category.topic?.name || '-'}</TableCell>
                                         <TableCell>
                                             <IconButton
                                                 color="info"

@@ -1,5 +1,5 @@
 // src/pages/question-groups/EditQuestionGroup.tsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
     Box, Typography, Paper, Button, TextField,
@@ -9,9 +9,30 @@ import {
 } from '@mui/material';
 import {
     ArrowBack as ArrowBackIcon,
-    Save as SaveIcon
+    Save as SaveIcon,
+    CloudUpload as CloudUploadIcon,
+    DeleteOutline as DeleteIcon
 } from '@mui/icons-material';
 import * as questionGroupService from '../../services/question-group.service';
+
+// Drag & Drop dosya yükleme için stiller
+const dropzoneStyles = {
+    border: '2px dashed #cccccc',
+    borderRadius: '4px',
+    padding: '20px',
+    textAlign: 'center' as const,
+    cursor: 'pointer',
+    backgroundColor: '#f9f9f9',
+    transition: 'border .3s ease-in-out, background-color .3s ease-in-out',
+    '&:hover': {
+        backgroundColor: '#f0f0f0',
+        borderColor: '#999999'
+    },
+    '&.active': {
+        borderColor: '#2196f3',
+        backgroundColor: 'rgba(33, 150, 243, 0.1)'
+    }
+};
 
 const EditQuestionGroup = () => {
     const { id } = useParams<{ id: string }>();
@@ -22,6 +43,14 @@ const EditQuestionGroup = () => {
     const [questionType, setQuestionType] = useState<string>('');
     const [gameId, setGameId] = useState<number>(0);
     const [selectedQuestions, setSelectedQuestions] = useState<number[]>([]);
+
+    // Görsel yükleme için yeni state değişkenleri
+    const [imageFile, setImageFile] = useState<File | null>(null);
+    const [imagePreview, setImagePreview] = useState<string | null>(null);
+    const [existingImage, setExistingImage] = useState<string | null>(null);
+    const [dragActive, setDragActive] = useState(false);
+    const [uploadError, setUploadError] = useState<string | null>(null);
+    const [imageChanged, setImageChanged] = useState(false);
 
     // Liste verileri
     const [eligibleQuestions, setEligibleQuestions] = useState<questionGroupService.Question[]>([]);
@@ -52,6 +81,13 @@ const EditQuestionGroup = () => {
             setGameId(response.game_id);
             setAllGroupQuestions(response.questions || []);
             setSelectedQuestions(response.questions?.map(q => q.id) || []);
+
+            // Mevcut görseli ayarla
+            if (response.image_url) {
+                setImagePreview(response.image_url);
+                // existingImage değişkenini kullanıyoruz
+                setExistingImage(response.image_url);
+            }
 
             setLoading(false);
 
@@ -109,6 +145,71 @@ const EditQuestionGroup = () => {
         setError(null);
     };
 
+    // Görsel yükleme işlemleri
+    const handleDrag = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.type === 'dragenter' || e.type === 'dragover') {
+            setDragActive(true);
+        } else if (e.type === 'dragleave') {
+            setDragActive(false);
+        }
+    }, []);
+
+    const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDragActive(false);
+
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+            handleFileChange(e.dataTransfer.files[0]);
+        }
+    }, []);
+
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            handleFileChange(e.target.files[0]);
+        }
+    };
+
+    const handleFileChange = (file: File) => {
+        // Dosya tipini kontrol et
+        if (!file.type.match('image.*')) {
+            setUploadError('Lütfen geçerli bir görsel dosyası yükleyin (JPEG, PNG, GIF, vs.)');
+            return;
+        }
+
+        // Dosya boyutunu kontrol et (5MB)
+        if (file.size > 5 * 1024 * 1024) {
+            setUploadError('Görsel dosyası 5MB\'tan küçük olmalıdır');
+            return;
+        }
+
+        setUploadError(null);
+        setImageFile(file);
+        setImageChanged(true);
+
+        // Önizleme URL'i oluştur
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setImagePreview(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const handleRemoveImage = () => {
+        setImageFile(null);
+        setImagePreview(null);
+
+        // Eğer zaten bir görsel varsa, bunu silmek istediğimizi belirtiyoruz
+        if (existingImage) {
+            setExistingImage(null);
+            setImageChanged(true);
+        }
+
+        setUploadError(null);
+    };
+
     // Form gönderme
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -130,13 +231,28 @@ const EditQuestionGroup = () => {
                 return;
             }
 
-            // Grup güncelle
-            const groupData: questionGroupService.QuestionGroupUpdate = {
-                name,
-                question_ids: selectedQuestions
-            };
+            // FormData oluştur
+            const formData = new FormData();
+            formData.append('name', name);
+            formData.append('_method', 'PUT'); // Laravel'de PUT/PATCH için gerekli
 
-            await questionGroupService.updateQuestionGroup(parseInt(id!), groupData);
+            // Seçili soruları ekle
+            selectedQuestions.forEach((id, index) => {
+                formData.append(`question_ids[${index}]`, id.toString());
+            });
+
+            // Görsel durumunu işle
+            if (imageChanged) {
+                if (imageFile) {
+                    formData.append('image', imageFile);
+                } else {
+                    // Görsel silindi
+                    formData.append('remove_image', '1');
+                }
+            }
+
+            // API'ye FormData gönder
+            await questionGroupService.updateQuestionGroupWithImage(parseInt(id!), formData);
 
             // Başarılı mesajı göster
             alert('Soru grubu başarıyla güncellendi.');
@@ -200,13 +316,13 @@ const EditQuestionGroup = () => {
             <form onSubmit={handleSubmit}>
                 <Paper sx={{ p: 3, borderRadius: 2, mb: 3 }}>
                     <Typography variant="h6" sx={{ mb: 3 }}>
-                        Grup Bilgileri
+                        Etkinlik Bilgileri
                     </Typography>
 
                     <Grid container spacing={3}>
                         <Grid item xs={12}>
                             <TextField
-                                label="Grup Adı"
+                                label="Etkinlik"
                                 fullWidth
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
@@ -238,6 +354,85 @@ const EditQuestionGroup = () => {
                                 disabled
                                 helperText="Oyun değiştirilemez"
                             />
+                        </Grid>
+
+                        {/* Görsel Yükleme Alanı */}
+                        <Grid item xs={12}>
+                            <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                                Etkinlik Görseli (Opsiyonel)
+                            </Typography>
+
+                            {imagePreview ? (
+                                <Box sx={{
+                                    position: 'relative',
+                                    width: 'fit-content',
+                                    margin: '0 auto',
+                                    mb: 2
+                                }}>
+                                    <Box
+                                        component="img"
+                                        src={imagePreview}
+                                        alt="Etkinlik görseli önizleme"
+                                        sx={{
+                                            maxWidth: '100%',
+                                            maxHeight: '200px',
+                                            borderRadius: 1,
+                                            border: '1px solid #e0e0e0'
+                                        }}
+                                    />
+                                    <IconButton
+                                        onClick={handleRemoveImage}
+                                        sx={{
+                                            position: 'absolute',
+                                            top: -10,
+                                            right: -10,
+                                            bgcolor: 'rgba(255, 255, 255, 0.7)',
+                                            '&:hover': {
+                                                bgcolor: 'rgba(255, 255, 255, 0.9)',
+                                            }
+                                        }}
+                                        size="small"
+                                    >
+                                        <DeleteIcon />
+                                    </IconButton>
+                                </Box>
+                            ) : (
+                                <Box
+                                    sx={{
+                                        ...dropzoneStyles,
+                                        ...(dragActive ? {
+                                            borderColor: '#2196f3',
+                                            backgroundColor: 'rgba(33, 150, 243, 0.1)'
+                                        } : {})
+                                    }}
+                                    onDragEnter={handleDrag}
+                                    onDragOver={handleDrag}
+                                    onDragLeave={handleDrag}
+                                    onDrop={handleDrop}
+                                    onClick={() => document.getElementById('file-upload')?.click()}
+                                >
+                                    <input
+                                        id="file-upload"
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={handleFileSelect}
+                                        style={{ display: 'none' }}
+                                    />
+                                    <CloudUploadIcon sx={{ fontSize: 40, color: '#666', mb: 1 }} />
+                                    <Typography>
+                                        Görsel yüklemek için tıklayın veya sürükleyin
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                        Maksimum dosya boyutu: 5MB (JPEG, PNG, GIF)
+                                    </Typography>
+                                </Box>
+                            )}
+
+                            {uploadError && (
+                                <Alert severity="error" sx={{ mt: 2 }}>
+                                    {uploadError}
+                                </Alert>
+                            )}
                         </Grid>
                     </Grid>
                 </Paper>

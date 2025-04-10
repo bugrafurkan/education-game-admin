@@ -11,33 +11,26 @@ import {
     Save as SaveIcon
 } from '@mui/icons-material';
 import * as categoryService from '../../services/category.service';
-
-// Eğitimdeki yaygın sınıf seviyeleri için ön tanımlı değerler
-const commonGrades = [
-    "Anaokulu", "1-4", "5-8", "9-12", "Üniversite", "Tümü"
-];
-
-// Eğitimdeki yaygın dersler için ön tanımlı değerler
-const commonSubjects = [
-    "Matematik", "Fen Bilgisi", "Türkçe", "Sosyal Bilgiler", "İngilizce",
-    "Fizik", "Kimya", "Biyoloji", "Coğrafya", "Tarih", "Diğer"
-];
+import { useEducationStructure } from '../../hooks/useEducationStructure';
 
 const AddEditCategory = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const isEdit = !!id;
 
+    // Eğitim yapısı verilerini yükle
+    const { grades, subjects, units, topics, loading: educationLoading } = useEducationStructure();
+
     // Form state
     const [name, setName] = useState('');
-    const [grade, setGrade] = useState('');
-    const [subject, setSubject] = useState('');
-    const [unit, setUnit] = useState('');
-    const [description, setDescription] = useState('');
+    const [gradeId, setGradeId] = useState<number | ''>('');
+    const [subjectId, setSubjectId] = useState<number | ''>('');
+    const [unitId, setUnitId] = useState<number | ''>('');
+    const [topicId, setTopicId] = useState<number | ''>('');
 
-    // Custom values (eğer listede olmayan bir değer girilecekse)
-    const [customGrade, setCustomGrade] = useState('');
-    const [customSubject, setCustomSubject] = useState('');
+    // Filtrelenmiş listeler
+    const [filteredUnits, setFilteredUnits] = useState(units);
+    const [filteredTopics, setFilteredTopics] = useState(topics);
 
     // UI states
     const [loading, setLoading] = useState(false);
@@ -54,10 +47,10 @@ const AddEditCategory = () => {
 
                     // Form alanlarını doldur
                     setName(categoryData.name);
-                    setGrade(categoryData.grade);
-                    setSubject(categoryData.subject);
-                    setUnit(categoryData.unit || '');
-                    setDescription(categoryData.description || '');
+                    setGradeId(categoryData.grade_id);
+                    setSubjectId(categoryData.subject_id);
+                    setUnitId(categoryData.unit_id || '');
+                    setTopicId(categoryData.topic_id || '');
 
                     setLoading(false);
                 } catch (err) {
@@ -71,6 +64,42 @@ const AddEditCategory = () => {
         }
     }, [id, isEdit]);
 
+    // Grade ve Subject değiştiğinde ilgili üniteleri filtrele
+    useEffect(() => {
+        if (gradeId && subjectId) {
+            const filtered = units.filter(
+                unit => unit.grade_id === gradeId && unit.subject_id === subjectId
+            );
+            setFilteredUnits(filtered);
+
+            // Eğer seçili ünite bu filtrelere uygun değilse, seçimi sıfırla
+            if (unitId && !filtered.some(unit => unit.id === unitId)) {
+                setUnitId('');
+                setTopicId('');
+            }
+        } else {
+            setFilteredUnits([]);
+            setUnitId('');
+            setTopicId('');
+        }
+    }, [gradeId, subjectId, units, unitId]);
+
+    // Unit değiştiğinde ilgili konuları filtrele
+    useEffect(() => {
+        if (unitId) {
+            const filtered = topics.filter(topic => topic.unit_id === unitId);
+            setFilteredTopics(filtered);
+
+            // Eğer seçili konu bu filtreye uygun değilse, seçimi sıfırla
+            if (topicId && !filtered.some(topic => topic.id === topicId)) {
+                setTopicId('');
+            }
+        } else {
+            setFilteredTopics([]);
+            setTopicId('');
+        }
+    }, [unitId, topics, topicId]);
+
     // Form submit
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -79,16 +108,12 @@ const AddEditCategory = () => {
             setLoading(true);
             setError(null);
 
-            // Eğer özel değerler girilmişse bunları kullan
-            const finalGrade = grade === 'custom' ? customGrade : grade;
-            const finalSubject = subject === 'custom' ? customSubject : subject;
-
             const categoryData: categoryService.CategoryCreate = {
                 name,
-                grade: finalGrade,
-                subject: finalSubject,
-                unit: unit || undefined,
-                description: description || undefined
+                grade_id: gradeId as number,
+                subject_id: subjectId as number,
+                unit_id: unitId ? (unitId as number) : undefined,
+                topic_id: topicId ? (topicId as number) : undefined
             };
 
             if (isEdit) {
@@ -101,12 +126,10 @@ const AddEditCategory = () => {
                 // Yeni kategori eklendiyse formu sıfırla
                 if (!isEdit) {
                     setName('');
-                    setGrade('');
-                    setSubject('');
-                    setUnit('');
-                    setDescription('');
-                    setCustomGrade('');
-                    setCustomSubject('');
+                    setGradeId('');
+                    setSubjectId('');
+                    setUnitId('');
+                    setTopicId('');
                 }
             }
 
@@ -124,12 +147,20 @@ const AddEditCategory = () => {
     };
 
     // Sınıf ve ders seçimi
-    const handleGradeChange = (event: SelectChangeEvent) => {
-        setGrade(event.target.value);
+    const handleGradeChange = (event: SelectChangeEvent<number | ''>) => {
+        setGradeId(event.target.value as number | '');
     };
 
-    const handleSubjectChange = (event: SelectChangeEvent) => {
-        setSubject(event.target.value);
+    const handleSubjectChange = (event: SelectChangeEvent<number | ''>) => {
+        setSubjectId(event.target.value as number | '');
+    };
+
+    const handleUnitChange = (event: SelectChangeEvent<number | ''>) => {
+        setUnitId(event.target.value as number | '');
+    };
+
+    const handleTopicChange = (event: SelectChangeEvent<number | ''>) => {
+        setTopicId(event.target.value as number | '');
     };
 
     return (
@@ -161,7 +192,7 @@ const AddEditCategory = () => {
             )}
 
             <Paper sx={{ p: 3, borderRadius: 2 }}>
-                {loading && !isEdit ? (
+                {(loading && !isEdit) || educationLoading ? (
                     <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
                         <CircularProgress />
                     </Box>
@@ -183,83 +214,70 @@ const AddEditCategory = () => {
                                 <FormControl fullWidth>
                                     <InputLabel>Sınıf Seviyesi</InputLabel>
                                     <Select
-                                        value={grade}
+                                        value={gradeId}
                                         label="Sınıf Seviyesi"
                                         onChange={handleGradeChange}
                                         required
                                         disabled={loading}
                                     >
-                                        {commonGrades.map((g) => (
-                                            <MenuItem key={g} value={g}>{g}</MenuItem>
+                                        <MenuItem value="" disabled>Sınıf Seçin</MenuItem>
+                                        {grades.map((grade) => (
+                                            <MenuItem key={grade.id} value={grade.id}>{grade.name}</MenuItem>
                                         ))}
-                                        <MenuItem value="custom">Diğer (Özel)</MenuItem>
                                     </Select>
                                 </FormControl>
-
-                                {grade === 'custom' && (
-                                    <TextField
-                                        label="Özel Sınıf Seviyesi"
-                                        fullWidth
-                                        value={customGrade}
-                                        onChange={(e) => setCustomGrade(e.target.value)}
-                                        required
-                                        disabled={loading}
-                                        margin="normal"
-                                    />
-                                )}
                             </Grid>
 
                             <Grid item xs={12} md={6}>
                                 <FormControl fullWidth>
                                     <InputLabel>Ders</InputLabel>
                                     <Select
-                                        value={subject}
+                                        value={subjectId}
                                         label="Ders"
                                         onChange={handleSubjectChange}
                                         required
                                         disabled={loading}
                                     >
-                                        {commonSubjects.map((s) => (
-                                            <MenuItem key={s} value={s}>{s}</MenuItem>
+                                        <MenuItem value="" disabled>Ders Seçin</MenuItem>
+                                        {subjects.map((subject) => (
+                                            <MenuItem key={subject.id} value={subject.id}>{subject.name}</MenuItem>
                                         ))}
-                                        <MenuItem value="custom">Diğer (Özel)</MenuItem>
                                     </Select>
                                 </FormControl>
-
-                                {subject === 'custom' && (
-                                    <TextField
-                                        label="Özel Ders"
-                                        fullWidth
-                                        value={customSubject}
-                                        onChange={(e) => setCustomSubject(e.target.value)}
-                                        required
-                                        disabled={loading}
-                                        margin="normal"
-                                    />
-                                )}
                             </Grid>
 
-                            <Grid item xs={12}>
-                                <TextField
-                                    label="Ünite"
-                                    fullWidth
-                                    value={unit}
-                                    onChange={(e) => setUnit(e.target.value)}
-                                    disabled={loading}
-                                    placeholder="Örneğin: Bölüm 3 - Doğal Sayılar"
-                                />
+                            <Grid item xs={12} md={6}>
+                                <FormControl fullWidth>
+                                    <InputLabel>Ünite</InputLabel>
+                                    <Select
+                                        value={unitId}
+                                        label="Ünite"
+                                        onChange={handleUnitChange}
+                                        disabled={loading || !gradeId || !subjectId || filteredUnits.length === 0}
+                                    >
+                                        <MenuItem value="">Ünite Seçin (Opsiyonel)</MenuItem>
+                                        {filteredUnits.map((unit) => (
+                                            <MenuItem key={unit.id} value={unit.id}>{unit.name}</MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
                             </Grid>
 
-                            <Grid item xs={12}>
-                                <TextField
-                                    label="Açıklama"
-                                    fullWidth
-                                    multiline
-                                    rows={3}
-                                    value={description}
-                                    onChange={(e) => setDescription(e.target.value)}
-                                    disabled={loading}
-                                />
+                            <Grid item xs={12} md={6}>
+                                <FormControl fullWidth>
+                                    <InputLabel>Konu</InputLabel>
+                                    <Select
+                                        value={topicId}
+                                        label="Konu"
+                                        onChange={handleTopicChange}
+                                        disabled={loading || !unitId || filteredTopics.length === 0}
+                                    >
+                                        <MenuItem value="">Konu Seçin (Opsiyonel)</MenuItem>
+                                        {filteredTopics.map((topic) => (
+                                            <MenuItem key={topic.id} value={topic.id}>{topic.name}</MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
                             </Grid>
 
                             <Grid item xs={12} sx={{ mt: 2, textAlign: 'right' }}>
@@ -275,7 +293,7 @@ const AddEditCategory = () => {
                                 <Button
                                     type="submit"
                                     variant="contained"
-                                    disabled={loading || !name || (!grade && !customGrade) || (!subject && !customSubject)}
+                                    disabled={loading || !name || !gradeId || !subjectId}
                                     startIcon={loading ? <CircularProgress size={20} /> : <SaveIcon />}
                                     sx={{
                                         py: 1.5,

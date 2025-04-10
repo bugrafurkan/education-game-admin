@@ -12,7 +12,7 @@ import {
     Collapse,
 } from '@mui/material';
 import {
-    Dashboard as DashboardIcon,
+    Home as HomeIcon,
     QuestionAnswer as QuestionIcon,
     Games as GameIcon,
     Settings as SettingsIcon,
@@ -48,12 +48,13 @@ const Sidebar = ({ open, onClose, variant }: SidebarProps) => {
         setUserRole(role);
     }, [isAuthenticated]);
 
+    // Menü sıralaması değiştirildi, Ayarlar sekmesi sona değil ortaya alındı
     const allMenuItems = [
-        { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
-        { text: 'Sorular', icon: <QuestionIcon />, path: '/questions' },
-        { text: 'Oyunlar', icon: <GameIcon />, path: '/games' },
-        { text: 'Soru Grupları', icon: <LibraryBooksIcon />, path: '/question-groups' },
-        { text: 'Reklamlar', icon: <CampaignIcon />, path: '/advertisements' },
+        { text: 'Ana Sayfa', icon: <HomeIcon />, path: '/' },
+        { text: 'Soru Yönetimi', icon: <QuestionIcon />, path: '/questions' },
+        { text: 'Oyun Yönetimi', icon: <GameIcon />, path: '/games' },
+        { text: 'Etkinlik Yönetimi', icon: <LibraryBooksIcon />, path: '/question-groups' },
+        { text: 'Reklam Yönetimi', icon: <CampaignIcon />, path: '/advertisements' },
         { text: 'Ayarlar', icon: <SettingsIcon />, path: '/settings' },
     ];
 
@@ -87,6 +88,7 @@ const Sidebar = ({ open, onClose, variant }: SidebarProps) => {
             <Divider sx={{ borderColor: 'rgba(255,255,255,0.1)' }} />
 
             <List>
+                {/* Menü öğelerini render et */}
                 {menuItemsToRender.map((item) => (
                     <ListItem key={item.text} disablePadding>
                         <ListItemButton
@@ -112,92 +114,96 @@ const Sidebar = ({ open, onClose, variant }: SidebarProps) => {
                     </ListItem>
                 ))}
 
-                {/* Kategoriler Menüsü Elle Eklenmiş */}
-                <ListItem disablePadding>
-                    <ListItemButton
-                        onClick={() => setOpenCategoryMenu(!openCategoryMenu)}
-                        selected={location.pathname.startsWith('/categories')}
-                        sx={{
-                            '&.Mui-selected': {
-                                backgroundColor: 'rgba(255,255,255,0.1)',
-                                color: '#fff',
-                                '&:hover': {
-                                    backgroundColor: 'rgba(255,255,255,0.15)',
-                                },
-                            },
-                            '&:hover': {
-                                backgroundColor: 'rgba(255,255,255,0.05)',
-                            },
-                        }}
-                    >
-                        <ListItemIcon sx={{ color: 'inherit' }}>
-                            <CategoryIcon />
-                        </ListItemIcon>
-                        <ListItemText primary="Kategoriler" />
-                        {openCategoryMenu ? <ExpandLess /> : <ExpandMore />}
-                    </ListItemButton>
-                </ListItem>
+                {/* Kategoriler Menüsü - Normal kullanıcılar için ve Ayarlardan sonra göster */}
+                {userRole !== 'editor' && (
+                    <>
+                        <ListItem disablePadding>
+                            <ListItemButton
+                                onClick={() => setOpenCategoryMenu(!openCategoryMenu)}
+                                selected={location.pathname.startsWith('/categories')}
+                                sx={{
+                                    '&.Mui-selected': {
+                                        backgroundColor: 'rgba(255,255,255,0.1)',
+                                        color: '#fff',
+                                        '&:hover': {
+                                            backgroundColor: 'rgba(255,255,255,0.15)',
+                                        },
+                                    },
+                                    '&:hover': {
+                                        backgroundColor: 'rgba(255,255,255,0.05)',
+                                    },
+                                }}
+                            >
+                                <ListItemIcon sx={{ color: 'inherit' }}>
+                                    <CategoryIcon />
+                                </ListItemIcon>
+                                <ListItemText primary="Kategoriler" />
+                                {openCategoryMenu ? <ExpandLess /> : <ExpandMore />}
+                            </ListItemButton>
+                        </ListItem>
 
-                <Collapse in={openCategoryMenu} timeout="auto" unmountOnExit>
-                    <List component="div" disablePadding>
-                        <ListItemButton
-                            component={Link}
-                            to="/categories"
-                            selected={location.pathname === '/categories'}
-                            sx={{ pl: 4 }}
-                        >
-                            <ListItemText primary="Kategori Listesi" />
-                        </ListItemButton>
+                        <Collapse in={openCategoryMenu} timeout="auto" unmountOnExit>
+                            <List component="div" disablePadding>
+                                <ListItemButton
+                                    component={Link}
+                                    to="/categories"
+                                    selected={location.pathname === '/categories'}
+                                    sx={{ pl: 4 }}
+                                >
+                                    <ListItemText primary="Kategori Listesi" />
+                                </ListItemButton>
 
-                        <ListItemButton
-                            component={Link}
-                            to="/grades"
-                            selected={location.pathname === '/grades'}
-                            sx={{ pl: 4 }}
-                        >
-                            <ListItemIcon sx={{ color: 'inherit' }}>
-                                <GradeIcon />
-                            </ListItemIcon>
-                            <ListItemText primary="Sınıflar" />
-                        </ListItemButton>
+                                <ListItemButton
+                                    component={Link}
+                                    to="/subjects"
+                                    selected={location.pathname === '/subjects'}
+                                    sx={{ pl: 4 }}
+                                >
+                                    <ListItemIcon sx={{ color: 'inherit' }}>
+                                        <SubjectIcon />
+                                    </ListItemIcon>
+                                    <ListItemText primary="Branşlar" />
+                                </ListItemButton>
 
-                        <ListItemButton
-                            component={Link}
-                            to="/subjects"
-                            selected={location.pathname === '/subjects'}
-                            sx={{ pl: 4 }}
-                        >
-                            <ListItemIcon sx={{ color: 'inherit' }}>
-                                <SubjectIcon />
-                            </ListItemIcon>
-                            <ListItemText primary="Dersler" />
-                        </ListItemButton>
+                                <ListItemButton
+                                    component={Link}
+                                    to="/grades"
+                                    selected={location.pathname === '/grades'}
+                                    sx={{ pl: 4 }}
+                                >
+                                    <ListItemIcon sx={{ color: 'inherit' }}>
+                                        <GradeIcon />
+                                    </ListItemIcon>
+                                    <ListItemText primary="Sınıflar" />
+                                </ListItemButton>
 
-                        <ListItemButton
-                            component={Link}
-                            to="/units"
-                            selected={location.pathname === '/units'}
-                            sx={{ pl: 4 }}
-                        >
-                            <ListItemIcon sx={{ color: 'inherit' }}>
-                                <UnitIcon />
-                            </ListItemIcon>
-                            <ListItemText primary="Üniteler" />
-                        </ListItemButton>
+                                <ListItemButton
+                                    component={Link}
+                                    to="/units"
+                                    selected={location.pathname === '/units'}
+                                    sx={{ pl: 4 }}
+                                >
+                                    <ListItemIcon sx={{ color: 'inherit' }}>
+                                        <UnitIcon />
+                                    </ListItemIcon>
+                                    <ListItemText primary="Üniteler" />
+                                </ListItemButton>
 
-                        <ListItemButton
-                            component={Link}
-                            to="/topics"
-                            selected={location.pathname === '/topics'}
-                            sx={{ pl: 4 }}
-                        >
-                            <ListItemIcon sx={{ color: 'inherit' }}>
-                                <TopicIcon />
-                            </ListItemIcon>
-                            <ListItemText primary="Konular" />
-                        </ListItemButton>
-                    </List>
-                </Collapse>
+                                <ListItemButton
+                                    component={Link}
+                                    to="/topics"
+                                    selected={location.pathname === '/topics'}
+                                    sx={{ pl: 4 }}
+                                >
+                                    <ListItemIcon sx={{ color: 'inherit' }}>
+                                        <TopicIcon />
+                                    </ListItemIcon>
+                                    <ListItemText primary="Bölümler" />
+                                </ListItemButton>
+                            </List>
+                        </Collapse>
+                    </>
+                )}
             </List>
         </Drawer>
     );

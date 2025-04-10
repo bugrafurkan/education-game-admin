@@ -61,14 +61,14 @@ const QuestionGroupList = () => {
 
     return (
         <Box>
-            <Typography variant="h4" sx={{ fontWeight: 'bold', mb: 3 }}>Soru Grupları</Typography>
+            <Typography variant="h4" sx={{ fontWeight: 'bold', mb: 3 }}>Etkinlikler</Typography>
 
             <Paper sx={{ p: 2, mb: 3 }}>
                 <Grid container spacing={2}>
                     <Grid item xs={12} md={4}>
                         <TextField
                             fullWidth
-                            label="Grup Ara"
+                            label="Etkinlkik Ara"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             InputProps={{
@@ -117,7 +117,7 @@ const QuestionGroupList = () => {
                     <Table>
                         <TableHead>
                             <TableRow>
-                                <TableCell onClick={() => handleSort('name')} sx={{ cursor: 'pointer' }}>Grup Adı {getSortIcon('name')}</TableCell>
+                                <TableCell onClick={() => handleSort('name')} sx={{ cursor: 'pointer' }}>Etkinlik Adı {getSortIcon('name')}</TableCell>
                                 <TableCell onClick={() => handleSort('question_type')} sx={{ cursor: 'pointer' }}>Soru Tipi {getSortIcon('question_type')}</TableCell>
                                 <TableCell onClick={() => handleSort('game_id')} sx={{ cursor: 'pointer' }}>Oyun {getSortIcon('game_id')}</TableCell>
                                 <TableCell>Soru Sayısı</TableCell>

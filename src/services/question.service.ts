@@ -1,13 +1,19 @@
 // src/services/question.service.ts
 import api from './api';
+import { Grade, Subject, Unit, Topic } from '../types/education';
 
 export interface Category {
     id: number;
     name: string;
-    grade: string;
-    subject: string;
-    unit?: string;
-    description?: string;
+    grade_id: number;
+    subject_id: number;
+    unit_id?: number;
+    topic_id?: number;
+    // İlişkisel veri
+    grade?: Grade;
+    subject?: Subject;
+    unit?: Unit;
+    topic?: Topic;
 }
 
 export interface Answer {
@@ -51,12 +57,11 @@ export interface QuestionFilter {
     difficulty?: string;
     category_id?: number;
     user_id?: number;
-    grade?: string;
-    subject?: string;
-    unit?: string;
-    konu?: string;
+    grade_id?: number;
+    subject_id?: number;
+    unit_id?: number;
+    topic_id?: number;
 }
-
 
 export interface PaginatedResponse<T> {
     data: T[];

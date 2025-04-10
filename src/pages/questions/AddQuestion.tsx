@@ -5,9 +5,9 @@ import {
     Box, Typography, Paper, Stepper, Step, StepLabel, Button,
     Grid, FormControl, FormLabel, RadioGroup, FormControlLabel, Radio,
     TextField, Divider, Alert, MenuItem, Select, SelectChangeEvent,
-    CircularProgress
+    CircularProgress, InputLabel
 } from '@mui/material';
-import { useCategories } from '../../hooks/useCategories';
+import { useEducationStructure } from '../../hooks/useEducationStructure';
 import * as questionService from '../../services/question.service';
 import * as gameService from '../../services/game.service';
 import axios, { AxiosError } from 'axios';
@@ -51,12 +51,26 @@ const AddQuestion = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    // Eğitim yapısı verilerini yükle
+    const { grades, subjects, units, topics} = useEducationStructure();
+
+    // Filtrelenmiş listeler
+    const [filteredSubjects, setFilteredSubjects] = useState(subjects);
+    const [filteredUnits, setFilteredUnits] = useState(units);
+    const [filteredTopics, setFilteredTopics] = useState(topics);
+
     // Form verileri
     const [questionType, setQuestionType] = useState<string>('');
     const [questionText, setQuestionText] = useState('');
     const [difficulty, setDifficulty] = useState('medium');
-    const [categoryId, setCategoryId] = useState('');
+    const [categoryId, setCategoryId] = useState<number | ''>('');
     const [gameId, setGameId] = useState(gameIdFromUrl || '');
+
+    // Kategori seçimi için state'ler
+    const [gradeId, setGradeId] = useState<number | ''>('');
+    const [subjectId, setSubjectId] = useState<number | ''>('');
+    const [unitId, setUnitId] = useState<number | ''>('');
+    const [topicId, setTopicId] = useState<number | ''>('');
 
     // Resim yükleme için state'ler
     const [imagePath, setImagePath] = useState<string | null>(null);
@@ -78,8 +92,79 @@ const AddQuestion = () => {
     const [games, setGames] = useState<gameService.Game[]>([]);
     const [gamesLoading, setGamesLoading] = useState(false);
 
-    // Kategori hook'u
-    const { categories, loading: categoriesLoading } = useCategories();
+    // Grade değiştiğinde ilgili dersleri filtrele
+    useEffect(() => {
+        if (gradeId) {
+            // Tüm dersleri göster (grade ve subject arasında doğrudan ilişki yoksa)
+            setFilteredSubjects(subjects);
+
+            // Grade değiştiğinde alt seçimleri sıfırla
+            setSubjectId('');
+            setUnitId('');
+            setTopicId('');
+            setCategoryId('');
+        } else {
+            setFilteredSubjects(subjects);
+            setSubjectId('');
+            setUnitId('');
+            setTopicId('');
+            setCategoryId('');
+        }
+    }, [gradeId, subjects]);
+
+    // Subject değiştiğinde ilgili üniteleri filtrele
+    useEffect(() => {
+        if (gradeId && subjectId) {
+            const filtered = units.filter(unit =>
+                unit.grade_id === gradeId && unit.subject_id === subjectId
+            );
+            setFilteredUnits(filtered);
+
+            // Subject değiştiğinde alt seçimleri sıfırla
+            setUnitId('');
+            setTopicId('');
+
+            // Kategoriyi seçmeye çalış
+            const matchingCategories = filtered.map(unit => unit.id);
+            if (matchingCategories.length > 0) {
+                // Eğer bir eşleşme bulunursa, ilk kategoriyi seç
+                // Bu davranış backend'e bağlı olarak değiştirilebilir
+                setCategoryId(matchingCategories[0]);
+            } else {
+                setCategoryId('');
+            }
+        } else {
+            setFilteredUnits([]);
+            setUnitId('');
+            setTopicId('');
+            setCategoryId('');
+        }
+    }, [gradeId, subjectId, units]);
+
+    // Unit değiştiğinde ilgili konuları filtrele
+    useEffect(() => {
+        if (unitId) {
+            const filtered = topics.filter(topic => topic.unit_id === unitId);
+            setFilteredTopics(filtered);
+
+            // Unit değiştiğinde topic seçimini sıfırla
+            setTopicId('');
+
+            // Ünite seçildiğinde kategori ID'sini güncelle
+            setCategoryId(unitId);
+        } else {
+            setFilteredTopics([]);
+            setTopicId('');
+        }
+    }, [unitId, topics]);
+
+    // Topic değişikliklerini izle
+    useEffect(() => {
+        if (topicId) {
+            // Konu seçildiğinde kategori ID'sini güncelle
+            setCategoryId(topicId);
+        }
+    }, [topicId]);
 
     // Düzenleme durumunda soruyu yükle
     useEffect(() => {
@@ -93,7 +178,15 @@ const AddQuestion = () => {
                     setQuestionType(question.question_type);
                     setQuestionText(question.question_text);
                     setDifficulty(question.difficulty);
-                    setCategoryId(question.category_id.toString());
+                    setCategoryId(question.category_id);
+
+                    // Kategori bilgilerini doldur
+                    if (question.category) {
+                        setGradeId(question.category.grade_id);
+                        setSubjectId(question.category.subject_id);
+                        if (question.category.unit_id) setUnitId(question.category.unit_id);
+                        if (question.category.topic_id) setTopicId(question.category.topic_id);
+                    }
 
                     // Resim yolunu ayarla
                     if (question.image_path) {
@@ -139,7 +232,7 @@ const AddQuestion = () => {
         };
 
         fetchQuestion();
-    }, [isEdit, questionId,choices]);
+    }, [isEdit, questionId, choices]);
 
     // Oyun listesini yükle
     useEffect(() => {
@@ -188,8 +281,20 @@ const AddQuestion = () => {
     };
 
     // Kategori değiştir
-    const handleCategoryChange = (event: SelectChangeEvent) => {
-        setCategoryId(event.target.value);
+    const handleGradeChange = (event: SelectChangeEvent<number | ''>) => {
+        setGradeId(event.target.value as number | '');
+    };
+
+    const handleSubjectChange = (event: SelectChangeEvent<number | ''>) => {
+        setSubjectId(event.target.value as number | '');
+    };
+
+    const handleUnitChange = (event: SelectChangeEvent<number | ''>) => {
+        setUnitId(event.target.value as number | '');
+    };
+
+    const handleTopicChange = (event: SelectChangeEvent<number | ''>) => {
+        setTopicId(event.target.value as number | '');
     };
 
     // Oyun değiştir
@@ -253,12 +358,26 @@ const AddQuestion = () => {
             setLoading(true);
             setError(null);
 
+            // Tüm zorunlu alanların kontrolü
+            if (!gradeId || !subjectId || !unitId || !topicId) {
+                setError('Lütfen tüm kategori alanlarını (Sınıf, Ders, Ünite ve Konu) doldurun.');
+                setLoading(false);
+                return;
+            }
+
+            // Kategori ID kontrol et
+            if (!categoryId) {
+                setError('Lütfen geçerli bir kategori seçin');
+                setLoading(false);
+                return;
+            }
+
             // Soru tipine göre cevapları hazırla
             const answers = getAnswersBasedOnType();
 
             // QuestionCreate için veri oluştur
             const questionData: questionService.QuestionCreate = {
-                category_id: parseInt(categoryId),
+                category_id: categoryId as number,
                 question_text: questionText,
                 question_type: questionType as 'multiple_choice' | 'true_false' | 'qa',
                 difficulty: difficulty as 'easy' | 'medium' | 'hard',
@@ -353,7 +472,7 @@ const AddQuestion = () => {
 
     // İkinci adım geçerli mi
     const isSecondStepValid = () => {
-        if (!questionText || !categoryId) return false;
+        if (!questionText || !gradeId || !subjectId || !unitId || !topicId) return false;
 
         switch (questionType) {
             case 'multiple_choice':
@@ -483,33 +602,92 @@ const AddQuestion = () => {
                                 )}
                             </Grid>
 
-                            <Grid item xs={12} sm={6}>
-                                <FormControl fullWidth>
-                                    <FormLabel>Kategori</FormLabel>
+                            {/* Kategori Seçimi - Hiyerarşik Yapı */}
+                            <Grid item xs={12} sm={6} md={3}>
+                                <FormControl fullWidth required>
+                                    <InputLabel>Sınıf</InputLabel>
                                     <Select
-                                        value={categoryId}
-                                        onChange={handleCategoryChange}
-                                        displayEmpty
+                                        value={gradeId}
+                                        label="Sınıf"
+                                        onChange={handleGradeChange}
+                                        required
                                     >
-                                        <MenuItem value="" disabled>Kategori Seçin</MenuItem>
-                                        {categoriesLoading ? (
-                                            <MenuItem value="" disabled>Yükleniyor...</MenuItem>
-                                        ) : (
-                                            categories.map((category) => (
-                                                <MenuItem key={category.id} value={category.id.toString()}>
-                                                    {category.name}
-                                                </MenuItem>
-                                            ))
-                                        )}
+                                        <MenuItem value="" disabled>Sınıf Seçin</MenuItem>
+                                        {grades.map((grade) => (
+                                            <MenuItem key={grade.id} value={grade.id}>
+                                                {grade.name}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+
+                            <Grid item xs={12} sm={6} md={3}>
+                                <FormControl fullWidth required>
+                                    <InputLabel>Ders</InputLabel>
+                                    <Select
+                                        value={subjectId}
+                                        label="Ders"
+                                        onChange={handleSubjectChange}
+                                        required
+                                        disabled={!gradeId}
+                                    >
+                                        <MenuItem value="" disabled>Ders Seçin</MenuItem>
+                                        {filteredSubjects.map((subject) => (
+                                            <MenuItem key={subject.id} value={subject.id}>
+                                                {subject.name}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+
+                            <Grid item xs={12} sm={6} md={3}>
+                                <FormControl fullWidth required>
+                                    <InputLabel>Ünite</InputLabel>
+                                    <Select
+                                        value={unitId}
+                                        label="Ünite"
+                                        onChange={handleUnitChange}
+                                        required
+                                        disabled={!subjectId || filteredUnits.length === 0}
+                                    >
+                                        <MenuItem value="" disabled>Ünite Seçin</MenuItem>
+                                        {filteredUnits.map((unit) => (
+                                            <MenuItem key={unit.id} value={unit.id}>
+                                                {unit.name}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+
+                            <Grid item xs={12} sm={6} md={3}>
+                                <FormControl fullWidth required>
+                                    <InputLabel>Konu</InputLabel>
+                                    <Select
+                                        value={topicId}
+                                        label="Konu"
+                                        onChange={handleTopicChange}
+                                        required
+                                        disabled={!unitId || filteredTopics.length === 0}
+                                    >
+                                        <MenuItem value="" disabled>Konu Seçin</MenuItem>
+                                        {filteredTopics.map((topic) => (
+                                            <MenuItem key={topic.id} value={topic.id}>
+                                                {topic.name}
+                                            </MenuItem>
+                                        ))}
                                     </Select>
                                 </FormControl>
                             </Grid>
 
                             <Grid item xs={12} sm={6}>
                                 <FormControl fullWidth>
-                                    <FormLabel>Zorluk Seviyesi</FormLabel>
+                                    <InputLabel>Zorluk Seviyesi</InputLabel>
                                     <Select
                                         value={difficulty}
+                                        label="Zorluk Seviyesi"
                                         onChange={handleDifficultyChange}
                                     >
                                         {difficultyLevels.map((level) => (
@@ -583,8 +761,10 @@ const AddQuestion = () => {
                         </Typography>
 
                         <FormControl fullWidth sx={{ mb: 3 }}>
+                            <InputLabel>Oyun</InputLabel>
                             <Select
                                 value={gameId}
+                                label="Oyun"
                                 onChange={handleGameChange}
                                 displayEmpty
                             >

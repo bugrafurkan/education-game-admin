@@ -1,22 +1,29 @@
 // src/services/category.service.ts
 import api from './api';
 
+// İlgili entity tiplerini kullan
+import { Grade, Subject, Unit, Topic } from '../types/education';
 
 export interface Category {
     id: number;
     name: string;
-    grade: string;
-    subject: string;
-    unit?: string;
-    description?: string;
+    grade_id: number;
+    subject_id: number;
+    unit_id?: number;
+    topic_id?: number;
+    // İlişkili veriler
+    grade?: Grade;
+    subject?: Subject;
+    unit?: Unit;
+    topic?: Topic;
 }
 
 export interface CategoryCreate {
     name: string;
-    grade: string;
-    subject: string;
-    unit?: string;
-    description?: string;
+    grade_id: number;
+    subject_id: number;
+    unit_id?: number;
+    topic_id?: number;
 }
 
 // Tüm kategorileri getir
@@ -26,11 +33,11 @@ export const getCategories = async (): Promise<Category[]> => {
 };
 
 // Belirli filtrelerle kategorileri getir
-export const getCategoriesByFilter = async (grade?: string, subject?: string): Promise<Category[]> => {
-    const url = grade && subject
-        ? `/categories/filter/${grade}/${subject}`
-        : grade
-            ? `/categories/filter/${grade}`
+export const getCategoriesByFilter = async (grade_id?: number, subject_id?: number): Promise<Category[]> => {
+    const url = grade_id && subject_id
+        ? `/categories/filter/${grade_id}/${subject_id}`
+        : grade_id
+            ? `/categories/filter/${grade_id}`
             : '/categories';
 
     const response = await api.get<Category[]>(url);
@@ -61,7 +68,7 @@ export const deleteCategory = async (id: number): Promise<void> => {
 };
 
 // Sınıf ve ders bazında filtreleme
-export const filterCategories = async (grade?: string, subject?: string): Promise<Category[]> => {
-    const response = await api.get<Category[]>(`/categories/filter/${grade || ''}/${subject || ''}`);
+export const filterCategories = async (grade_id?: number, subject_id?: number): Promise<Category[]> => {
+    const response = await api.get<Category[]>(`/categories/filter/${grade_id || ''}/${subject_id || ''}`);
     return response.data;
 };

@@ -37,10 +37,10 @@ export const useCategories = () => {
         }
     };
 
-    const filterCategories = async (grade?: string, subject?: string): Promise<categoryService.Category[]> => {
+    const filterCategories = async (grade_id?: number, subject_id?: number): Promise<categoryService.Category[]> => {
         try {
             setLoading(true);
-            const filteredCategories = await categoryService.filterCategories(grade, subject);
+            const filteredCategories = await categoryService.filterCategories(grade_id, subject_id);
             setLoading(false);
             return filteredCategories;
         } catch (err) {

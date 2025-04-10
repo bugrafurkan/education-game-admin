@@ -1,17 +1,40 @@
 // src/pages/question-groups/AddQuestionGroup.tsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Box, Typography, Paper, Stepper, Step, StepLabel, Button,
     Grid, TextField, FormControl, InputLabel, Select, MenuItem,
     SelectChangeEvent, Divider, Alert, CircularProgress, List,
     ListItem, ListItemText, Checkbox, ListItemIcon, Pagination,
-    FormHelperText, Chip
+    FormHelperText, Chip, IconButton
 } from '@mui/material';
+import {
+    CloudUpload as CloudUploadIcon,
+    DeleteOutline as DeleteIcon
+} from '@mui/icons-material';
 import * as questionGroupService from '../../services/question-group.service';
 import * as gameService from '../../services/game.service';
 
-const steps = ['Grup Bilgileri', 'Soru Seçimi', 'Önizleme'];
+const steps = ['Etkinlik Bilgileri', 'Soru Seçimi', 'Önizleme'];
+
+// Drag & Drop dosya yükleme için stiller
+const dropzoneStyles = {
+    border: '2px dashed #cccccc',
+    borderRadius: '4px',
+    padding: '20px',
+    textAlign: 'center' as const,
+    cursor: 'pointer',
+    backgroundColor: '#f9f9f9',
+    transition: 'border .3s ease-in-out, background-color .3s ease-in-out',
+    '&:hover': {
+        backgroundColor: '#f0f0f0',
+        borderColor: '#999999'
+    },
+    '&.active': {
+        borderColor: '#2196f3',
+        backgroundColor: 'rgba(33, 150, 243, 0.1)'
+    }
+};
 
 const AddQuestionGroup = () => {
     const navigate = useNavigate();
@@ -22,6 +45,12 @@ const AddQuestionGroup = () => {
     const [questionType, setQuestionType] = useState<'multiple_choice' | 'true_false' | 'qa'>('multiple_choice');
     const [gameId, setGameId] = useState<string>('');
     const [selectedQuestions, setSelectedQuestions] = useState<number[]>([]);
+
+    // Görsel yükleme için yeni state değişkenleri
+    const [imageFile, setImageFile] = useState<File | null>(null);
+    const [imagePreview, setImagePreview] = useState<string | null>(null);
+    const [dragActive, setDragActive] = useState(false);
+    const [uploadError, setUploadError] = useState<string | null>(null);
 
     // Liste verileri
     const [games, setGames] = useState<gameService.Game[]>([]);
@@ -118,6 +147,63 @@ const AddQuestionGroup = () => {
         setError(null);
     };
 
+    // Görsel yükleme işlemleri
+    const handleDrag = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.type === 'dragenter' || e.type === 'dragover') {
+            setDragActive(true);
+        } else if (e.type === 'dragleave') {
+            setDragActive(false);
+        }
+    }, []);
+
+    const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDragActive(false);
+
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+            handleFileChange(e.dataTransfer.files[0]);
+        }
+    }, []);
+
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            handleFileChange(e.target.files[0]);
+        }
+    };
+
+    const handleFileChange = (file: File) => {
+        // Dosya tipini kontrol et
+        if (!file.type.match('image.*')) {
+            setUploadError('Lütfen geçerli bir görsel dosyası yükleyin (JPEG, PNG, GIF, vs.)');
+            return;
+        }
+
+        // Dosya boyutunu kontrol et (5MB)
+        if (file.size > 5 * 1024 * 1024) {
+            setUploadError('Görsel dosyası 5MB\'tan küçük olmalıdır');
+            return;
+        }
+
+        setUploadError(null);
+        setImageFile(file);
+
+        // Önizleme URL'i oluştur
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setImagePreview(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const handleRemoveImage = () => {
+        setImageFile(null);
+        setImagePreview(null);
+        setUploadError(null);
+    };
+
     // Form gönderme
     const handleSubmit = async () => {
         try {
@@ -137,15 +223,24 @@ const AddQuestionGroup = () => {
                 return;
             }
 
-            // Grup oluştur
-            const groupData: questionGroupService.QuestionGroupCreate = {
-                name,
-                question_type: questionType,
-                game_id: parseInt(gameId),
-                question_ids: selectedQuestions
-            };
+            // FormData oluştur
+            const formData = new FormData();
+            formData.append('name', name);
+            formData.append('question_type', questionType);
+            formData.append('game_id', gameId);
 
-            await questionGroupService.createQuestionGroup(groupData);
+            // Seçili soruları ekle
+            selectedQuestions.forEach((id, index) => {
+                formData.append(`question_ids[${index}]`, id.toString());
+            });
+
+            // Görsel dosyası varsa ekle
+            if (imageFile) {
+                formData.append('image', imageFile);
+            }
+
+            // API'ye FormData gönder
+            await questionGroupService.createQuestionGroupWithImage(formData);
 
             // Başarılı mesajı göster
             alert('Soru grubu başarıyla oluşturuldu.');
@@ -190,13 +285,13 @@ const AddQuestionGroup = () => {
                 return (
                     <Box>
                         <Typography variant="h6" sx={{ mb: 3 }}>
-                            Grup Bilgilerini Girin
+                            Etkinlik Bilgilerini Girin
                         </Typography>
 
                         <Grid container spacing={3}>
                             <Grid item xs={12}>
                                 <TextField
-                                    label="Grup Adı"
+                                    label="Etkinlik Adı"
                                     fullWidth
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
@@ -239,6 +334,85 @@ const AddQuestionGroup = () => {
                                         )}
                                     </Select>
                                 </FormControl>
+                            </Grid>
+
+                            {/* Görsel Yükleme Alanı */}
+                            <Grid item xs={12}>
+                                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                                    Etkinlik Görseli (Opsiyonel)
+                                </Typography>
+
+                                {imagePreview ? (
+                                    <Box sx={{
+                                        position: 'relative',
+                                        width: 'fit-content',
+                                        margin: '0 auto',
+                                        mb: 2
+                                    }}>
+                                        <Box
+                                            component="img"
+                                            src={imagePreview}
+                                            alt="Etkinlik görseli önizleme"
+                                            sx={{
+                                                maxWidth: '100%',
+                                                maxHeight: '200px',
+                                                borderRadius: 1,
+                                                border: '1px solid #e0e0e0'
+                                            }}
+                                        />
+                                        <IconButton
+                                            onClick={handleRemoveImage}
+                                            sx={{
+                                                position: 'absolute',
+                                                top: -10,
+                                                right: -10,
+                                                bgcolor: 'rgba(255, 255, 255, 0.7)',
+                                                '&:hover': {
+                                                    bgcolor: 'rgba(255, 255, 255, 0.9)',
+                                                }
+                                            }}
+                                            size="small"
+                                        >
+                                            <DeleteIcon />
+                                        </IconButton>
+                                    </Box>
+                                ) : (
+                                    <Box
+                                        sx={{
+                                            ...dropzoneStyles,
+                                            ...(dragActive ? {
+                                                borderColor: '#2196f3',
+                                                backgroundColor: 'rgba(33, 150, 243, 0.1)'
+                                            } : {})
+                                        }}
+                                        onDragEnter={handleDrag}
+                                        onDragOver={handleDrag}
+                                        onDragLeave={handleDrag}
+                                        onDrop={handleDrop}
+                                        onClick={() => document.getElementById('file-upload')?.click()}
+                                    >
+                                        <input
+                                            id="file-upload"
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={handleFileSelect}
+                                            style={{ display: 'none' }}
+                                        />
+                                        <CloudUploadIcon sx={{ fontSize: 40, color: '#666', mb: 1 }} />
+                                        <Typography>
+                                            Görsel yüklemek için tıklayın veya sürükleyin
+                                        </Typography>
+                                        <Typography variant="caption" color="text.secondary">
+                                            Maksimum dosya boyutu: 5MB (JPEG, PNG, GIF)
+                                        </Typography>
+                                    </Box>
+                                )}
+
+                                {uploadError && (
+                                    <Alert severity="error" sx={{ mt: 2 }}>
+                                        {uploadError}
+                                    </Alert>
+                                )}
                             </Grid>
                         </Grid>
                     </Box>
@@ -330,10 +504,31 @@ const AddQuestionGroup = () => {
                 return (
                     <Box>
                         <Typography variant="h6" sx={{ mb: 3 }}>
-                            Soru Grubu Önizleme
+                            Etkinlik Önizleme
                         </Typography>
 
                         <Grid container spacing={3}>
+                            {/* Görsel Önizleme */}
+                            {imagePreview && (
+                                <Grid item xs={12}>
+                                    <Typography variant="subtitle1" fontWeight="bold">
+                                        Etkinlik Görseli:
+                                    </Typography>
+                                    <Box
+                                        component="img"
+                                        src={imagePreview}
+                                        alt="Etkinlik görseli"
+                                        sx={{
+                                            maxWidth: '100%',
+                                            maxHeight: '200px',
+                                            mt: 1,
+                                            borderRadius: 1,
+                                            border: '1px solid #e0e0e0'
+                                        }}
+                                    />
+                                </Grid>
+                            )}
+
                             <Grid item xs={12} sm={6}>
                                 <Typography variant="subtitle1" fontWeight="bold">
                                     Grup Adı:

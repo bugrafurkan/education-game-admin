@@ -56,7 +56,7 @@ const UnitList = () => {
     return (
         <Box p={3}>
             <Box display="flex" justifyContent="space-between" mb={2}>
-                <Typography variant="h5" fontWeight="bold">Üniteler</Typography>
+                <Typography variant="h5" fontWeight="bold">Ünite Yönetimi</Typography>
                 <Button
                     variant="contained"
                     startIcon={<Add />}

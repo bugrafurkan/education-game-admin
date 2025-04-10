@@ -11,6 +11,7 @@ export interface QuestionGroup {
     questions_count: number;
     created_at: string;
     updated_at: string;
+    image_url?: string; // Etkinlik görseli için URL eklendi
     game?: {
         id: number;
         name: string;
@@ -102,9 +103,29 @@ export const createQuestionGroup = async (groupData: QuestionGroupCreate): Promi
     return response.data;
 };
 
+// Görsel ile yeni soru grubu oluştur (FormData kullanır)
+export const createQuestionGroupWithImage = async (formData: FormData): Promise<QuestionGroup> => {
+    const response = await api.post<QuestionGroup>('/question-groups', formData, {
+        headers: {
+            'Content-Type': 'multipart/form-data'
+        }
+    });
+    return response.data;
+};
+
 // Soru grubunu güncelle
 export const updateQuestionGroup = async (id: number, groupData: QuestionGroupUpdate): Promise<QuestionGroup> => {
     const response = await api.put<QuestionGroup>(`/question-groups/${id}`, groupData);
+    return response.data;
+};
+
+// Görsel ile soru grubunu güncelle (FormData kullanır)
+export const updateQuestionGroupWithImage = async (id: number, formData: FormData): Promise<QuestionGroup> => {
+    const response = await api.post<QuestionGroup>(`/question-groups/${id}`, formData, {
+        headers: {
+            'Content-Type': 'multipart/form-data'
+        }
+    });
     return response.data;
 };
 

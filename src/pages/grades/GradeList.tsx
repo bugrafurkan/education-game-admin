@@ -46,7 +46,7 @@ const GradeList = () => {
         <Box p={3}>
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                 <Typography variant="h5" fontWeight="bold">
-                    Sınıflar
+                    Sınıf Yönetimi
                 </Typography>
                 <Button
                     variant="contained"

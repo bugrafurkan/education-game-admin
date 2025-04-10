@@ -111,7 +111,7 @@ const Advertisements = () => {
                 ? file.type.startsWith('image/')
                 : file.type.startsWith('video/');
             if (!isValidFileType) {
-                alert(`Lütfen geçerli bir ${adType === 'image' ? 'görsel' : 'video'} dosyası seçin.`);
+                alert(`Lütfen geçerli bir ${adType === 'image' ? 'banner' : 'video'} dosyası seçin.`);
                 return;
             }
             setSelectedFile(file);
@@ -257,7 +257,7 @@ const Advertisements = () => {
                                 <TableRow key={ad.id} hover>
                                     <TableCell><Typography>{ad.name}</Typography></TableCell>
                                     <TableCell>
-                                        <Chip label={ad.type === 'image' ? 'Görsel' : 'Video'} color={ad.type === 'image' ? 'primary' : 'secondary'} size="small" />
+                                        <Chip label={ad.type === 'image' ? 'Banner' : 'Video'} color={ad.type === 'image' ? 'primary' : 'secondary'} size="small" />
                                     </TableCell>
                                     <TableCell>
                                         <Chip label={ad.is_active ? 'Aktif' : 'Pasif'} color={ad.is_active ? 'success' : 'default'} size="small" />
@@ -361,7 +361,7 @@ const Advertisements = () => {
                                             setSelectedFile(null);
                                         }}
                                     >
-                                        <FormControlLabel value="image" control={<Radio />} label="Görsel Reklam" />
+                                        <FormControlLabel value="image" control={<Radio />} label="Banner Reklam" />
                                         <FormControlLabel value="video" control={<Radio />} label="Video Reklam" />
                                     </RadioGroup>
                                 </FormControl>

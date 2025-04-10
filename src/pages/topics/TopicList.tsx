@@ -59,13 +59,13 @@ const TopicList = () => {
     return (
         <Box p={3}>
             <Box display="flex" justifyContent="space-between" mb={2}>
-                <Typography variant="h5" fontWeight="bold">Konular</Typography>
+                <Typography variant="h5" fontWeight="bold">Bölüm Yönetimi</Typography>
                 <Button
                     variant="contained"
                     startIcon={<Add />}
                     onClick={() => navigate('/topics/add')}
                 >
-                    Yeni Konu Ekle
+                    Yeni Bölüm Ekle
                 </Button>
             </Box>
 
@@ -73,7 +73,7 @@ const TopicList = () => {
                 <Table>
                     <TableHead>
                         <TableRow>
-                            <TableCell>Konu Adı</TableCell>
+                            <TableCell>Bölüm Adı</TableCell>
                             <TableCell>Ünite</TableCell>
                             <TableCell>Sınıf</TableCell>
                             <TableCell>Ders</TableCell>

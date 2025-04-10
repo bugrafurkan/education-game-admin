@@ -10,9 +10,12 @@ import {
     ArrowBack as ArrowBackIcon,
     Edit as EditIcon,
     Delete as DeleteIcon,
-    ContentCopy as CopyIcon
+    ContentCopy as CopyIcon,
+    Image as ImageIcon
 } from '@mui/icons-material';
 import * as questionGroupService from '../../services/question-group.service';
+import { getExportById } from '../../services/export.service';
+import { useExport } from '../../hooks/useExport';
 
 const QuestionGroupDetail = () => {
     const { id } = useParams<{ id: string }>();
@@ -23,10 +26,49 @@ const QuestionGroupDetail = () => {
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [codeDialogOpen, setCodeDialogOpen] = useState(false);
     const [codeCopied, setCodeCopied] = useState(false);
+    const { triggerExport, loading: exportLoading } = useExport();
+
+    // Added states for export status handling
+    const [exportStatus, setExportStatus] = useState<'idle' | 'pending' | 'processing' | 'completed' | 'done' | 'failed'>('idle');
+    const [outputUrl, setOutputUrl] = useState<string | null>(null);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const [exportId, setExportId] = useState<number | null>(null);
 
     useEffect(() => {
         fetchQuestionGroup();
     }, [id]);
+
+    // Added effect to check export status when exportId changes
+    useEffect(() => {
+        if (exportId) {
+            const checkExportStatus = async () => {
+                try {
+                    // Get export status using the existing service method
+                    const exportData = await getExportById(Number(exportId));
+
+                    // Backend'de 'done' frontend'de 'completed' olarak tanımlanmış
+                    if (exportData.status === 'completed' || exportData.status === 'done') {
+                        setExportStatus('completed');
+                        // undefined değil null kullan
+                        setOutputUrl(exportData.output_url || exportData.download_url || null);
+                    } else if (exportData.status === 'failed') {
+                        setExportStatus('failed');
+                        // undefined değil null kullan
+                        setErrorMessage(exportData.error_message || 'Export işlemi başarısız oldu.');
+                    } else if (exportData.status === 'pending' || exportData.status === 'processing') {
+                        setExportStatus(exportData.status);
+                    }
+                } catch (err) {
+                    console.error('Error checking export status:', err);
+                    setExportStatus('failed');
+                    setErrorMessage('Export durumu kontrol edilirken bir hata oluştu.');
+                }
+            };
+
+            setExportStatus('pending');
+            checkExportStatus();
+        }
+    }, [exportId]);
 
     const fetchQuestionGroup = async () => {
         if (!id) return;
@@ -73,6 +115,32 @@ const QuestionGroupDetail = () => {
         if (!questionGroup) return;
         navigator.clipboard.writeText(questionGroup.code);
         setCodeCopied(true);
+    };
+
+    const handleExport = async () => {
+        if (!questionGroup?.id || !questionGroup?.game?.id) return;
+
+        try {
+            // Reset export status
+            setExportStatus('idle');
+            setOutputUrl(null);
+            setErrorMessage(null);
+
+            const result = await triggerExport({
+                question_group_id: questionGroup.id,
+                game_id: questionGroup.game.id,
+            });
+
+            setExportId(result.id);
+
+            // İlerlemeyi takip etmek için bilgi mesajı göster
+            alert('Export başlatıldı! ID: ' + result.id);
+        } catch (error) {
+            setExportStatus('failed');
+            setErrorMessage('Export işlemi başlatılırken bir hata oluştu.');
+            alert('Export işlemi sırasında hata oluştu.');
+            console.error(error);
+        }
     };
 
     // Soru tipi etiketini getir
@@ -132,12 +200,21 @@ const QuestionGroupDetail = () => {
 
                 <Box>
                     <Button
+                        onClick={handleExport}
+                        disabled={exportLoading || exportStatus === 'pending'}
+                        variant="contained"
+                        color="primary"
+                        sx={{ mr: 1 }}
+                    >
+                        {exportLoading || exportStatus === 'pending' ? "Yükleniyor..." : "Export Et"}
+                    </Button>
+                    <Button
                         variant="outlined"
                         startIcon={<CopyIcon />}
                         onClick={handleCopyCodeClick}
                         sx={{ mr: 1 }}
                     >
-                        Grup Kodu
+                        Etkinlik Kodu
                     </Button>
                     <Button
                         variant="outlined"
@@ -161,13 +238,51 @@ const QuestionGroupDetail = () => {
 
             <Paper sx={{ p: 3, borderRadius: 2, mb: 3 }}>
                 <Typography variant="h6" sx={{ mb: 3 }}>
-                    Grup Bilgileri
+                    Etkinlik Bilgileri
                 </Typography>
 
                 <Grid container spacing={3}>
+                    {/* Etkinlik Görseli */}
+                    <Grid item xs={12}>
+                        <Typography variant="subtitle2" color="text.secondary">
+                            Etkinlik Görseli
+                        </Typography>
+                        <Box sx={{ mt: 1, mb: 2 }}>
+                            {questionGroup.image_url ? (
+                                <Box
+                                    component="img"
+                                    src={questionGroup.image_url}
+                                    alt={questionGroup.name}
+                                    sx={{
+                                        maxWidth: '100%',
+                                        maxHeight: '300px',
+                                        objectFit: 'contain',
+                                        borderRadius: 1,
+                                        border: '1px solid #e0e0e0'
+                                    }}
+                                />
+                            ) : (
+                                <Box sx={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    bgcolor: '#f5f5f5',
+                                    borderRadius: 1,
+                                    p: 4,
+                                    border: '1px dashed #cccccc'
+                                }}>
+                                    <ImageIcon sx={{ fontSize: 40, color: '#aaaaaa', mr: 2 }} />
+                                    <Typography color="text.secondary">
+                                        Bu etkinlik için görsel bulunmuyor
+                                    </Typography>
+                                </Box>
+                            )}
+                        </Box>
+                    </Grid>
+
                     <Grid item xs={12} sm={6} md={4}>
                         <Typography variant="subtitle2" color="text.secondary">
-                            Grup Adı
+                            Etkinlik
                         </Typography>
                         <Typography variant="body1" fontWeight="medium">
                             {questionGroup.name}
@@ -176,7 +291,7 @@ const QuestionGroupDetail = () => {
 
                     <Grid item xs={12} sm={6} md={4}>
                         <Typography variant="subtitle2" color="text.secondary">
-                            Grup Kodu
+                            Etkinlik Kodu
                         </Typography>
                         <Box sx={{ display: 'flex', alignItems: 'center' }}>
                             <Typography variant="body1" fontWeight="medium" fontFamily="monospace">
@@ -228,6 +343,46 @@ const QuestionGroupDetail = () => {
                             {questionGroup.questions?.length || 0}
                         </Typography>
                     </Grid>
+
+                    {/* Export Status Display */}
+                    {exportStatus === 'completed' && outputUrl && (
+                        <Grid item xs={12}>
+                            <Box sx={{ mt: 2, mb: 2, p: 2, bgcolor: '#f8f9fa', borderRadius: 1, border: '1px solid #e0e0e0' }}>
+                                <Typography variant="subtitle2" color="success.main" sx={{ mb: 1, fontWeight: "bold" }}>
+                                    Export işlemi tamamlandı!
+                                </Typography>
+                                <a href={outputUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+                                    <Button variant="outlined" color="success" fullWidth startIcon={<span role="img" aria-label="game">🎮</span>}>
+                                        Oyunu Görüntüle
+                                    </Button>
+                                </a>
+                            </Box>
+                        </Grid>
+                    )}
+
+                    {exportStatus === 'pending' || exportStatus === 'processing' ? (
+                        <Grid item xs={12}>
+                            <Box sx={{ mt: 2, mb: 2, p: 2, bgcolor: '#f8f9fa', borderRadius: 1, border: '1px solid #e0e0e0', display: 'flex', alignItems: 'center' }}>
+                                <CircularProgress size={20} sx={{ mr: 2 }} />
+                                <Typography variant="subtitle2" color="primary.main">
+                                    Export işlemi devam ediyor...
+                                </Typography>
+                            </Box>
+                        </Grid>
+                    ) : null}
+
+                    {exportStatus === 'failed' && errorMessage && (
+                        <Grid item xs={12}>
+                            <Box sx={{ mt: 2, mb: 2, p: 2, bgcolor: '#fef6f6', borderRadius: 1, border: '1px solid #f5c2c2' }}>
+                                <Typography variant="subtitle2" color="error.main" sx={{ mb: 1, fontWeight: "bold" }}>
+                                    Export başarısız oldu
+                                </Typography>
+                                <Typography variant="body2" color="error.main">
+                                    {errorMessage}
+                                </Typography>
+                            </Box>
+                        </Grid>
+                    )}
                 </Grid>
             </Paper>
 
@@ -335,7 +490,7 @@ const QuestionGroupDetail = () => {
                 open={codeDialogOpen}
                 onClose={() => setCodeDialogOpen(false)}
             >
-                <DialogTitle>Grup Kodu</DialogTitle>
+                <DialogTitle>Etkinlik Kodu</DialogTitle>
                 <DialogContent>
                     <DialogContentText>
                         Bu gruptan soruları çekmek için aşağıdaki kodu kullanabilirsiniz:

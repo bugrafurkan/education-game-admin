@@ -45,7 +45,7 @@ const SubjectList = () => {
     return (
         <Box p={3}>
             <Box display="flex" justifyContent="space-between" mb={2}>
-                <Typography variant="h5" fontWeight="bold">Dersler</Typography>
+                <Typography variant="h5" fontWeight="bold">Branş Yönetimi</Typography>
                 <Button
                     variant="contained"
                     startIcon={<Add />}

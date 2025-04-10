@@ -17,8 +17,8 @@ import {
 } from '@mui/icons-material';
 import { Link } from 'react-router-dom';
 import { useQuestions } from '../../hooks/useQuestions';
-import { QuestionFilter, Category } from '../../services/question.service';
-import { useCategories } from '../../hooks/useCategories';
+import { QuestionFilter } from '../../services/question.service';
+import { useEducationStructure } from '../../hooks/useEducationStructure';
 import { useUsers } from '../../hooks/useUsers';
 
 const QuestionList = () => {
@@ -30,23 +30,22 @@ const QuestionList = () => {
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [questionToDelete, setQuestionToDelete] = useState<number | null>(null);
 
-    // Kategori filtreleri için state'ler
-    const [gradeFilter, setGradeFilter] = useState<string>('');
-    const [subjectFilter, setSubjectFilter] = useState<string>('');
-    const [unitFilter, setUnitFilter] = useState<string>('');
-    const [categoryFilter, setCategoryFilter] = useState<string>('');
+    // Eğitim yapısı verilerini yükle
+    const { grades, subjects, units, topics} = useEducationStructure();
 
-    // Kategorileri ve filtrelenmiş kategorileri almak için hook'lar
-    const { categories } = useCategories();
+    // Kategori filtreleri için state'ler - artık ID bazlı
+    const [gradeIdFilter, setGradeIdFilter] = useState<number | ''>('');
+    const [subjectIdFilter, setSubjectIdFilter] = useState<number | ''>('');
+    const [unitIdFilter, setUnitIdFilter] = useState<number | ''>('');
+    const [topicIdFilter, setTopicIdFilter] = useState<number | ''>('');
+
+    // Filtrelenmiş listeler
+    const [filteredSubjects, setFilteredSubjects] = useState(subjects);
+    const [filteredUnits, setFilteredUnits] = useState(units);
+    const [filteredTopics, setFilteredTopics] = useState(topics);
 
     const { users } = useUsers();
     const [userFilter, setUserFilter] = useState<string>('');
-
-    // Filtreleme için unique değerleri tutacak state'ler
-    const [grades, setGrades] = useState<string[]>([]);
-    const [subjects, setSubjects] = useState<string[]>([]);
-    const [units, setUnits] = useState<string[]>([]);
-    const [filteredCategories, setFilteredCategories] = useState<Category[]>([]);
 
     // API filtreleri
     const filters: QuestionFilter = {
@@ -54,84 +53,64 @@ const QuestionList = () => {
         type: typeFilter || undefined,
         difficulty: difficultyFilter || undefined,
         user_id: userFilter ? Number(userFilter) : undefined,
-        grade: gradeFilter || undefined,
-        subject: subjectFilter || undefined,
-        unit: unitFilter || undefined,
-        konu: categoryFilter
-            ? filteredCategories.find(cat => cat.id.toString() === categoryFilter)?.description
-            : undefined,
+        grade_id: gradeIdFilter ? Number(gradeIdFilter) : undefined,
+        subject_id: subjectIdFilter ? Number(subjectIdFilter) : undefined,
+        unit_id: unitIdFilter ? Number(unitIdFilter) : undefined,
+        topic_id: topicIdFilter ? Number(topicIdFilter) : undefined
     };
 
     // Hook ile soruları yükle
     const { questions, loading, error, pagination, deleteQuestion } = useQuestions(page, filters);
 
-    // Kategori filtreleme bilgilerini yükle
+    // Grade değiştiğinde ilgili dersleri filtrele
     useEffect(() => {
-        if (categories.length > 0) {
-            // Tüm unique sınıfları bul
-            const uniqueGrades = Array.from(new Set(categories.map(cat => cat.grade))).filter(Boolean);
-            setGrades(uniqueGrades as string[]);
-        }
-    }, [categories]);
+        if (gradeIdFilter) {
+            // Tüm dersleri göster (grade ve subject arasında doğrudan ilişki yoksa)
+            setFilteredSubjects(subjects);
 
-    // Sınıf değiştiğinde dersleri filtrele
-    useEffect(() => {
-        if (categories.length > 0 && gradeFilter) {
-            // Seçilen sınıfa göre dersleri filtrele
-            const filteredSubjects = Array.from(
-                new Set(
-                    categories
-                        .filter(cat => cat.grade === gradeFilter)
-                        .map(cat => cat.subject)
-                )
-            ).filter(Boolean);
-
-            setSubjects(filteredSubjects as string[]);
-            setSubjectFilter(''); // Sınıf değiştiğinde ders filtresini sıfırla
-            setUnitFilter(''); // Sınıf değiştiğinde ünite filtresini sıfırla
-            setCategoryFilter(''); // Sınıf değiştiğinde kategori filtresini sıfırla
+            // Grade değiştiğinde alt seçimleri sıfırla
+            setSubjectIdFilter('');
+            setUnitIdFilter('');
+            setTopicIdFilter('');
         } else {
-            setSubjects([]);
+            setFilteredSubjects(subjects);
+            setSubjectIdFilter('');
+            setUnitIdFilter('');
+            setTopicIdFilter('');
         }
-    }, [categories, gradeFilter]);
+    }, [gradeIdFilter, subjects]);
 
-    // Ders değiştiğinde üniteleri filtrele
+    // Subject değiştiğinde ilgili üniteleri filtrele
     useEffect(() => {
-        if (categories.length > 0 && gradeFilter && subjectFilter) {
-            // Seçilen sınıf ve derse göre üniteleri filtrele
-            const filteredUnits = Array.from(
-                new Set(
-                    categories
-                        .filter(cat => cat.grade === gradeFilter && cat.subject === subjectFilter)
-                        .map(cat => cat.unit)
-                )
-            ).filter(Boolean);
-
-            setUnits(filteredUnits as string[]);
-            setUnitFilter(''); // Ders değiştiğinde ünite filtresini sıfırla
-            setCategoryFilter(''); // Ders değiştiğinde kategori filtresini sıfırla
-        } else {
-            setUnits([]);
-        }
-    }, [categories, gradeFilter, subjectFilter]);
-
-    // Ünite değiştiğinde kategorileri filtrele
-    useEffect(() => {
-        if (categories.length > 0 && gradeFilter && subjectFilter) {
-            let filtered = categories.filter(
-                cat => cat.grade === gradeFilter && cat.subject === subjectFilter
+        if (gradeIdFilter && subjectIdFilter) {
+            const filtered = units.filter(unit =>
+                unit.grade_id === gradeIdFilter && unit.subject_id === subjectIdFilter
             );
+            setFilteredUnits(filtered);
 
-            if (unitFilter) {
-                filtered = filtered.filter(cat => cat.unit === unitFilter);
-            }
-
-            setFilteredCategories(filtered);
-            setCategoryFilter(''); // Ünite değiştiğinde kategori filtresini sıfırla
+            // Subject değiştiğinde alt seçimleri sıfırla
+            setUnitIdFilter('');
+            setTopicIdFilter('');
         } else {
-            setFilteredCategories([]);
+            setFilteredUnits([]);
+            setUnitIdFilter('');
+            setTopicIdFilter('');
         }
-    }, [categories, gradeFilter, subjectFilter, unitFilter]);
+    }, [gradeIdFilter, subjectIdFilter, units]);
+
+    // Unit değiştiğinde ilgili konuları filtrele
+    useEffect(() => {
+        if (unitIdFilter) {
+            const filtered = topics.filter(topic => topic.unit_id === unitIdFilter);
+            setFilteredTopics(filtered);
+
+            // Unit değiştiğinde topic seçimini sıfırla
+            setTopicIdFilter('');
+        } else {
+            setFilteredTopics([]);
+            setTopicIdFilter('');
+        }
+    }, [unitIdFilter, topics]);
 
     // Filtre değişikliklerini yönet
     const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -150,23 +129,23 @@ const QuestionList = () => {
     };
 
     // Kategori filtre değişikliklerini yönet
-    const handleGradeChange = (event: SelectChangeEvent) => {
-        setGradeFilter(event.target.value);
+    const handleGradeChange = (event: SelectChangeEvent<number | ''>) => {
+        setGradeIdFilter(event.target.value as number | '');
         setPage(1);
     };
 
-    const handleSubjectChange = (event: SelectChangeEvent) => {
-        setSubjectFilter(event.target.value);
+    const handleSubjectChange = (event: SelectChangeEvent<number | ''>) => {
+        setSubjectIdFilter(event.target.value as number | '');
         setPage(1);
     };
 
-    const handleUnitChange = (event: SelectChangeEvent) => {
-        setUnitFilter(event.target.value);
+    const handleUnitChange = (event: SelectChangeEvent<number | ''>) => {
+        setUnitIdFilter(event.target.value as number | '');
         setPage(1);
     };
 
-    const handleCategoryChange = (event: SelectChangeEvent) => {
-        setCategoryFilter(event.target.value);
+    const handleTopicChange = (event: SelectChangeEvent<number | ''>) => {
+        setTopicIdFilter(event.target.value as number | '');
         setPage(1);
     };
 
@@ -175,10 +154,11 @@ const QuestionList = () => {
         setSearch('');
         setTypeFilter('');
         setDifficultyFilter('');
-        setGradeFilter('');
-        setSubjectFilter('');
-        setUnitFilter('');
-        setCategoryFilter('');
+        setGradeIdFilter('');
+        setSubjectIdFilter('');
+        setUnitIdFilter('');
+        setTopicIdFilter('');
+        setUserFilter('');
         setPage(1);
     };
 
@@ -243,7 +223,14 @@ const QuestionList = () => {
 
     // Herhangi bir filtre aktif mi kontrol et
     const isAnyFilterActive = () => {
-        return search || typeFilter || difficultyFilter || gradeFilter || subjectFilter || unitFilter || categoryFilter;
+        return search ||
+            typeFilter ||
+            difficultyFilter ||
+            gradeIdFilter ||
+            subjectIdFilter ||
+            unitIdFilter ||
+            topicIdFilter ||
+            userFilter;
     };
 
     return (
@@ -348,11 +335,15 @@ const QuestionList = () => {
                         <Grid item xs={12} sm={6} md={3}>
                             <FormControl fullWidth>
                                 <InputLabel>Sınıf</InputLabel>
-                                <Select value={gradeFilter} label="Sınıf" onChange={handleGradeChange}>
+                                <Select
+                                    value={gradeIdFilter}
+                                    label="Sınıf"
+                                    onChange={handleGradeChange}
+                                >
                                     <MenuItem value="">Tümü</MenuItem>
                                     {grades.map((grade) => (
-                                        <MenuItem key={grade} value={grade}>
-                                            {grade}
+                                        <MenuItem key={grade.id} value={grade.id}>
+                                            {grade.name}
                                         </MenuItem>
                                     ))}
                                 </Select>
@@ -363,11 +354,16 @@ const QuestionList = () => {
                         <Grid item xs={12} sm={6} md={3}>
                             <FormControl fullWidth>
                                 <InputLabel>Ders</InputLabel>
-                                <Select value={subjectFilter} label="Ders" onChange={handleSubjectChange}>
+                                <Select
+                                    value={subjectIdFilter}
+                                    label="Ders"
+                                    onChange={handleSubjectChange}
+                                    disabled={!gradeIdFilter}
+                                >
                                     <MenuItem value="">Tümü</MenuItem>
-                                    {subjects.map((subject) => (
-                                        <MenuItem key={subject} value={subject}>
-                                            {subject}
+                                    {filteredSubjects.map((subject) => (
+                                        <MenuItem key={subject.id} value={subject.id}>
+                                            {subject.name}
                                         </MenuItem>
                                     ))}
                                 </Select>
@@ -378,11 +374,16 @@ const QuestionList = () => {
                         <Grid item xs={12} sm={6} md={3}>
                             <FormControl fullWidth>
                                 <InputLabel>Ünite</InputLabel>
-                                <Select value={unitFilter} label="Ünite" onChange={handleUnitChange}>
+                                <Select
+                                    value={unitIdFilter}
+                                    label="Ünite"
+                                    onChange={handleUnitChange}
+                                    disabled={!subjectIdFilter || filteredUnits.length === 0}
+                                >
                                     <MenuItem value="">Tümü</MenuItem>
-                                    {units.map((unit) => (
-                                        <MenuItem key={unit} value={unit}>
-                                            {unit}
+                                    {filteredUnits.map((unit) => (
+                                        <MenuItem key={unit.id} value={unit.id}>
+                                            {unit.name}
                                         </MenuItem>
                                     ))}
                                 </Select>
@@ -394,14 +395,15 @@ const QuestionList = () => {
                             <FormControl fullWidth>
                                 <InputLabel>Konu</InputLabel>
                                 <Select
-                                    value={categoryFilter}
+                                    value={topicIdFilter}
                                     label="Konu"
-                                    onChange={handleCategoryChange}
+                                    onChange={handleTopicChange}
+                                    disabled={!unitIdFilter || filteredTopics.length === 0}
                                 >
                                     <MenuItem value="">Tümü</MenuItem>
-                                    {filteredCategories.map((category) => (
-                                        <MenuItem key={category.id} value={category.id.toString()}>
-                                            {category.description || category.name}
+                                    {filteredTopics.map((topic) => (
+                                        <MenuItem key={topic.id} value={topic.id}>
+                                            {topic.name}
                                         </MenuItem>
                                     ))}
                                 </Select>
@@ -507,7 +509,7 @@ const QuestionList = () => {
                                             <TableCell>
                                                 <Tooltip title={
                                                     question.category ?
-                                                        `${question.category.grade || '-'} / ${question.category.subject || '-'} / ${question.category.unit || '-'}` :
+                                                        `${question.category.grade?.name || '-'} / ${question.category.subject?.name || '-'} / ${question.category.unit?.name || '-'}` :
                                                         'Kategori bilgisi yok'
                                                 }>
                                                     <span>{question.category?.name || '-'}</span>

@@ -84,9 +84,10 @@ const EditQuestionGroup = () => {
 
             // Mevcut görseli ayarla
             if (response.image_url) {
-                setImagePreview(response.image_url);
+                const fullImageUrl = `https://ariyayin.broosmedia.com/public/storage/${response.image_url}`;
+                setImagePreview(fullImageUrl);
                 // existingImage değişkenini kullanıyoruz
-                setExistingImage(response.image_url);
+                setExistingImage(fullImageUrl);
             }
 
             setLoading(false);

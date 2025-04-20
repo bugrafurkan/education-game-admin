@@ -4,18 +4,22 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
     Box, Typography, Paper, Button, Grid, CircularProgress, Alert, List, ListItem, ListItemText,
     Chip, IconButton, Tooltip, Dialog, DialogActions,
-    DialogContent, DialogContentText, DialogTitle
+    DialogContent, DialogContentText, DialogTitle, TextField
 } from '@mui/material';
 import {
     ArrowBack as ArrowBackIcon,
     Edit as EditIcon,
     Delete as DeleteIcon,
     ContentCopy as CopyIcon,
-    Image as ImageIcon
+    Image as ImageIcon,
+    Code as CodeIcon,
+    CheckCircle as CheckCircleIcon
 } from '@mui/icons-material';
 import * as questionGroupService from '../../services/question-group.service';
-import { getExportById } from '../../services/export.service';
-import { useExport } from '../../hooks/useExport';
+import * as iframeService from '../../services/iframe.service'; // Yeni iframe servisi
+
+// NodeJS tiplerini içe aktar
+type Timeout = ReturnType<typeof setTimeout>;
 
 const QuestionGroupDetail = () => {
     const { id } = useParams<{ id: string }>();
@@ -26,49 +30,24 @@ const QuestionGroupDetail = () => {
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [codeDialogOpen, setCodeDialogOpen] = useState(false);
     const [codeCopied, setCodeCopied] = useState(false);
-    const { triggerExport, loading: exportLoading } = useExport();
 
-    // Added states for export status handling
-    const [exportStatus, setExportStatus] = useState<'idle' | 'pending' | 'processing' | 'completed' | 'done' | 'failed'>('idle');
-    const [outputUrl, setOutputUrl] = useState<string | null>(null);
-    const [errorMessage, setErrorMessage] = useState<string | null>(null);
-    const [exportId, setExportId] = useState<number | null>(null);
+    // İframe ile ilgili durumlar
+    const [iframeLoading, setIframeLoading] = useState(false);
+    const [iframeDialogOpen, setIframeDialogOpen] = useState(false);
+    const [iframeCode, setIframeCode] = useState<string | null>(null);
+    const [iframeStatus, setIframeStatus] = useState<'pending' | 'processing' | 'completed' | 'failed'>('pending');
+    const [iframeCopied, setIframeCopied] = useState(false);
+    const [statusCheckInterval, setStatusCheckInterval] = useState<Timeout | null>(null);
 
     useEffect(() => {
         fetchQuestionGroup();
+        return () => {
+            // Component unmount olduğunda interval'i temizle
+            if (statusCheckInterval) {
+                clearInterval(statusCheckInterval);
+            }
+        };
     }, [id]);
-
-    // Added effect to check export status when exportId changes
-    useEffect(() => {
-        if (exportId) {
-            const checkExportStatus = async () => {
-                try {
-                    // Get export status using the existing service method
-                    const exportData = await getExportById(Number(exportId));
-
-                    // Backend'de 'done' frontend'de 'completed' olarak tanımlanmış
-                    if (exportData.status === 'completed' || exportData.status === 'done') {
-                        setExportStatus('completed');
-                        // undefined değil null kullan
-                        setOutputUrl(exportData.output_url || exportData.download_url || null);
-                    } else if (exportData.status === 'failed') {
-                        setExportStatus('failed');
-                        // undefined değil null kullan
-                        setErrorMessage(exportData.error_message || 'Export işlemi başarısız oldu.');
-                    } else if (exportData.status === 'pending' || exportData.status === 'processing') {
-                        setExportStatus(exportData.status);
-                    }
-                } catch (err) {
-                    console.error('Error checking export status:', err);
-                    setExportStatus('failed');
-                    setErrorMessage('Export durumu kontrol edilirken bir hata oluştu.');
-                }
-            };
-
-            setExportStatus('pending');
-            checkExportStatus();
-        }
-    }, [exportId]);
 
     const fetchQuestionGroup = async () => {
         if (!id) return;
@@ -117,29 +96,75 @@ const QuestionGroupDetail = () => {
         setCodeCopied(true);
     };
 
-    const handleExport = async () => {
-        if (!questionGroup?.id || !questionGroup?.game?.id) return;
+    // İframe oluşturma işlemleri
+    const handleCreateIframe = async () => {
+        if (!questionGroup?.id) return;
 
         try {
-            // Reset export status
-            setExportStatus('idle');
-            setOutputUrl(null);
-            setErrorMessage(null);
+            setIframeLoading(true);
+            setIframeStatus('processing');
+            setIframeDialogOpen(true);
 
-            const result = await triggerExport({
-                question_group_id: questionGroup.id,
-                game_id: questionGroup.game.id,
-            });
+            // iframe oluşturmayı başlat
+            await iframeService.createIframe(questionGroup.id);
 
-            setExportId(result.id);
+            // Durumu periyodik olarak kontrol et
+            const interval = setInterval(checkIframeStatus, 5000) as Timeout; // 5 saniyede bir kontrol et
+            setStatusCheckInterval(interval);
+        } catch (err) {
+            console.error('Error creating iframe:', err);
+            setIframeStatus('failed');
+            setIframeLoading(false);
+        }
+    };
 
-            // İlerlemeyi takip etmek için bilgi mesajı göster
-            alert('Export başlatıldı! ID: ' + result.id);
-        } catch (error) {
-            setExportStatus('failed');
-            setErrorMessage('Export işlemi başlatılırken bir hata oluştu.');
-            alert('Export işlemi sırasında hata oluştu.');
-            console.error(error);
+    const checkIframeStatus = async () => {
+        if (!questionGroup?.id) return;
+
+        try {
+            const status = await iframeService.checkIframeStatus(questionGroup.id);
+
+            if (status.isReady) {
+                setIframeStatus('completed');
+                // null değerini kabul eden setIframeCode için doğru tip dönüşümü
+                setIframeCode(status.iframe_code || null);
+                setIframeLoading(false);
+
+                // Başarıyla tamamlandığında intervali temizle
+                if (statusCheckInterval) {
+                    clearInterval(statusCheckInterval);
+                    setStatusCheckInterval(null);
+                }
+
+                // Soru grubunu güncel bilgilerle yeniden yükle
+                fetchQuestionGroup();
+            } else if (status.status === 'failed') {
+                setIframeStatus('failed');
+                setIframeLoading(false);
+
+                if (statusCheckInterval) {
+                    clearInterval(statusCheckInterval);
+                    setStatusCheckInterval(null);
+                }
+            }
+        } catch (err) {
+            console.error('Error checking iframe status:', err);
+            // Hata durumunda sürekli kontrol etmeye devam et
+        }
+    };
+
+    const handleCopyIframe = () => {
+        if (!iframeCode) return;
+        navigator.clipboard.writeText(iframeCode);
+        setIframeCopied(true);
+        setTimeout(() => setIframeCopied(false), 3000);
+    };
+
+    const closeIframeDialog = () => {
+        setIframeDialogOpen(false);
+        if (statusCheckInterval) {
+            clearInterval(statusCheckInterval);
+            setStatusCheckInterval(null);
         }
     };
 
@@ -200,13 +225,14 @@ const QuestionGroupDetail = () => {
 
                 <Box>
                     <Button
-                        onClick={handleExport}
-                        disabled={exportLoading || exportStatus === 'pending'}
+                        onClick={handleCreateIframe}
+                        disabled={iframeLoading}
                         variant="contained"
                         color="primary"
+                        startIcon={<CodeIcon />}
                         sx={{ mr: 1 }}
                     >
-                        {exportLoading || exportStatus === 'pending' ? "Yükleniyor..." : "Export Et"}
+                        {iframeLoading ? "İşleniyor..." : "İframe Oluştur"}
                     </Button>
                     <Button
                         variant="outlined"
@@ -344,42 +370,58 @@ const QuestionGroupDetail = () => {
                         </Typography>
                     </Grid>
 
-                    {/* Export Status Display */}
-                    {exportStatus === 'completed' && outputUrl && (
+                    {/* İframe Durumu Gösterimi */}
+                    {questionGroup.iframe_status === 'completed' && questionGroup.iframe_code && (
                         <Grid item xs={12}>
-                            <Box sx={{ mt: 2, mb: 2, p: 2, bgcolor: '#f8f9fa', borderRadius: 1, border: '1px solid #e0e0e0' }}>
-                                <Typography variant="subtitle2" color="success.main" sx={{ mb: 1, fontWeight: "bold" }}>
-                                    Export işlemi tamamlandı!
-                                </Typography>
-                                <a href={outputUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
-                                    <Button variant="outlined" color="success" fullWidth startIcon={<span role="img" aria-label="game">🎮</span>}>
-                                        Oyunu Görüntüle
-                                    </Button>
-                                </a>
+                            <Box sx={{ mt: 2, mb: 2, p: 2, bgcolor: '#f8fff8', borderRadius: 1, border: '1px solid #c6e6c6' }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                                    <CheckCircleIcon color="success" sx={{ mr: 1 }} />
+                                    <Typography variant="subtitle1" color="success.main" sx={{ fontWeight: "bold" }}>
+                                        İframe Hazır
+                                    </Typography>
+                                </Box>
+                                <Button
+                                    variant="outlined"
+                                    color="success"
+                                    onClick={() => {
+                                        setIframeCode(questionGroup.iframe_code || null);
+                                        setIframeDialogOpen(true);
+                                        setIframeStatus('completed');
+                                    }}
+                                    fullWidth
+                                    startIcon={<CodeIcon />}
+                                >
+                                    İframe Kodunu Görüntüle
+                                </Button>
                             </Box>
                         </Grid>
                     )}
 
-                    {exportStatus === 'pending' || exportStatus === 'processing' ? (
+                    {questionGroup.iframe_status === 'processing' && (
                         <Grid item xs={12}>
                             <Box sx={{ mt: 2, mb: 2, p: 2, bgcolor: '#f8f9fa', borderRadius: 1, border: '1px solid #e0e0e0', display: 'flex', alignItems: 'center' }}>
                                 <CircularProgress size={20} sx={{ mr: 2 }} />
                                 <Typography variant="subtitle2" color="primary.main">
-                                    Export işlemi devam ediyor...
+                                    İframe oluşturma işlemi devam ediyor...
                                 </Typography>
                             </Box>
                         </Grid>
-                    ) : null}
+                    )}
 
-                    {exportStatus === 'failed' && errorMessage && (
+                    {questionGroup.iframe_status === 'failed' && (
                         <Grid item xs={12}>
                             <Box sx={{ mt: 2, mb: 2, p: 2, bgcolor: '#fef6f6', borderRadius: 1, border: '1px solid #f5c2c2' }}>
                                 <Typography variant="subtitle2" color="error.main" sx={{ mb: 1, fontWeight: "bold" }}>
-                                    Export başarısız oldu
+                                    İframe oluşturma başarısız oldu
                                 </Typography>
-                                <Typography variant="body2" color="error.main">
-                                    {errorMessage}
-                                </Typography>
+                                <Button
+                                    variant="outlined"
+                                    color="primary"
+                                    onClick={handleCreateIframe}
+                                    size="small"
+                                >
+                                    Tekrar Dene
+                                </Button>
                             </Box>
                         </Grid>
                     )}
@@ -522,6 +564,102 @@ const QuestionGroupDetail = () => {
                     >
                         Kopyala
                     </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* İframe Gösterme Dialogu */}
+            <Dialog
+                open={iframeDialogOpen}
+                onClose={closeIframeDialog}
+                maxWidth="md"
+                fullWidth
+            >
+                <DialogTitle>
+                    {iframeStatus === 'processing' ? "İframe Oluşturuluyor..." :
+                        iframeStatus === 'completed' ? "İframe Kodu Hazır" :
+                            "İframe Oluşturma"}
+                </DialogTitle>
+                <DialogContent>
+                    {iframeStatus === 'processing' && (
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', py: 4 }}>
+                            <CircularProgress sx={{ mb: 3 }} />
+                            <Typography>
+                                İframe kodu oluşturuluyor, lütfen bekleyin...
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
+                                Bu işlem birkaç dakika sürebilir.
+                            </Typography>
+                        </Box>
+                    )}
+
+                    {iframeStatus === 'completed' && iframeCode && (
+                        <>
+                            <DialogContentText sx={{ mb: 2 }}>
+                                Aşağıdaki iframe kodunu web sitenize ekleyerek bu soru grubunu görüntüleyebilirsiniz:
+                            </DialogContentText>
+
+                            <TextField
+                                fullWidth
+                                variant="outlined"
+                                multiline
+                                rows={4}
+                                value={iframeCode}
+                                InputProps={{
+                                    readOnly: true,
+                                    sx: { fontFamily: 'monospace' }
+                                }}
+                                sx={{ mb: 3 }}
+                            />
+
+                            {iframeCopied && (
+                                <Alert severity="success" sx={{ mb: 3 }}>
+                                    İframe kodu panoya kopyalandı!
+                                </Alert>
+                            )}
+
+                            <DialogContentText sx={{ mb: 2 }}>
+                                Önizleme:
+                            </DialogContentText>
+
+                            <Box sx={{
+                                border: '1px solid #e0e0e0',
+                                borderRadius: 1,
+                                p: 1,
+                                mb: 2,
+                                bgcolor: '#f9f9f9',
+                                height: '400px',
+                                overflow: 'hidden'
+                            }}>
+                                <div dangerouslySetInnerHTML={{ __html: iframeCode }} />
+                            </Box>
+                        </>
+                    )}
+
+                    {iframeStatus === 'failed' && (
+                        <Alert severity="error" sx={{ my: 2 }}>
+                            <Typography fontWeight="bold" sx={{ mb: 1 }}>
+                                İframe oluşturma işlemi başarısız oldu.
+                            </Typography>
+                            <Typography variant="body2">
+                                Lütfen daha sonra tekrar deneyin veya sistem yöneticisiyle iletişime geçin.
+                            </Typography>
+                        </Alert>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={closeIframeDialog}>
+                        {iframeStatus === 'processing' ? "Arka Planda Devam Et" : "Kapat"}
+                    </Button>
+                    {iframeStatus === 'completed' && iframeCode && (
+                        <Button
+                            onClick={handleCopyIframe}
+                            variant="contained"
+                            startIcon={<CopyIcon />}
+                            color="primary"
+                        >
+                            Kopyala
+                        </Button>
+                    )}
                 </DialogActions>
             </Dialog>
         </Box>

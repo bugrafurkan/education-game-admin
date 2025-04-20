@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import {
     Box, Typography, Paper, Button, TextField, InputAdornment, Table, TableBody,
     TableCell, TableContainer, TableHead, TablePagination, TableRow, Grid,
-    CircularProgress, Alert, Select, MenuItem, IconButton
+    CircularProgress, Alert, Select, MenuItem, IconButton, FormControl, InputLabel
 } from '@mui/material';
 import {
     Add as AddIcon, Search as SearchIcon, Edit as EditIcon, Delete as DeleteIcon,
@@ -12,6 +12,7 @@ import {
 import { Link } from 'react-router-dom';
 import * as questionGroupService from '../../services/question-group.service';
 import { useGames } from '../../hooks/useGames';
+import { useCategories } from '../../hooks/useCategories';
 
 const QuestionGroupList = () => {
     const [loading, setLoading] = useState(true);
@@ -22,24 +23,34 @@ const QuestionGroupList = () => {
     const [totalItems, setTotalItems] = useState(0);
 
     const [search, setSearch] = useState('');
-    const [questionType, setQuestionType] = useState('');
+    const [questionType, setQuestionType] = useState<'multiple_choice' | 'true_false' | 'qa' | ''>('');
     const [gameId, setGameId] = useState('');
+    const [categoryId, setCategoryId] = useState('');
     const [sortField, setSortField] = useState('created_at');
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
     const { games } = useGames();
+    const { categories } = useCategories();
 
     useEffect(() => {
         fetchGroups();
-    }, [page, rowsPerPage, search, questionType, gameId, sortField, sortDirection]);
+    }, [page, rowsPerPage, search, questionType, gameId, categoryId, sortField, sortDirection]);
 
     const fetchGroups = async () => {
         setLoading(true);
         try {
-            const response = await questionGroupService.getQuestionGroups(page);
+            const response = await questionGroupService.getQuestionGroups(page, {
+                search,
+                question_type: questionType || undefined,
+                game_id: gameId,
+                category_id: categoryId,
+                sort_field: sortField,
+                sort_direction: sortDirection
+            });
             setGroups(response.data);
             setTotalItems(response.total);
         } catch (e) {
+            console.error(e);
             setError('Veriler alınamadı');
         }
         setLoading(false);
@@ -68,7 +79,7 @@ const QuestionGroupList = () => {
                     <Grid item xs={12} md={4}>
                         <TextField
                             fullWidth
-                            label="Etkinlkik Ara"
+                            label="Etkinlik Ara"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             InputProps={{
@@ -80,29 +91,52 @@ const QuestionGroupList = () => {
                             }}
                         />
                     </Grid>
+
                     <Grid item xs={12} md={3}>
-                        <Select fullWidth value={questionType} onChange={(e) => setQuestionType(e.target.value)} displayEmpty>
-                            <MenuItem value="">Tüm Soru Tipleri</MenuItem>
-                            <MenuItem value="multiple_choice">Çoktan Seçmeli</MenuItem>
-                            <MenuItem value="true_false">Doğru-Yanlış</MenuItem>
-                            <MenuItem value="qa">Klasik</MenuItem>
-                        </Select>
+                        <FormControl fullWidth>
+                            <InputLabel>Soru Tipi</InputLabel>
+                            <Select
+                                value={questionType}
+                                onChange={(e) => setQuestionType(e.target.value as 'multiple_choice' | 'true_false' | 'qa' | '')}>
+                                <MenuItem value="">Tüm Soru Tipleri</MenuItem>
+                                <MenuItem value="multiple_choice">Çoktan Seçmeli</MenuItem>
+                                <MenuItem value="true_false">Doğru-Yanlış</MenuItem>
+                                <MenuItem value="qa">Klasik</MenuItem>
+                            </Select>
+                        </FormControl>
+
                     </Grid>
+
                     <Grid item xs={12} md={3}>
-                        <Select fullWidth value={gameId} onChange={(e) => setGameId(e.target.value)} displayEmpty>
-                            <MenuItem value="">Tüm Oyunlar</MenuItem>
-                            {games.map((game) => (
-                                <MenuItem key={game.id} value={game.id}>{game.name}</MenuItem>
-                            ))}
-                        </Select>
+                        <FormControl fullWidth>
+                            <InputLabel>Oyun</InputLabel>
+                            <Select value={gameId} onChange={(e) => setGameId(e.target.value)}>
+                                <MenuItem value="">Tüm Oyunlar</MenuItem>
+                                {games.map((game) => (
+                                    <MenuItem key={game.id} value={game.id}>{game.name}</MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
                     </Grid>
-                    <Grid item xs={12} md={2} sx={{ textAlign: { xs: 'left', md: 'right' } }}>
+
+                    <Grid item xs={12} md={3}>
+                        <FormControl fullWidth>
+                            <InputLabel>Kategori</InputLabel>
+                            <Select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+                                <MenuItem value="">Tüm Kategoriler</MenuItem>
+                                {categories.map((cat) => (
+                                    <MenuItem key={cat.id} value={cat.id}>{cat.name}</MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                    </Grid>
+
+                    <Grid item xs={12} md={12} sx={{ textAlign: 'right' }}>
                         <Button
                             component={Link}
                             to="/question-groups/add"
                             variant="contained"
                             startIcon={<AddIcon />}
-                            fullWidth
                         >
                             Yeni Ekle
                         </Button>

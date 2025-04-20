@@ -14,6 +14,7 @@ import {
 } from '@mui/icons-material';
 import * as questionGroupService from '../../services/question-group.service';
 import * as gameService from '../../services/game.service';
+import { useCategories } from '../../hooks/useCategories';
 
 const steps = ['Etkinlik Bilgileri', 'Soru Seçimi', 'Önizleme'];
 
@@ -44,6 +45,7 @@ const AddQuestionGroup = () => {
     const [name, setName] = useState('');
     const [questionType, setQuestionType] = useState<'multiple_choice' | 'true_false' | 'qa'>('multiple_choice');
     const [gameId, setGameId] = useState<string>('');
+    const [categoryId, setCategoryId] = useState<string>('');
     const [selectedQuestions, setSelectedQuestions] = useState<number[]>([]);
 
     // Görsel yükleme için yeni state değişkenleri
@@ -63,6 +65,9 @@ const AddQuestionGroup = () => {
     const [error, setError] = useState<string | null>(null);
     const [questionsPage, setQuestionsPage] = useState(1);
     const [totalQuestionsPages, setTotalQuestionsPages] = useState(1);
+
+    const { categories } = useCategories();
+
 
     // Oyunları yükle
     useEffect(() => {
@@ -84,10 +89,10 @@ const AddQuestionGroup = () => {
 
     // Seçilen oyun ve soru tipine göre uygun soruları yükle
     useEffect(() => {
-        if (activeStep === 1 && gameId && questionType) {
+        if (activeStep === 1 && gameId && questionType && categoryId) {
             fetchEligibleQuestions();
         }
-    }, [activeStep, gameId, questionType, questionsPage]);
+    }, [activeStep, gameId, questionType, categoryId, questionsPage]);
 
     const fetchEligibleQuestions = async () => {
         try {
@@ -95,6 +100,7 @@ const AddQuestionGroup = () => {
             const response = await questionGroupService.getEligibleQuestions({
                 game_id: parseInt(gameId),
                 question_type: questionType,
+                category_id: parseInt(categoryId),
                 page: questionsPage
             });
             setEligibleQuestions(response.data);
@@ -126,6 +132,11 @@ const AddQuestionGroup = () => {
         setGameId(event.target.value);
         setSelectedQuestions([]); // Oyun değiştiğinde seçili soruları sıfırla
     };
+
+    const handleCategoryChange = (event: SelectChangeEvent) => {
+        setCategoryId(event.target.value);
+    };
+
 
     // Soru seçimi
     const handleQuestionToggle = (questionId: number) => {
@@ -210,7 +221,6 @@ const AddQuestionGroup = () => {
             setLoading(true);
             setError(null);
 
-            // Soru sayısını kontrol et
             if (selectedQuestions.length < 16) {
                 setError('En az 16 soru seçmelisiniz.');
                 setLoading(false);
@@ -223,29 +233,22 @@ const AddQuestionGroup = () => {
                 return;
             }
 
-            // FormData oluştur
             const formData = new FormData();
             formData.append('name', name);
             formData.append('question_type', questionType);
             formData.append('game_id', gameId);
+            formData.append('category_id', categoryId);
 
-            // Seçili soruları ekle
             selectedQuestions.forEach((id, index) => {
                 formData.append(`question_ids[${index}]`, id.toString());
             });
 
-            // Görsel dosyası varsa ekle
             if (imageFile) {
                 formData.append('image', imageFile);
             }
 
-            // API'ye FormData gönder
             await questionGroupService.createQuestionGroupWithImage(formData);
-
-            // Başarılı mesajı göster
             alert('Soru grubu başarıyla oluşturuldu.');
-
-            // Soru grupları listesine yönlendir
             navigate('/question-groups');
         } catch (err) {
             console.error('Error creating question group:', err);
@@ -297,6 +300,24 @@ const AddQuestionGroup = () => {
                                     onChange={(e) => setName(e.target.value)}
                                     required
                                 />
+                            </Grid>
+
+                            <Grid item xs={12} sm={6}>
+                                <FormControl fullWidth>
+                                    <InputLabel>Kategori</InputLabel>
+                                    <Select
+                                        value={categoryId}
+                                        label="Kategori"
+                                        onChange={handleCategoryChange}
+                                    >
+                                        <MenuItem value="">Seçiniz</MenuItem>
+                                        {categories.map((cat) => (
+                                            <MenuItem key={cat.id} value={cat.id.toString()}>
+                                                {cat.name}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
                             </Grid>
 
                             <Grid item xs={12} sm={6}>

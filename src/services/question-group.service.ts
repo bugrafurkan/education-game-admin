@@ -12,6 +12,12 @@ export interface QuestionGroup {
     created_at: string;
     updated_at: string;
     image_url?: string; // Etkinlik görseli için URL eklendi
+
+    // İframe ile ilgili eklenen yeni alanlar
+    iframe_url?: string;
+    iframe_code?: string;
+    iframe_status?: 'pending' | 'processing' | 'completed' | 'failed';
+
     game?: {
         id: number;
         name: string;
@@ -23,8 +29,11 @@ export interface QuestionGroup {
         email: string;
     };
     questions?: Question[];
+    category?: {
+        id: number;
+        name: string;
+    };
 }
-
 export interface Question {
     id: number;
     category_id: number;
@@ -74,16 +83,32 @@ export interface QuestionGroupUpdate {
 export interface EligibleQuestionsParams {
     game_id: number;
     question_type: 'multiple_choice' | 'true_false' | 'qa';
+    category_id?: number;
     page?: number;
 }
 
+export interface QuestionGroupFilters {
+    search?: string;
+    question_type?: 'multiple_choice' | 'true_false' | 'qa';
+    game_id?: string | number;
+    category_id?: string | number;
+    sort_field?: string;
+    sort_direction?: 'asc' | 'desc';
+}
+
+
 // Tüm soru gruplarını getir
-export const getQuestionGroups = async (page = 1): Promise<PaginatedResponse<QuestionGroup>> => {
+export const getQuestionGroups = async (
+    page = 1,
+    filters: QuestionGroupFilters = {}
+): Promise<PaginatedResponse<QuestionGroup>> => {
     const response = await api.get<PaginatedResponse<QuestionGroup>>('/question-groups', {
-        params: { page }
+        params: { page, ...filters }
     });
     return response.data;
 };
+
+
 
 // Belirli bir soru grubunu getir
 export const getQuestionGroup = async (id: number): Promise<QuestionGroup> => {

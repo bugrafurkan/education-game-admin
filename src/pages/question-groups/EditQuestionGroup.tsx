@@ -84,7 +84,7 @@ const EditQuestionGroup = () => {
 
             // Mevcut görseli ayarla
             if (response.image_url) {
-                const fullImageUrl = `https://ariyayin.broosmedia.com/public/storage/${response.image_url}`;
+                const fullImageUrl = `https://etkinlik.app/storage/${response.image_url}`;
                 setImagePreview(fullImageUrl);
                 // existingImage değişkenini kullanıyoruz
                 setExistingImage(fullImageUrl);
@@ -291,7 +291,11 @@ const EditQuestionGroup = () => {
     }
 
     return (
-        <Box>
+        <Box sx={{
+            width: '100%',
+            px: 2,            // Responsive boşluk (varsayılan container gibi)
+            boxSizing: 'border-box'
+        }}>
             <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                     <IconButton

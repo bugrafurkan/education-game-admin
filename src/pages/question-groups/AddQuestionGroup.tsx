@@ -286,7 +286,11 @@ const AddQuestionGroup = () => {
         switch (step) {
             case 0:
                 return (
-                    <Box>
+                    <Box sx={{
+                        width: '100%',
+                        px: 2,            // Responsive boşluk (varsayılan container gibi)
+                        boxSizing: 'border-box'
+                    }}>
                         <Typography variant="h6" sx={{ mb: 3 }}>
                             Etkinlik Bilgilerini Girin
                         </Typography>

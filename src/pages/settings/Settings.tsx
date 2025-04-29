@@ -131,6 +131,13 @@ const Settings = () => {
         if (success) {
             setShowSuccess(true);
             setSelectedLogoFile(null);
+
+            // Eğer tema rengi değişti ise sayfayı yenile
+            if (settings?.general?.theme_color !== themeColor) {
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000); // 1 saniye içinde yenile (bildirim görülsün diye)
+            }
         }
     };
 
@@ -146,6 +153,11 @@ const Settings = () => {
         const success = await updateSettings(newSettings);
         if (success) {
             setShowSuccess(true);
+
+            // Tema rengi güncellendiğinde sayfayı yenile
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000); // 1 saniye içinde yenile (bildirim görülsün diye)
         }
     };
 
@@ -188,7 +200,12 @@ const Settings = () => {
     }
 
     return (
-        <Box sx={{ maxWidth: 800, mx: 'auto' }}>
+        <Box sx={{
+            width: '100%',
+            px: 2,            // Responsive boşluk (varsayılan container gibi)
+            boxSizing: 'border-box',
+            mx : 'auto'
+        }}>
             <Typography variant="h4" gutterBottom sx={{ mb: 4, fontWeight: 'bold' }}>
                 Genel Ayarlar
             </Typography>

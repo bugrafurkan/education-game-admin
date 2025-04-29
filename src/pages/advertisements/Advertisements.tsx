@@ -6,7 +6,7 @@ import {
     IconButton, RadioGroup, Radio, FormControl, FormLabel,
     Dialog, DialogTitle, DialogContent, DialogActions,
     Chip, Table, TableBody, TableCell, TableContainer,
-    TableHead, TableRow, Tooltip
+    TableHead, TableRow, Tooltip, MenuItem, Select, InputLabel
 } from '@mui/material';
 import {
     Add as AddIcon,
@@ -18,6 +18,7 @@ import {
 } from '@mui/icons-material';
 import { useAdvertisements } from '../../hooks/useAdvertisement';
 import { Advertisement } from '../../services/advertisement.service';
+import { useEducationStructure } from '../../hooks/useEducationStructure';
 
 // React DatePicker kullanımı
 import DatePicker from "react-datepicker";
@@ -33,7 +34,7 @@ setDefaultLocale('tr');
 const Advertisements = () => {
     const {
         advertisements,
-        loading,
+        loading: adLoading,
         error,
         addAdvertisement,
         updateAdDetails,
@@ -41,6 +42,12 @@ const Advertisements = () => {
         removeAdvertisement,
         isSubmitting
     } = useAdvertisements();
+
+    const {
+        grades,
+        subjects,
+        loading: educationLoading
+    } = useEducationStructure();
 
     const [openDialog, setOpenDialog] = useState(false);
     const [isEditMode, setIsEditMode] = useState(false);
@@ -198,6 +205,8 @@ const Advertisements = () => {
         });
     };
 
+    const loading = adLoading || educationLoading;
+
     if (loading) {
         return (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px' }}>
@@ -207,7 +216,11 @@ const Advertisements = () => {
     }
 
     return (
-        <Box>
+        <Box sx={{
+        width: '100%',
+            px: 2,            // Responsive boşluk (varsayılan container gibi)
+            boxSizing: 'border-box'
+    }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
                 <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold' }}>
                     Reklam Yönetimi
@@ -335,18 +348,45 @@ const Advertisements = () => {
                         </Box>
 
                         <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
-                            <TextField
-                                label="Sınıf (Grade)"
-                                fullWidth
-                                value={grade}
-                                onChange={(e) => setGrade(e.target.value)}
-                            />
-                            <TextField
-                                label="Ders (Subject)"
-                                fullWidth
-                                value={subject}
-                                onChange={(e) => setSubject(e.target.value)}
-                            />
+                            <FormControl fullWidth>
+                                <InputLabel id="grade-select-label">Sınıf (Grade)</InputLabel>
+                                <Select
+                                    labelId="grade-select-label"
+                                    id="grade-select"
+                                    value={grade}
+                                    label="Sınıf (Grade)"
+                                    onChange={(e) => setGrade(e.target.value)}
+                                >
+                                    <MenuItem value="">
+                                        <em>Seçiniz</em>
+                                    </MenuItem>
+                                    {grades.map((g) => (
+                                        <MenuItem key={g.id} value={g.name}>
+                                            {g.name}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+
+                            <FormControl fullWidth>
+                                <InputLabel id="subject-select-label">Ders (Subject)</InputLabel>
+                                <Select
+                                    labelId="subject-select-label"
+                                    id="subject-select"
+                                    value={subject}
+                                    label="Ders (Subject)"
+                                    onChange={(e) => setSubject(e.target.value)}
+                                >
+                                    <MenuItem value="">
+                                        <em>Seçiniz</em>
+                                    </MenuItem>
+                                    {subjects.map((s) => (
+                                        <MenuItem key={s.id} value={s.name}>
+                                            {s.name}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
                         </Box>
 
                         {!isEditMode && (

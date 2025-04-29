@@ -54,7 +54,11 @@ const UnitList = () => {
     const getSubjectName = (id: number) => subjects.find((s) => s.id === id)?.name || '-';
 
     return (
-        <Box p={3}>
+        <Box p={3} sx={{
+            width: '100%',
+            px: 3,            // Responsive boşluk (varsayılan container gibi)
+            boxSizing: 'border-box'
+        }}>
             <Box display="flex" justifyContent="space-between" mb={2}>
                 <Typography variant="h5" fontWeight="bold">Ünite Yönetimi</Typography>
                 <Button

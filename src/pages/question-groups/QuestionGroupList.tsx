@@ -71,7 +71,11 @@ const QuestionGroupList = () => {
     };
 
     return (
-        <Box>
+        <Box sx={{
+            width: '100%',
+            px: 2,            // Responsive boşluk (varsayılan container gibi)
+            boxSizing: 'border-box'
+        }}>
             <Typography variant="h4" sx={{ fontWeight: 'bold', mb: 3 }}>Etkinlikler</Typography>
 
             <Paper sx={{ p: 2, mb: 3 }}>

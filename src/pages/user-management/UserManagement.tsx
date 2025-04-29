@@ -106,7 +106,11 @@ const UserManagement: React.FC = () => {
     }
 
     return (
-        <Box>
+        <Box sx={{
+            width: '100%',
+            px: 3,            // Responsive boşluk (varsayılan container gibi)
+            boxSizing: 'border-box'
+        }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
                 <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', mb: 0 }}>
                     Kullanıcı Yönetimi

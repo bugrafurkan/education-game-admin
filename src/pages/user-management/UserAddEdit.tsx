@@ -125,7 +125,11 @@ const UserAddEdit: React.FC = () => {
 
 
     return (
-        <Box>
+        <Box sx={{
+            width: '100%',
+            px: 3,            // Responsive boşluk (varsayılan container gibi)
+            boxSizing: 'border-box'
+        }}>
             <Breadcrumbs aria-label="breadcrumb" sx={{ mb: 3 }}>
                 <MuiLink component={Link} to="/user-management" underline="hover" color="inherit">
                     Kullanıcı Yönetimi

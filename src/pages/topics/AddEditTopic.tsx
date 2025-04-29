@@ -92,7 +92,11 @@ const AddEditTopic = () => {
     const selectedSubject = subjects.find((s) => s.id === selectedUnit?.subject_id);
 
     return (
-        <Box p={3}>
+        <Box sx={{
+            width: '100%',
+            px: 3,            // Responsive boşluk (varsayılan container gibi)
+            boxSizing: 'border-box'
+        }}>
             <Typography variant="h5" fontWeight="bold" mb={2}>
                 {isEdit ? 'Konu Düzenle' : 'Yeni Konu Ekle'}
             </Typography>

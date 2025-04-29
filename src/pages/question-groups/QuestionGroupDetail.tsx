@@ -13,7 +13,8 @@ import {
     ContentCopy as CopyIcon,
     Image as ImageIcon,
     Code as CodeIcon,
-    CheckCircle as CheckCircleIcon
+    CheckCircle as CheckCircleIcon,
+    Download as DownloadIcon
 } from '@mui/icons-material';
 import * as questionGroupService from '../../services/question-group.service';
 import * as iframeService from '../../services/iframe.service'; // Yeni iframe servisi
@@ -184,7 +185,7 @@ const QuestionGroupDetail = () => {
 
     if (loading) {
         return (
-            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh', width: '100%' }}>
                 <CircularProgress />
             </Box>
         );
@@ -192,7 +193,7 @@ const QuestionGroupDetail = () => {
 
     if (error) {
         return (
-            <Alert severity="error" sx={{ mt: 3 }}>
+            <Alert severity="error" sx={{ mt: 3, width: '100%' }}>
                 {error}
             </Alert>
         );
@@ -200,14 +201,14 @@ const QuestionGroupDetail = () => {
 
     if (!questionGroup) {
         return (
-            <Alert severity="warning" sx={{ mt: 3 }}>
+            <Alert severity="warning" sx={{ mt: 3, width: '100%' }}>
                 Soru grubu bulunamadı.
             </Alert>
         );
     }
 
     return (
-        <Box>
+        <Box sx={{ width: '100%', px: 0 }}>
             <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                     <IconButton
@@ -393,6 +394,26 @@ const QuestionGroupDetail = () => {
                                 >
                                     İframe Kodunu Görüntüle
                                 </Button>
+                                {questionGroup.zip_url && (
+                                    <>
+                                        <Button
+                                            variant="outlined"
+                                            color="secondary"
+                                            href={questionGroup.zip_url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            startIcon={<DownloadIcon />}
+                                            sx={{ mt: 2 }}
+                                        >
+                                            Zip Dosyasını İndir
+                                        </Button>
+
+                                        <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                                            Bu zip dosyası, Unity için oluşturulmuş tüm verileri içerir. İndirdikten sonra yerel olarak inceleyebilirsiniz.
+                                        </Typography>
+                                    </>
+                                )}
+
                             </Box>
                         </Grid>
                     )}
@@ -484,11 +505,11 @@ const QuestionGroupDetail = () => {
                                     }
                                 />
 
-                                <Tooltip title="Soruyu Görüntüle">
+                                <Tooltip title="Soruyu Düzenle">
                                     <IconButton
                                         size="small"
                                         component={Link}
-                                        to={`/questions/${question.id}`}
+                                        to={`/questions/${question.id}/edit`}
                                     >
                                         <EditIcon fontSize="small" />
                                     </IconButton>

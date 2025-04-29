@@ -57,7 +57,11 @@ const TopicList = () => {
     }, []);
 
     return (
-        <Box p={3}>
+        <Box sx={{
+            width: '100%',
+            px: 3,            // Responsive boşluk (varsayılan container gibi)
+            boxSizing: 'border-box'
+        }}>
             <Box display="flex" justifyContent="space-between" mb={2}>
                 <Typography variant="h5" fontWeight="bold">Bölüm Yönetimi</Typography>
                 <Button

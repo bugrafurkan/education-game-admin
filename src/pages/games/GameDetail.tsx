@@ -163,7 +163,11 @@ const GameDetail = () => {
     }
 
     return (
-        <Box>
+        <Box sx={{
+            width: '100%',
+            px: 2,            // Responsive boşluk (varsayılan container gibi)
+            boxSizing: 'border-box'
+        }}>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 4 }}>
                 <Button
                     component={Link}

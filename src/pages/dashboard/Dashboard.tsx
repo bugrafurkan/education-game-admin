@@ -29,7 +29,7 @@ const Dashboard = () => {
 
     if (loading) {
         return (
-            <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 8, width: '100%', maxWidth: 'none', m: 0 }}>
                 <CircularProgress />
             </Box>
         );
@@ -37,7 +37,7 @@ const Dashboard = () => {
 
     if (error) {
         return (
-            <Alert severity="error" sx={{ mt: 2 }}>
+            <Alert severity="error" sx={{ mt: 2, width: '100%', maxWidth: 'none', m: 0 }}>
                 {error}
             </Alert>
         );
@@ -89,15 +89,97 @@ const Dashboard = () => {
     ];
 
     return (
-        <Box>
-            <HomeIcon color="primary" sx={{ fontSize: 34 }} />
-            <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
-                Ana Sayfa
-            </Typography>
+        <Box
+            sx={{
+                width: '100%',
+                px: 2,            // Responsive boşluk (varsayılan container gibi)
+                boxSizing: 'border-box'
+            }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+                <HomeIcon color="primary" sx={{ fontSize: 34 }} />
+                <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
+                    Ana Sayfa
+                </Typography>
+            </Box>
 
-            <Grid container spacing={3}>
+            {/* 1. HIZLI İŞLEMLER (Taşındı) */}
+            <Grid container spacing={3} sx={{ mb: 3, mx: 0, width: '100%' }}>
+                <Grid item xs={12}>
+                    <Card sx={{ borderRadius: 2 }}>
+                        <CardHeader title="Hızlı İşlemler" />
+                        <Divider />
+                        <CardContent>
+                            <Grid container spacing={2}>
+                                <Grid item xs={12} sm={6} md={2.4}>
+                                    <Button
+                                        variant="contained"
+                                        fullWidth
+                                        startIcon={<AddIcon />}
+                                        component={Link}
+                                        to="/questions/add"
+                                        sx={{ py: 1.5 }}
+                                    >
+                                        Yeni Soru Ekle
+                                    </Button>
+                                </Grid>
+                                <Grid item xs={12} sm={6} md={2.4}>
+                                    <Button
+                                        variant="outlined"
+                                        fullWidth
+                                        startIcon={<ViewListIcon />}
+                                        component={Link}
+                                        to="/questions"
+                                        sx={{ py: 1.5 }}
+                                    >
+                                        Soruları Listele
+                                    </Button>
+                                </Grid>
+                                <Grid item xs={12} sm={6} md={2.4}>
+                                    <Button
+                                        variant="outlined"
+                                        fullWidth
+                                        startIcon={<FolderSpecialIcon />}
+                                        component={Link}
+                                        to="/question-groups"
+                                        sx={{ py: 1.5 }}
+                                    >
+                                        Etkinlikleri Yönet
+                                    </Button>
+                                </Grid>
+                                <Grid item xs={12} sm={6} md={2.4}>
+                                    <Button
+                                        variant="outlined"
+                                        fullWidth
+                                        startIcon={<GamepadIcon />}
+                                        component={Link}
+                                        to="/games"
+                                        sx={{ py: 1.5 }}
+                                    >
+                                        Oyunları Görüntüle
+                                    </Button>
+                                </Grid>
+                                <Grid item xs={12} sm={6} md={2.4}>
+                                    <Button
+                                        variant="outlined"
+                                        fullWidth
+                                        startIcon={<CampaignIcon />}
+                                        component={Link}
+                                        to="/advertisements"
+                                        sx={{ py: 1.5 }}
+                                    >
+                                        Reklamları Yönet
+                                    </Button>
+                                </Grid>
+                            </Grid>
+                        </CardContent>
+                    </Card>
+                </Grid>
+            </Grid>
+
+            {/* 2. İSTATİSTİK KARTLARI */}
+            <Grid container spacing={3} sx={{ mx: 0, width: '100%' }}>
                 {statItems.map((stat, index) => (
-                    <Grid item xs={12} sm={6} md={3} key={index}>
+                    <Grid item xs={12} sm={6} md={4} lg={2} key={index}>
                         <Paper
                             elevation={0}
                             sx={{
@@ -125,7 +207,8 @@ const Dashboard = () => {
                 ))}
             </Grid>
 
-            <Grid container spacing={3} sx={{ mt: 2 }}>
+            {/* 3. SON EKLENENLER VE ETKİNLİKLER */}
+            <Grid container spacing={3} sx={{ mt: 3, mx: 0, width: '100%' }}>
                 <Grid item xs={12} md={6}>
                     <Card sx={{ borderRadius: 2, height: '100%' }}>
                         <CardHeader title="Son Eklenen Sorular" />
@@ -194,79 +277,6 @@ const Dashboard = () => {
                                     ))}
                                 </List>
                             )}
-                        </CardContent>
-                    </Card>
-                </Grid>
-            </Grid>
-
-            <Grid container spacing={3} sx={{ mt: 2 }}>
-                <Grid item xs={12}>
-                    <Card sx={{ borderRadius: 2 }}>
-                        <CardHeader title="Hızlı İşlemler" />
-                        <Divider />
-                        <CardContent>
-                            <Grid container spacing={2}>
-                                <Grid item xs={12} sm={6} md={2.4}>
-                                    <Button
-                                        variant="contained"
-                                        fullWidth
-                                        startIcon={<AddIcon />}
-                                        component={Link}
-                                        to="/questions/add"
-                                        sx={{ py: 1.5 }}
-                                    >
-                                        Yeni Soru Ekle
-                                    </Button>
-                                </Grid>
-                                <Grid item xs={12} sm={6} md={2.4}>
-                                    <Button
-                                        variant="outlined"
-                                        fullWidth
-                                        startIcon={<ViewListIcon />}
-                                        component={Link}
-                                        to="/questions"
-                                        sx={{ py: 1.5 }}
-                                    >
-                                        Soruları Listele
-                                    </Button>
-                                </Grid>
-                                <Grid item xs={12} sm={6} md={2}>
-                                    <Button
-                                        variant="outlined"
-                                        fullWidth
-                                        startIcon={<FolderSpecialIcon />}
-                                        component={Link}
-                                        to="/question-groups"
-                                        sx={{ py: 1.5 }}
-                                    >
-                                        Etkinlikleri Yönet
-                                    </Button>
-                                </Grid>
-                                <Grid item xs={12} sm={6} md={2.4}>
-                                    <Button
-                                        variant="outlined"
-                                        fullWidth
-                                        startIcon={<GamepadIcon />}
-                                        component={Link}
-                                        to="/games"
-                                        sx={{ py: 1.5 }}
-                                    >
-                                        Oyunları Görüntüle
-                                    </Button>
-                                </Grid>
-                                <Grid item xs={12} sm={6} md={2.4}>
-                                    <Button
-                                        variant="outlined"
-                                        fullWidth
-                                        startIcon={<CampaignIcon />}
-                                        component={Link}
-                                        to="/advertisements"
-                                        sx={{ py: 1.5 }}
-                                    >
-                                        Reklamları Yönet
-                                    </Button>
-                                </Grid>
-                            </Grid>
                         </CardContent>
                     </Card>
                 </Grid>

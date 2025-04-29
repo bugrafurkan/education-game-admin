@@ -71,7 +71,11 @@ const GameList = () => {
     };
 
     return (
-        <Box>
+        <Box sx={{
+            width: '100%',
+            px: 2,            // Responsive boşluk (varsayılan container gibi)
+            boxSizing: 'border-box'
+        }}>
             <Typography variant="h4" gutterBottom sx={{ mb: 4, fontWeight: 'bold' }}>
                 Oyun Yönetimi
             </Typography>

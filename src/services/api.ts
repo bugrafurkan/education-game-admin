@@ -2,11 +2,12 @@
 import axios from 'axios';
 
 // API temel URL'si - .env dosyasından alınabilir
-const API_URL = 'https://ariyayin.broosmedia.com/public/api';
+const API_URL = 'https://etkinlik.app/api';
 
 // axios örneğini oluştur
 const api = axios.create({
     baseURL: API_URL,
+    withCredentials: true,
     headers: {
         'Content-Type': 'application/json',
     }

@@ -86,8 +86,6 @@ const Header = ({ onMenuToggle }: HeaderProps) => {
                         open={Boolean(anchorEl)}
                         onClose={handleClose}
                     >
-                        <MenuItem onClick={handleClose}>Profil</MenuItem>
-                        <MenuItem onClick={handleClose}>Ayarlar</MenuItem>
                         <MenuItem onClick={handleLogout}>Çıkış</MenuItem>
                     </Menu>
                 </Box>

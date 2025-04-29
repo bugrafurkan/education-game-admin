@@ -11,6 +11,7 @@ import { useEducationStructure } from '../../hooks/useEducationStructure';
 import * as questionService from '../../services/question.service';
 import * as gameService from '../../services/game.service';
 import axios, { AxiosError } from 'axios';
+import { useCategories } from '../../hooks/useCategories'; // Kategori hook'unu ekleyin
 
 // Soru tipi seçenekleri
 const questionTypes = [
@@ -52,12 +53,9 @@ const AddQuestion = () => {
     const [error, setError] = useState<string | null>(null);
 
     // Eğitim yapısı verilerini yükle
-    const { grades, subjects, units, topics} = useEducationStructure();
-
-    // Filtrelenmiş listeler
-    const [filteredSubjects, setFilteredSubjects] = useState(subjects);
-    const [filteredUnits, setFilteredUnits] = useState(units);
-    const [filteredTopics, setFilteredTopics] = useState(topics);
+    const { grades, subjects, units, topics } = useEducationStructure();
+    // Kategorileri yükle
+    const { categories } = useCategories();
 
     // Form verileri
     const [questionType, setQuestionType] = useState<string>('');
@@ -92,79 +90,24 @@ const AddQuestion = () => {
     const [games, setGames] = useState<gameService.Game[]>([]);
     const [gamesLoading, setGamesLoading] = useState(false);
 
-    // Grade değiştiğinde ilgili dersleri filtrele
+    // Kategori değiştiğinde ilgili bilgileri otomatik doldur
     useEffect(() => {
-        if (gradeId) {
-            // Tüm dersleri göster (grade ve subject arasında doğrudan ilişki yoksa)
-            setFilteredSubjects(subjects);
-
-            // Grade değiştiğinde alt seçimleri sıfırla
-            setSubjectId('');
-            setUnitId('');
-            setTopicId('');
-            setCategoryId('');
-        } else {
-            setFilteredSubjects(subjects);
-            setSubjectId('');
-            setUnitId('');
-            setTopicId('');
-            setCategoryId('');
-        }
-    }, [gradeId, subjects]);
-
-    // Subject değiştiğinde ilgili üniteleri filtrele
-    useEffect(() => {
-        if (gradeId && subjectId) {
-            const filtered = units.filter(unit =>
-                unit.grade_id === gradeId && unit.subject_id === subjectId
-            );
-            setFilteredUnits(filtered);
-
-            // Subject değiştiğinde alt seçimleri sıfırla
-            setUnitId('');
-            setTopicId('');
-
-            // Kategoriyi seçmeye çalış
-            const matchingCategories = filtered.map(unit => unit.id);
-            if (matchingCategories.length > 0) {
-                // Eğer bir eşleşme bulunursa, ilk kategoriyi seç
-                // Bu davranış backend'e bağlı olarak değiştirilebilir
-                setCategoryId(matchingCategories[0]);
-            } else {
-                setCategoryId('');
+        if (categoryId) {
+            const selectedCategory = categories.find(c => c.id === categoryId);
+            if (selectedCategory) {
+                setGradeId(selectedCategory.grade_id);
+                setSubjectId(selectedCategory.subject_id);
+                setUnitId(selectedCategory.unit_id ?? '');
+                setTopicId(selectedCategory.topic_id ?? '');
             }
         } else {
-            setFilteredUnits([]);
+            // Kategori seçilmediğinde alanları temizle
+            setGradeId('');
+            setSubjectId('');
             setUnitId('');
             setTopicId('');
-            setCategoryId('');
         }
-    }, [gradeId, subjectId, units]);
-
-    // Unit değiştiğinde ilgili konuları filtrele
-    useEffect(() => {
-        if (unitId) {
-            const filtered = topics.filter(topic => topic.unit_id === unitId);
-            setFilteredTopics(filtered);
-
-            // Unit değiştiğinde topic seçimini sıfırla
-            setTopicId('');
-
-            // Ünite seçildiğinde kategori ID'sini güncelle
-            setCategoryId(unitId);
-        } else {
-            setFilteredTopics([]);
-            setTopicId('');
-        }
-    }, [unitId, topics]);
-
-    // Topic değişikliklerini izle
-    useEffect(() => {
-        if (topicId) {
-            // Konu seçildiğinde kategori ID'sini güncelle
-            setCategoryId(topicId);
-        }
-    }, [topicId]);
+    }, [categoryId, categories]);
 
     // Düzenleme durumunda soruyu yükle
     useEffect(() => {
@@ -179,14 +122,6 @@ const AddQuestion = () => {
                     setQuestionText(question.question_text);
                     setDifficulty(question.difficulty);
                     setCategoryId(question.category_id);
-
-                    // Kategori bilgilerini doldur
-                    if (question.category) {
-                        setGradeId(question.category.grade_id);
-                        setSubjectId(question.category.subject_id);
-                        if (question.category.unit_id) setUnitId(question.category.unit_id);
-                        if (question.category.topic_id) setTopicId(question.category.topic_id);
-                    }
 
                     // Resim yolunu ayarla
                     if (question.image_path) {
@@ -232,7 +167,7 @@ const AddQuestion = () => {
         };
 
         fetchQuestion();
-    }, [isEdit, questionId, choices]);
+    }, [isEdit, questionId]);
 
     // Oyun listesini yükle
     useEffect(() => {
@@ -281,20 +216,8 @@ const AddQuestion = () => {
     };
 
     // Kategori değiştir
-    const handleGradeChange = (event: SelectChangeEvent<number | ''>) => {
-        setGradeId(event.target.value as number | '');
-    };
-
-    const handleSubjectChange = (event: SelectChangeEvent<number | ''>) => {
-        setSubjectId(event.target.value as number | '');
-    };
-
-    const handleUnitChange = (event: SelectChangeEvent<number | ''>) => {
-        setUnitId(event.target.value as number | '');
-    };
-
-    const handleTopicChange = (event: SelectChangeEvent<number | ''>) => {
-        setTopicId(event.target.value as number | '');
+    const handleCategoryChange = (event: SelectChangeEvent<number | ''>) => {
+        setCategoryId(event.target.value as number | '');
     };
 
     // Oyun değiştir
@@ -357,13 +280,6 @@ const AddQuestion = () => {
         try {
             setLoading(true);
             setError(null);
-
-            // Tüm zorunlu alanların kontrolü
-            if (!gradeId || !subjectId || !unitId || !topicId) {
-                setError('Lütfen tüm kategori alanlarını (Sınıf, Ders, Ünite ve Konu) doldurun.');
-                setLoading(false);
-                return;
-            }
 
             // Kategori ID kontrol et
             if (!categoryId) {
@@ -472,7 +388,7 @@ const AddQuestion = () => {
 
     // İkinci adım geçerli mi
     const isSecondStepValid = () => {
-        if (!questionText || !gradeId || !subjectId || !unitId || !topicId) return false;
+        if (!questionText || !categoryId) return false;
 
         switch (questionType) {
             case 'multiple_choice':
@@ -501,7 +417,11 @@ const AddQuestion = () => {
         switch (step) {
             case 0:
                 return (
-                    <Box>
+                    <Box sx={{
+                        width: '100%',
+                        px: 3,            // Responsive boşluk (varsayılan container gibi)
+                        boxSizing: 'border-box'
+                    }}>
                         <Typography variant="h6" sx={{ mb: 3 }}>
                             Eklemek istediğiniz soru tipini seçin
                         </Typography>
@@ -524,7 +444,11 @@ const AddQuestion = () => {
 
             case 1:
                 return (
-                    <Box>
+                    <Box sx={{
+                        width: '100%',
+                        px: 2,            // Responsive boşluk (varsayılan container gibi)
+                        boxSizing: 'border-box'
+                    }}>
                         <Typography variant="h6" sx={{ mb: 3 }}>
                             Soru Detaylarını Girin
                         </Typography>
@@ -602,17 +526,35 @@ const AddQuestion = () => {
                                 )}
                             </Grid>
 
-                            {/* Kategori Seçimi - Hiyerarşik Yapı */}
-                            <Grid item xs={12} sm={6} md={3}>
+                            {/* Kategori Seçimi - edit modunda disabled */}
+                            <Grid item xs={12}>
                                 <FormControl fullWidth required>
+                                    <InputLabel>Kategori</InputLabel>
+                                    <Select
+                                        value={categoryId}
+                                        label="Kategori"
+                                        onChange={handleCategoryChange}
+                                        required
+                                        disabled={isEdit} // Edit modunda değiştirilemesin
+                                    >
+                                        <MenuItem value="" disabled>Kategori Seçin</MenuItem>
+                                        {categories.map((category) => (
+                                            <MenuItem key={category.id} value={category.id}>
+                                                {category.name}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+
+                            {/* Otomatik doldurulan ve seçilemeyen alanlar */}
+                            <Grid item xs={12} sm={6} md={3}>
+                                <FormControl fullWidth disabled>
                                     <InputLabel>Sınıf</InputLabel>
                                     <Select
                                         value={gradeId}
                                         label="Sınıf"
-                                        onChange={handleGradeChange}
-                                        required
                                     >
-                                        <MenuItem value="" disabled>Sınıf Seçin</MenuItem>
                                         {grades.map((grade) => (
                                             <MenuItem key={grade.id} value={grade.id}>
                                                 {grade.name}
@@ -623,17 +565,13 @@ const AddQuestion = () => {
                             </Grid>
 
                             <Grid item xs={12} sm={6} md={3}>
-                                <FormControl fullWidth required>
+                                <FormControl fullWidth disabled>
                                     <InputLabel>Ders</InputLabel>
                                     <Select
                                         value={subjectId}
                                         label="Ders"
-                                        onChange={handleSubjectChange}
-                                        required
-                                        disabled={!gradeId}
                                     >
-                                        <MenuItem value="" disabled>Ders Seçin</MenuItem>
-                                        {filteredSubjects.map((subject) => (
+                                        {subjects.map((subject) => (
                                             <MenuItem key={subject.id} value={subject.id}>
                                                 {subject.name}
                                             </MenuItem>
@@ -643,17 +581,13 @@ const AddQuestion = () => {
                             </Grid>
 
                             <Grid item xs={12} sm={6} md={3}>
-                                <FormControl fullWidth required>
+                                <FormControl fullWidth disabled>
                                     <InputLabel>Ünite</InputLabel>
                                     <Select
                                         value={unitId}
                                         label="Ünite"
-                                        onChange={handleUnitChange}
-                                        required
-                                        disabled={!subjectId || filteredUnits.length === 0}
                                     >
-                                        <MenuItem value="" disabled>Ünite Seçin</MenuItem>
-                                        {filteredUnits.map((unit) => (
+                                        {units.map((unit) => (
                                             <MenuItem key={unit.id} value={unit.id}>
                                                 {unit.name}
                                             </MenuItem>
@@ -663,17 +597,13 @@ const AddQuestion = () => {
                             </Grid>
 
                             <Grid item xs={12} sm={6} md={3}>
-                                <FormControl fullWidth required>
+                                <FormControl fullWidth disabled>
                                     <InputLabel>Konu</InputLabel>
                                     <Select
                                         value={topicId}
                                         label="Konu"
-                                        onChange={handleTopicChange}
-                                        required
-                                        disabled={!unitId || filteredTopics.length === 0}
                                     >
-                                        <MenuItem value="" disabled>Konu Seçin</MenuItem>
-                                        {filteredTopics.map((topic) => (
+                                        {topics.map((topic) => (
                                             <MenuItem key={topic.id} value={topic.id}>
                                                 {topic.name}
                                             </MenuItem>
@@ -755,7 +685,11 @@ const AddQuestion = () => {
 
             case 2:
                 return (
-                    <Box>
+                    <Box sx={{
+                        width: '100%',
+                        px: 3,            // Responsive boşluk (varsayılan container gibi)
+                        boxSizing: 'border-box'
+                    }}>
                         <Typography variant="h6" sx={{ mb: 3 }}>
                             Sorunun Ekleneceği Oyunu Seçin
                         </Typography>
@@ -846,7 +780,11 @@ const AddQuestion = () => {
     };
 
     return (
-        <Box>
+        <Box sx={{
+            width: '100%',
+            px: 3,            // Responsive boşluk (varsayılan container gibi)
+            boxSizing: 'border-box'
+        }}>
             <Typography variant="h4" gutterBottom sx={{ mb: 4, fontWeight: 'bold' }}>
                 {isEdit ? 'Soruyu Düzenle' : 'Yeni Soru Ekle'}
             </Typography>

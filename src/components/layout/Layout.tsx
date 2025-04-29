@@ -29,11 +29,13 @@ const Layout = () => {
                 sx={{
                     flexGrow: 1,
                     p: 3,
-                    width: { md: `calc(100% - 240px)` },
-                    ml: { md: '240px' },
+                    width: `100%` ,
+                    ml: 0,
+                    pr: 0,
                     mt: '64px',
                     backgroundColor: '#f5f8fa',
-                    minHeight: '100vh'
+                    minHeight: '100vh',
+                    overflowX: 'hidden'
                 }}
             >
                 <Outlet />

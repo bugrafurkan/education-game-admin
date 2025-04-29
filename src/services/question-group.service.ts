@@ -17,7 +17,7 @@ export interface QuestionGroup {
     iframe_url?: string;
     iframe_code?: string;
     iframe_status?: 'pending' | 'processing' | 'completed' | 'failed';
-
+    zip_url?: string;
     game?: {
         id: number;
         name: string;

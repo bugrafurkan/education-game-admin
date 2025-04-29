@@ -164,7 +164,11 @@ const AddEditCategory = () => {
     };
 
     return (
-        <Box>
+        <Box sx={{
+            width: '100%',
+            px: 2,            // Responsive boşluk (varsayılan container gibi)
+            boxSizing: 'border-box'
+        }}>
             <Box sx={{ mb: 3, display: 'flex', alignItems: 'center' }}>
                 <IconButton
                     component={Link}

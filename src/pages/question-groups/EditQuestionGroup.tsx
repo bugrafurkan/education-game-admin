@@ -84,7 +84,7 @@ const EditQuestionGroup = () => {
 
             // Mevcut görseli ayarla
             if (response.image_url) {
-                const fullImageUrl = `https://etkinlik.app/storage/${response.image_url}`;
+                const fullImageUrl = `response.image_url`;
                 setImagePreview(fullImageUrl);
                 // existingImage değişkenini kullanıyoruz
                 setExistingImage(fullImageUrl);
@@ -93,7 +93,7 @@ const EditQuestionGroup = () => {
             setLoading(false);
 
             // Uygun soruları yükle
-            fetchEligibleQuestions();
+
         } catch (err) {
             console.error('Error fetching question group:', err);
             setError('Soru grubu yüklenirken bir hata oluştu.');

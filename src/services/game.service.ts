@@ -99,3 +99,18 @@ export const getIframeCode = async (gameId: number): Promise<IframeCodeResponse>
     const response = await api.get<IframeCodeResponse>(`/games/${gameId}/iframe`);
     return response.data;
 };
+
+// Oyunda olmayan soruları getir
+export const getAvailableQuestions = async (gameId: number): Promise<Question[]> => {
+    const response = await api.get<Question[]>(`/games/${gameId}/available-questions`);
+    return response.data;
+};
+
+// Toplu soru ekle
+export const addMultipleQuestions = async (gameId: number, questionIds: number[], points?: number): Promise<{ message: string }> => {
+    const response = await api.post<{ message: string }>(`/games/${gameId}/questions/bulk-add`, {
+        question_ids: questionIds,
+        points: points || 100
+    });
+    return response.data;
+};

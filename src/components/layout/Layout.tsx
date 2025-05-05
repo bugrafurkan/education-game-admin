@@ -9,13 +9,19 @@ const Layout = () => {
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('md'));
     const [mobileOpen, setMobileOpen] = useState(false);
+    const drawerWidth = 240;
 
     const handleDrawerToggle = () => {
         setMobileOpen(!mobileOpen);
     };
 
     return (
-        <Box sx={{ display: 'flex' }}>
+        <Box sx={{
+            display: 'flex',
+            minHeight: '100vh',
+            width: '100%',
+            backgroundColor: '#f5f8fa'
+        }}>
             <Header onMenuToggle={handleDrawerToggle} />
 
             <Sidebar
@@ -28,17 +34,22 @@ const Layout = () => {
                 component="main"
                 sx={{
                     flexGrow: 1,
-                    p: 3,
-                    width: `100%` ,
-                    ml: 0,
-                    pr: 0,
-                    mt: '64px',
-                    backgroundColor: '#f5f8fa',
-                    minHeight: '100vh',
-                    overflowX: 'hidden'
+                    marginLeft: { xs: 0, md: `${drawerWidth}px` },
+                    marginTop: '64px',
+                    minHeight: 'calc(100vh - 64px)',
+                    width: { xs: '100%', md: `calc(100% - ${drawerWidth}px)` },
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    transition: theme.transitions.create(['margin', 'width'], {
+                        easing: theme.transitions.easing.sharp,
+                        duration: theme.transitions.duration.leavingScreen,
+                    })
                 }}
             >
-                <Outlet />
+                <Box sx={{ width: '100%', maxWidth: '1400px', p: 0 }}>
+                    <Outlet />
+                </Box>
             </Box>
         </Box>
     );

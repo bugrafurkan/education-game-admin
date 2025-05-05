@@ -84,7 +84,7 @@ const EditQuestionGroup = () => {
 
             // Mevcut görseli ayarla
             if (response.image_url) {
-                const fullImageUrl = `response.image_url`;
+                const fullImageUrl = response.image_url;
                 setImagePreview(fullImageUrl);
                 // existingImage değişkenini kullanıyoruz
                 setExistingImage(fullImageUrl);

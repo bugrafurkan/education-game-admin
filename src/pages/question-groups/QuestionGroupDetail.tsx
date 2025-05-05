@@ -107,10 +107,10 @@ const QuestionGroupDetail = () => {
             setIframeDialogOpen(true);
 
             // iframe oluşturmayı başlat
-            await iframeService.createIframe(questionGroup.id);
+            await iframeService.createIframe(questionGroup.id,questionGroup.game_id);
 
             // Durumu periyodik olarak kontrol et
-            const interval = setInterval(checkIframeStatus, 5000) as Timeout; // 5 saniyede bir kontrol et
+            const interval = setInterval(checkIframeStatus, 60000) as Timeout; // 5 saniyede bir kontrol et
             setStatusCheckInterval(interval);
         } catch (err) {
             console.error('Error creating iframe:', err);

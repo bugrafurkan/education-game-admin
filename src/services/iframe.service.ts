@@ -11,16 +11,15 @@ interface CreateIframeResponse {
     job_id?: string;
 }
 
-export const createIframe = async (groupId: number): Promise<CreateIframeResponse> => {
+export const createIframe = async (groupId: number, gameId: number): Promise<CreateIframeResponse> => {
     try {
-        const response = await api.post(`/jenkins/create-iframe/${groupId}`);
+        const response = await api.post(`/jenkins/create-iframe/${groupId}/${gameId}`);
         return response.data;
     } catch (error) {
         console.error('İframe oluşturma hatası:', error);
         throw error;
     }
 };
-
 /**
  * İframe durumunu kontrol eder
  * @param groupId Soru grubu ID'si

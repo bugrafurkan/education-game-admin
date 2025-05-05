@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import axios, { AxiosError } from 'axios';
 import * as gameService from '../services/game.service';
 import { Game, GameQuestionAdd, IframeCodeResponse } from '../services/game.service';
+import {Question} from "../services/question.service.ts";
 
 interface ApiErrorResponse {
     message: string;
@@ -16,6 +17,8 @@ export const useGame = (id: number) => {
     const [iframeCode, setIframeCode] = useState<string | null>(null);
     const [iframeLoading, setIframeLoading] = useState(false);
     const [iframeError, setIframeError] = useState<string | null>(null);
+    const [availableQuestions, setAvailableQuestions] = useState<Question[]>([]);
+    const [loadingAvailableQuestions, setLoadingAvailableQuestions] = useState(false)
 
     const fetchGame = async () => {
         try {
@@ -64,6 +67,21 @@ export const useGame = (id: number) => {
         }
     };
 
+    // Oyunda olmayan soruları getir
+    const getAvailableQuestions = async () => {
+        if (!game) return;
+
+        try {
+            setLoadingAvailableQuestions(true);
+            const questions = await gameService.getAvailableQuestions(game.id);
+            setAvailableQuestions(questions);
+        } catch (error) {
+            console.error('Error fetching available questions:', error);
+        } finally {
+            setLoadingAvailableQuestions(false);
+        }
+    };
+
     // Oyuna soru ekle
     const addQuestion = async (questionData: GameQuestionAdd): Promise<boolean> => {
         if (!game) return false;
@@ -83,6 +101,21 @@ export const useGame = (id: number) => {
                 console.error('Unexpected error:', error);
             }
             setLoading(false);
+            return false;
+        }
+    };
+
+    // Toplu soru ekle
+    const addMultipleQuestions = async (questionIds: number[], points?: number): Promise<boolean> => {
+        if (!game) return false;
+
+        try {
+            setLoading(true);
+            await gameService.addMultipleQuestions(game.id, questionIds, points);
+            await fetchGame(); // Oyun bilgilerini yenile
+            return true;
+        } catch (error) {
+            console.error('Error adding multiple questions:', error);
             return false;
         }
     };
@@ -119,9 +152,13 @@ export const useGame = (id: number) => {
         iframeCode,
         iframeLoading,
         iframeError,
+        availableQuestions,
+        loadingAvailableQuestions,
         refresh: fetchGame,
         removeQuestion,
         addQuestion,
-        getIframeCode
+        getIframeCode,
+        getAvailableQuestions,
+        addMultipleQuestions
     };
 };

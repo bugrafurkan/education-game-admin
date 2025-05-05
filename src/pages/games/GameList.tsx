@@ -154,10 +154,6 @@ const GameList = () => {
                                             {game.description || 'Açıklama yok'}
                                         </Typography>
 
-                                        <Typography variant="body2">
-                                            <strong>Soru Sayısı:</strong> {game.question_count || game.questions?.length || 0}
-                                        </Typography>
-
                                         {game.creator && (
                                             <Typography variant="body2">
                                                 <strong>Oluşturan:</strong> {game.creator.name}

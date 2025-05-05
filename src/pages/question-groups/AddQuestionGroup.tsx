@@ -40,6 +40,7 @@ const dropzoneStyles = {
 const AddQuestionGroup = () => {
     const navigate = useNavigate();
     const [activeStep, setActiveStep] = useState(0);
+    const [selectAllChecked, setSelectAllChecked] = useState(false);
 
     // Form verileri
     const [name, setName] = useState('');
@@ -91,6 +92,7 @@ const AddQuestionGroup = () => {
     useEffect(() => {
         if (activeStep === 1 && gameId && questionType && categoryId) {
             fetchEligibleQuestions();
+            setSelectAllChecked(false);
         }
     }, [activeStep, gameId, questionType, categoryId, questionsPage]);
 
@@ -156,6 +158,29 @@ const AddQuestionGroup = () => {
 
         setSelectedQuestions(newSelectedQuestions);
         setError(null);
+    };
+
+    // Sayfadaki tüm soruları seç/kaldır
+    const handleSelectAllToggle = () => {
+        if (selectAllChecked) {
+            // Tüm seçimleri kaldır
+            setSelectedQuestions(prev =>
+                prev.filter(id => !eligibleQuestions.some(q => q.id === id))
+            );
+        } else {
+            // Bu sayfadaki tüm soruları ekle (48 soru limitini aşmamak kaydıyla)
+            const newSelections = [...selectedQuestions];
+
+            eligibleQuestions.forEach(question => {
+                if (!newSelections.includes(question.id) && newSelections.length < 48) {
+                    newSelections.push(question.id);
+                }
+            });
+
+            setSelectedQuestions(newSelections);
+        }
+
+        setSelectAllChecked(!selectAllChecked);
     };
 
     // Görsel yükleme işlemleri
@@ -479,6 +504,36 @@ const AddQuestionGroup = () => {
                         ) : (
                             <>
                                 <List sx={{ width: '100%', bgcolor: 'background.paper', borderRadius: 1, border: '1px solid #e0e0e0' }}>
+                                    {/* Tümünü Seç header */}
+                                    <ListItem
+                                        dense
+                                        sx={{
+                                            borderBottom: '2px solid #f0f0f0',
+                                            bgcolor: '#f9f9f9',
+                                        }}
+                                    >
+                                        <ListItemIcon>
+                                            <Checkbox
+                                                edge="start"
+                                                checked={selectAllChecked}
+                                                onChange={handleSelectAllToggle}
+                                                disabled={eligibleQuestions.length === 0 || (selectedQuestions.length >= 48 && !selectAllChecked)}
+                                                indeterminate={
+                                                    selectedQuestions.some(id => eligibleQuestions.some(q => q.id === id)) &&
+                                                    !eligibleQuestions.every(q => selectedQuestions.includes(q.id))
+                                                }
+                                            />
+                                        </ListItemIcon>
+                                        <ListItemText
+                                            primary={
+                                                <Typography variant="subtitle2">
+                                                    Sayfadaki Tüm Soruları Seç
+                                                    {selectedQuestions.length >= 48 && !selectAllChecked ?
+                                                        " (maksimum 48 soru seçilebilir)" : ""}
+                                                </Typography>
+                                            }
+                                        />
+                                    </ListItem>
                                     {eligibleQuestions.map((question) => {
                                         const isSelected = selectedQuestions.indexOf(question.id) !== -1;
 

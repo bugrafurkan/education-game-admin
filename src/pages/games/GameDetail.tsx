@@ -5,7 +5,8 @@ import {
     Box, Typography, Paper, Button, Grid, Chip,
     List, ListItem, ListItemText, ListItemIcon, ListItemSecondaryAction,
     IconButton, Tabs, Tab, Alert, CircularProgress, Dialog,
-    DialogTitle, DialogContent, DialogContentText, DialogActions
+    DialogTitle, DialogContent, DialogContentText, DialogActions,
+    Checkbox, ListItemButton
 } from '@mui/material';
 import {
     QuestionAnswer as QuestionIcon,
@@ -54,11 +55,18 @@ const GameDetail = () => {
     const { id } = useParams<{ id: string }>();
     const gameId = parseInt(id || '0');
 
+    const [bulkAddDialogOpen, setBulkAddDialogOpen] = useState(false);
+    const [selectedQuestions, setSelectedQuestions] = useState<number[]>([]);
+
     const {
-        game, loading, error,  removeQuestion
+        game, loading, error, removeQuestion,
+        availableQuestions, loadingAvailableQuestions,
+        getAvailableQuestions, addMultipleQuestions
     } = useGame(gameId);
 
     const [tabValue, setTabValue] = useState(0);
+
+
 
     // Soru silme
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -104,6 +112,33 @@ const GameDetail = () => {
     const handleDeleteCancel = () => {
         setDeleteDialogOpen(false);
         setQuestionToDelete(null);
+    };
+
+    // Toplu ekleme metodlarını
+    const handleBulkAddClick = async () => {
+        setBulkAddDialogOpen(true);
+        setSelectedQuestions([]);
+        await getAvailableQuestions();
+    };
+
+    const handleQuestionSelect = (questionId: number) => {
+        setSelectedQuestions(prev => {
+            if (prev.includes(questionId)) {
+                return prev.filter(id => id !== questionId);
+            } else {
+                return [...prev, questionId];
+            }
+        });
+    };
+
+    const handleBulkAddConfirm = async () => {
+        if (selectedQuestions.length === 0) return;
+
+        const success = await addMultipleQuestions(selectedQuestions, 100);
+        if (success) {
+            setBulkAddDialogOpen(false);
+            setSelectedQuestions([]);
+        }
     };
 
     // iframe kodunu al
@@ -183,8 +218,7 @@ const GameDetail = () => {
                 <Button
                     variant="contained"
                     startIcon={<AddIcon />}
-                    component={Link}
-                    to={`/questions/add?gameId=${game.id}`}
+                    onClick={handleBulkAddClick}
                     sx={{
                         mr: 1,
                         bgcolor: '#1a1a27',
@@ -373,6 +407,73 @@ const GameDetail = () => {
                         startIcon={isDeleting ? <CircularProgress size={20} /> : null}
                     >
                         {isDeleting ? 'İşleniyor...' : 'Çıkar'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+            {/* Toplu Soru Ekleme Dialogu */}
+            <Dialog
+                open={bulkAddDialogOpen}
+                onClose={() => setBulkAddDialogOpen(false)}
+                maxWidth="md"
+                fullWidth
+            >
+                <DialogTitle>Toplu Soru Ekle</DialogTitle>
+                <DialogContent>
+                    <DialogContentText sx={{ mb: 2 }}>
+                        Eklemek istediğiniz soruları seçin:
+                    </DialogContentText>
+
+                    {loadingAvailableQuestions ? (
+                        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                            <CircularProgress />
+                        </Box>
+                    ) : availableQuestions.length === 0 ? (
+                        <Alert severity="info">
+                            Eklenebilecek yeni soru bulunmuyor.
+                        </Alert>
+                    ) : (
+                        <List sx={{ maxHeight: 400, overflow: 'auto', border: '1px solid #eee', borderRadius: 1 }}>
+                            {availableQuestions.map((question) => (
+                                <ListItem
+                                    key={question.id}
+                                    disablePadding
+                                >
+                                    <ListItemButton onClick={() => handleQuestionSelect(question.id)}>
+                                        <ListItemIcon>
+                                            <Checkbox
+                                                edge="start"
+                                                checked={selectedQuestions.includes(question.id)}
+                                                tabIndex={-1}
+                                                disableRipple
+                                            />
+                                        </ListItemIcon>
+                                        <ListItemText
+                                            primary={question.question_text}
+                                            secondary={`ID: ${question.id} - ${question.question_type}`}
+                                        />
+                                    </ListItemButton>
+                                </ListItem>
+                            ))}
+                        </List>
+                    )}
+
+                    {selectedQuestions.length > 0 && (
+                        <Typography sx={{ mt: 2 }}>
+                            Seçilen soru sayısı: {selectedQuestions.length}
+                        </Typography>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setBulkAddDialogOpen(false)}>
+                        İptal
+                    </Button>
+                    <Button
+                        onClick={handleBulkAddConfirm}
+                        variant="contained"
+                        disabled={selectedQuestions.length === 0}
+                        startIcon={<AddIcon />}
+                    >
+                        Seçilenleri Ekle
                     </Button>
                 </DialogActions>
             </Dialog>

@@ -28,6 +28,8 @@ import UnitList from "../pages/units/UnitList.tsx";
 import AddEditUnit from "../pages/units/AddEditUnit.tsx";
 import TopicList from "../pages/topics/TopicList.tsx";
 import AddEditTopic from "../pages/topics/AddEditTopic.tsx";
+import TopluSoruEkleme from "../pages/questions/TopluSoruEkleme.tsx";
+import ExcelSoruImport from "../pages/questions/ExcelSoruImport.tsx";
 
 // AuthGuard: Kimlik doğrulama gerektiren rotalar için koruma
 interface AuthGuardProps {
@@ -85,6 +87,8 @@ const AppRoutes = () => {
                 <Route path="questions" element={<QuestionList />} />
                 <Route path="questions/add" element={<AddQuestion />} />
                 <Route path="questions/:id/edit" element={<AddQuestion />} />
+                <Route path="/questions/bulk-add" element={<TopluSoruEkleme />} />
+                <Route path="/questions/excel-import" element={<ExcelSoruImport />} />
                 <Route path="games" element={<GameList />} />
                 <Route path="games/:id" element={<GameDetail />} />
                 <Route path="exports" element={<ExportList />} />

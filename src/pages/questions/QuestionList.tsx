@@ -13,14 +13,16 @@ import {
     Search as SearchIcon,
     Edit as EditIcon,
     Delete as DeleteIcon,
-    MenuBook as MenuBookIcon
+    MenuBook as MenuBookIcon,
+    ViewList as ViewListIcon,
+    FileUpload as FileUploadIcon
 } from '@mui/icons-material';
 import { Link } from 'react-router-dom';
 import { useQuestions } from '../../hooks/useQuestions';
 import { QuestionFilter } from '../../services/question.service';
 import { useEducationStructure } from '../../hooks/useEducationStructure';
 import { useUsers } from '../../hooks/useUsers';
-import {useCategories} from "../../hooks/useCategories";
+import { useCategories } from "../../hooks/useCategories";
 
 const QuestionList = () => {
     const [page, setPage] = useState(1);
@@ -31,12 +33,10 @@ const QuestionList = () => {
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [questionToDelete, setQuestionToDelete] = useState<number | null>(null);
 
-
-
     // Eğitim yapısı verilerini yükle
     const { grades, subjects, units, topics} = useEducationStructure();
 
-    // Kategori filtreleri için state'ler - artık ID bazlı
+    // Kategori filtreleri için state'ler - ID bazlı
     const [gradeIdFilter, setGradeIdFilter] = useState<number | ''>('');
     const [subjectIdFilter, setSubjectIdFilter] = useState<number | ''>('');
     const [unitIdFilter, setUnitIdFilter] = useState<number | ''>('');
@@ -63,7 +63,7 @@ const QuestionList = () => {
     // Hook ile soruları yükle
     const { questions, loading, error, pagination, deleteQuestion } = useQuestions(page, filters);
 
-
+    // Kategori değiştiğinde ilgili bilgileri otomatik doldur
     useEffect(() => {
         if (categoryIdFilter) {
             const selectedCategory = categories.find(c => c.id === categoryIdFilter);
@@ -80,6 +80,7 @@ const QuestionList = () => {
             setTopicIdFilter('');
         }
     }, [categoryIdFilter, categories]);
+
     // Filtre değişikliklerini yönet
     const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearch(e.target.value);
@@ -95,8 +96,6 @@ const QuestionList = () => {
         setDifficultyFilter(event.target.value);
         setPage(1);
     };
-
-
 
     // Tüm filtreleri sıfırla
     const handleResetFilters = () => {
@@ -182,7 +181,7 @@ const QuestionList = () => {
     return (
         <Container maxWidth="xl">
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, my: 3 }}>
-                {/* Başlık ve Yeni Soru Ekle Butonu */}
+                {/* Başlık ve Butonlar */}
                 <Paper sx={{ p: 3, borderRadius: 2 }}>
                     <Grid container spacing={2} alignItems="center">
                         <Grid item xs={12} sm={6}>
@@ -193,7 +192,38 @@ const QuestionList = () => {
                                 </Typography>
                             </Box>
                         </Grid>
-                        <Grid item xs={12} sm={6} sx={{ textAlign: { xs: 'left', sm: 'right' } }}>
+                        <Grid item xs={12} sm={6} sx={{
+                            textAlign: { xs: 'left', sm: 'right' },
+                            display: 'flex',
+                            justifyContent: { xs: 'flex-start', sm: 'flex-end' },
+                            gap: 2,
+                            flexWrap: { xs: 'wrap', md: 'nowrap' }
+                        }}>
+                            {/* Excel ile Soru Ekleme Butonu */}
+                            <Button
+                                variant="outlined"
+                                size="medium"
+                                startIcon={<FileUploadIcon />}
+                                component={Link}
+                                to="/questions/excel-import"
+                                sx={{ fontSize: '0.9rem', py: 1.2 }}
+                            >
+                                Excel ile Ekle
+                            </Button>
+
+                            {/* Toplu Soru Ekleme Butonu */}
+                            <Button
+                                variant="outlined"
+                                size="medium"
+                                startIcon={<ViewListIcon />}
+                                component={Link}
+                                to="/questions/bulk-add"
+                                sx={{ fontSize: '0.9rem', py: 1.2 }}
+                            >
+                                Toplu Soru Ekle
+                            </Button>
+
+                            {/* Tek Soru Ekleme Butonu */}
                             <Button
                                 variant="contained"
                                 size="medium"
@@ -276,6 +306,8 @@ const QuestionList = () => {
                                 </Select>
                             </FormControl>
                         </Grid>
+
+                        {/* Kategori */}
                         <Grid item xs={12} sm={6} md={3}>
                             <FormControl fullWidth>
                                 <InputLabel>Kategori</InputLabel>
@@ -291,6 +323,7 @@ const QuestionList = () => {
                                 </Select>
                             </FormControl>
                         </Grid>
+
                         {/* Sınıf */}
                         <Grid item xs={12} sm={6} md={3}>
                             <FormControl fullWidth disabled>

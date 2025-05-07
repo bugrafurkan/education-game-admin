@@ -14,6 +14,15 @@ import {
 
 import { Link } from 'react-router-dom';
 import { useGames } from '../../hooks/useGames';
+import { Game } from '../../services/game.service.ts'
+
+// Oyunlar için görseller (id'ye göre)
+const gameImages: {[key: number]: string} = {
+    1: 'https://etkinlik.app/images/game1.jpg',
+    2: 'https://etkinlik.app/images/game2.jpg',
+    3: 'https://etkinlik.app/images/game3.jpg',
+    // Daha fazla oyun eklendiğinde buraya yeni ID'ler ve görsel yolları ekle
+};
 
 const GameList = () => {
     const [page, setPage] = useState(1);
@@ -21,9 +30,26 @@ const GameList = () => {
     const [search, setSearch] = useState('');
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [gameToDelete, setGameToDelete] = useState<number | null>(null);
+    const [imageErrors, setImageErrors] = useState<{[key: number]: boolean}>({});
 
     // Hook ile oyunları yükle
     const { games, loading, error, pagination, deleteGame } = useGames(page);
+
+    // Görsel yükleme hatası işleme
+    const handleImageError = (gameId: number) => {
+        setImageErrors(prev => ({...prev, [gameId]: true}));
+    };
+
+    // Oyun için görsel URL'sini belirle
+    const getGameImageUrl = (game: Game) => {
+        // Oyun ID'sine göre görsel kontrolü
+        if (gameImages[game.id] && !imageErrors[game.id]) {
+            return gameImages[game.id];
+        }
+
+        // Görsel bulunamazsa veya hata olursa null dön (fallback için)
+        return null;
+    };
 
     // Arama işlemi - client-side filtreleme
     const filteredGames = games.filter(game => {
@@ -119,77 +145,105 @@ const GameList = () => {
             ) : (
                 <>
                     <Grid container spacing={3}>
-                        {filteredGames.map((game) => (
-                            <Grid item xs={12} sm={6} md={4} key={game.id}>
-                                <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', borderRadius: 2 }}>
-                                    <CardMedia
-                                        component="div"
-                                        sx={{
-                                            height: 140,
-                                            backgroundColor: game.type === 'jeopardy' ? '#3f51b5' : '#f50057',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            color: 'white',
-                                            fontSize: '1.5rem',
-                                            fontWeight: 'bold'
-                                        }}
-                                    >
-                                        {getGameTypeLabel(game.type)}
-                                    </CardMedia>
+                        {filteredGames.map((game) => {
+                            const gameImage = getGameImageUrl(game);
 
-                                    <CardContent sx={{ flexGrow: 1 }}>
-                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 1 }}>
-                                            <Typography variant="h6" component="div" sx={{ fontWeight: 'bold' }}>
-                                                {game.name}
-                                            </Typography>
-                                            <Chip
-                                                label={game.is_active ? 'Aktif' : 'Pasif'}
-                                                color={game.is_active ? 'success' : 'default'}
-                                                size="small"
-                                            />
-                                        </Box>
-
-                                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                                            {game.description || 'Açıklama yok'}
-                                        </Typography>
-
-                                        {game.creator && (
-                                            <Typography variant="body2">
-                                                <strong>Oluşturan:</strong> {game.creator.name}
-                                            </Typography>
-                                        )}
-                                    </CardContent>
-
-                                    <CardActions sx={{ p: 2, pt: 0 }}>
-                                        <Button
-                                            size="small"
-                                            startIcon={<ViewIcon />}
-                                            component={Link}
-                                            to={`/games/${game.id}`}
+                            return (
+                                <Grid item xs={12} sm={6} md={4} key={game.id}>
+                                    <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', borderRadius: 2 }}>
+                                        <CardMedia
+                                            component="div"
+                                            sx={{
+                                                height: 140,
+                                                backgroundColor: game.type === 'jeopardy' ? '#3f51b5' : '#f50057',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                color: 'white',
+                                                fontSize: '1.5rem',
+                                                fontWeight: 'bold',
+                                                position: 'relative',
+                                                overflow: 'hidden'
+                                            }}
                                         >
-                                            Detaylar
-                                        </Button>
-                                </CardActions>
-                            </Card>
-                            </Grid>
-                            ))}
+                                            {gameImage && (
+                                                <img
+                                                    src={gameImage}
+                                                    alt={`${game.name} görseli`}
+                                                    onError={() => handleImageError(game.id)}
+                                                    style={{
+                                                        position: 'absolute',
+                                                        width: '100%',
+                                                        height: '100%',
+                                                        objectFit: 'cover',
+                                                        opacity: 0.7,  // Metin okunabilir olması için hafif şeffaflık
+                                                    }}
+                                                />
+                                            )}
+                                            <Box
+                                                sx={{
+                                                    position: 'relative',
+                                                    zIndex: 1,
+                                                    textShadow: '2px 2px 4px rgba(0,0,0,0.7)'  // Metin okunabilirliği için gölge
+                                                }}
+                                            >
+                                                {getGameTypeLabel(game.type)}
+                                            </Box>
+                                        </CardMedia>
+
+                                        <CardContent sx={{ flexGrow: 1 }}>
+                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 1 }}>
+                                                <Typography variant="h6" component="div" sx={{ fontWeight: 'bold' }}>
+                                                    {game.name}
+                                                </Typography>
+                                                <Chip
+                                                    label={game.is_active ? 'Aktif' : 'Pasif'}
+                                                    color={game.is_active ? 'success' : 'default'}
+                                                    size="small"
+                                                />
+                                            </Box>
+
+                                            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                                                {game.description || 'Açıklama yok'}
+                                            </Typography>
+
+                                            {game.creator && (
+                                                <Typography variant="body2">
+                                                    <strong>Oluşturan:</strong> {game.creator.name}
+                                                </Typography>
+                                            )}
+                                        </CardContent>
+
+                                        <CardActions sx={{ p: 2, pt: 0 }}>
+                                            <Button
+                                                size="small"
+                                                startIcon={<ViewIcon />}
+                                                component={Link}
+                                                to={`/games/${game.id}`}
+                                            >
+                                                Detaylar
+                                            </Button>
+                                        </CardActions>
+                                    </Card>
+                                </Grid>
+                            );
+                        })}
                     </Grid>
 
                     {!loading && pagination && (
-                    <Paper sx={{ mt: 3, borderRadius: 2 }}>
-                        <TablePagination
-                            component="div"
-                            count={pagination.total}
-                            rowsPerPage={rowsPerPage}
-                            page={pagination.current_page - 1} // API'den 1-tabanlı, MUI'de 0-tabanlı
-                            onPageChange={handleChangePage}
-                            onRowsPerPageChange={handleChangeRowsPerPage}
-                            rowsPerPageOptions={[6, 12, 24]}
-                            labelRowsPerPage="Sayfa başına oyun:"
-                            labelDisplayedRows={({ from, to, count }) => `${from}-${to} / ${count}`}
-                        />
-                    </Paper>
+                        <Paper sx={{ mt: 3, borderRadius: 2 }}>
+                            <TablePagination
+                                component="div"
+                                count={pagination.total}
+                                rowsPerPage={rowsPerPage}
+                                page={pagination.current_page - 1} // API'den 1-tabanlı, MUI'de 0-tabanlı
+                                onPageChange={handleChangePage}
+                                onRowsPerPageChange={handleChangeRowsPerPage}
+                                rowsPerPageOptions={[6, 12, 24]}
+                                labelRowsPerPage="Sayfa başına oyun:"
+                                labelDisplayedRows={({ from, to, count }) => `${from}-${to} / ${count}`}
+                            />
+                        </Paper>
                     )}
                 </>
             )}

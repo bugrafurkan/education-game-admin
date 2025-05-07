@@ -225,7 +225,7 @@ const GameDetail = () => {
                         '&:hover': { bgcolor: '#2a2a37' }
                     }}
                 >
-                    Soru Ekle
+                    Soru Seç
                 </Button>
             </Box>
 

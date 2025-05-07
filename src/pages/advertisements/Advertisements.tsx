@@ -14,7 +14,8 @@ import {
     Delete as DeleteIcon,
     Edit as EditIcon,
     Visibility as VisibilityIcon,
-    VisibilityOff as VisibilityOffIcon
+    VisibilityOff as VisibilityOffIcon,
+    ZoomIn as ZoomInIcon
 } from '@mui/icons-material';
 import { useAdvertisements } from '../../hooks/useAdvertisement';
 import { Advertisement } from '../../services/advertisement.service';
@@ -30,6 +31,158 @@ import './datepicker-custom.css'; // Özel CSS dosyası (oluşturmanız gerekece
 // Türkçe dil desteği ekleme
 registerLocale('tr', tr);
 setDefaultLocale('tr');
+
+// Önizleme modalı için tip tanımları
+interface PreviewModalProps {
+    open: boolean;
+    onClose: () => void;
+    src: string;
+    type: 'image' | 'video' | string;
+    title: string;
+}
+
+// Önizleme modalı için yeni bileşen
+const PreviewModal = ({ open, onClose, src, type, title }: PreviewModalProps) => {
+    return (
+        <Dialog
+            open={open}
+            onClose={onClose}
+            maxWidth="md"
+            fullWidth
+        >
+            <DialogTitle>{title}</DialogTitle>
+            <DialogContent>
+                <Box sx={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    mt: 2
+                }}>
+                    {type === 'image' ? (
+                        <img
+                            src={src}
+                            alt={title}
+                            style={{
+                                maxWidth: '100%',
+                                maxHeight: '70vh'
+                            }}
+                        />
+                    ) : (
+                        <video
+                            src={src}
+                            controls
+                            style={{
+                                maxWidth: '100%',
+                                maxHeight: '70vh'
+                            }}
+                        />
+                    )}
+                </Box>
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={onClose}>Kapat</Button>
+            </DialogActions>
+        </Dialog>
+    );
+};
+
+// MediaPreview bileşeni için tip tanımları
+interface MediaPreviewProps {
+    advert: Advertisement;
+    onClick: (src: string, type: string, title: string) => void;
+}
+
+// MediaPreview bileşeni - Küçük önizleme
+const MediaPreview = ({ advert, onClick }: MediaPreviewProps) => {
+    const isVideo = advert.type === 'video';
+    const previewUrl = advert.file_url || (advert.file_path ? `/storage/${advert.file_path}` : null);
+
+    if (!previewUrl) return <Box sx={{ textAlign: 'center', color: 'text.secondary' }}>Görsel Yok</Box>;
+
+    return (
+        <Box
+            sx={{
+                width: '80px',
+                height: '45px',
+                overflow: 'hidden',
+                borderRadius: '4px',
+                border: '1px solid #eee',
+                position: 'relative',
+                cursor: 'pointer',
+                '&:hover': {
+                    borderColor: 'primary.main',
+                    '& .zoom-icon': {
+                        opacity: 1
+                    }
+                }
+            }}
+            onClick={() => onClick(previewUrl, advert.type, advert.name)}
+        >
+            {isVideo ? (
+                <Box sx={{
+                    width: '100%',
+                    height: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: '#f0f0f0'
+                }}>
+                    <Typography variant="caption" color="text.secondary">
+                        Video
+                    </Typography>
+                    <Box
+                        className="zoom-icon"
+                        sx={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            width: '100%',
+                            height: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            backgroundColor: 'rgba(0,0,0,0.3)',
+                            opacity: 0,
+                            transition: 'opacity 0.2s'
+                        }}
+                    >
+                        <ZoomInIcon sx={{ color: 'white', fontSize: '1.2rem' }} />
+                    </Box>
+                </Box>
+            ) : (
+                <>
+                    <img
+                        src={previewUrl}
+                        alt={advert.name}
+                        style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover'
+                        }}
+                    />
+                    <Box
+                        className="zoom-icon"
+                        sx={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            width: '100%',
+                            height: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            backgroundColor: 'rgba(0,0,0,0.3)',
+                            opacity: 0,
+                            transition: 'opacity 0.2s'
+                        }}
+                    >
+                        <ZoomInIcon sx={{ color: 'white', fontSize: '1.2rem' }} />
+                    </Box>
+                </>
+            )}
+        </Box>
+    );
+};
 
 const Advertisements = () => {
     const {
@@ -61,6 +214,31 @@ const Advertisements = () => {
     const [grade, setGrade] = useState('');
     const [subject, setSubject] = useState('');
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+    // Önizleme modalı için state
+    const [previewModal, setPreviewModal] = useState({
+        open: false,
+        src: '',
+        type: 'image' as 'image' | 'video',
+        title: ''
+    });
+
+    const handleOpenPreview = (src: string, type: string, title: string) => {
+        setPreviewModal({
+            open: true,
+            src,
+            // 'image' ya da 'video' dışında bir tür gelirse varsayılan olarak 'image' kullan
+            type: (type === 'video' ? 'video' : 'image') as 'image' | 'video',
+            title
+        });
+    };
+
+    const handleClosePreview = () => {
+        setPreviewModal({
+            ...previewModal,
+            open: false
+        });
+    };
 
     const handleOpenDialog = (isEdit = false, ad?: Advertisement) => {
         if (isEdit && ad) {
@@ -217,10 +395,10 @@ const Advertisements = () => {
 
     return (
         <Box sx={{
-        width: '100%',
+            width: '100%',
             px: 2,            // Responsive boşluk (varsayılan container gibi)
             boxSizing: 'border-box'
-    }}>
+        }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
                 <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold' }}>
                     Reklam Yönetimi
@@ -255,19 +433,26 @@ const Advertisements = () => {
                     <Table>
                         <TableHead>
                             <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                                <TableCell width="20%">Reklam Adı</TableCell>
-                                <TableCell width="10%">Tür</TableCell>
-                                <TableCell width="10%">Durum</TableCell>
+                                <TableCell width="8%">Önizleme</TableCell>
+                                <TableCell width="17%">Reklam Adı</TableCell>
+                                <TableCell width="9%">Tür</TableCell>
+                                <TableCell width="9%">Durum</TableCell>
                                 <TableCell width="10%">Sınıf</TableCell>
                                 <TableCell width="10%">Ders</TableCell>
-                                <TableCell width="13%">Başlangıç Tarihi</TableCell>
-                                <TableCell width="13%">Bitiş Tarihi</TableCell>
-                                <TableCell width="14%" align="right">İşlemler</TableCell>
+                                <TableCell width="12%">Başlangıç Tarihi</TableCell>
+                                <TableCell width="12%">Bitiş Tarihi</TableCell>
+                                <TableCell width="13%" align="right">İşlemler</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
                             {advertisements.map((ad) => (
                                 <TableRow key={ad.id} hover>
+                                    <TableCell>
+                                        <MediaPreview
+                                            advert={ad}
+                                            onClick={handleOpenPreview}
+                                        />
+                                    </TableCell>
                                     <TableCell><Typography>{ad.name}</Typography></TableCell>
                                     <TableCell>
                                         <Chip label={ad.type === 'image' ? 'Banner' : 'Video'} color={ad.type === 'image' ? 'primary' : 'secondary'} size="small" />
@@ -307,6 +492,7 @@ const Advertisements = () => {
                 </TableContainer>
             )}
 
+            {/* Reklam Ekleme/Düzenleme Dialog */}
             <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
                 <DialogTitle>{isEditMode ? 'Reklamı Düzenle' : 'Yeni Reklam Ekle'}</DialogTitle>
                 <DialogContent>
@@ -439,6 +625,15 @@ const Advertisements = () => {
                     </Button>
                 </DialogActions>
             </Dialog>
+
+            {/* Önizleme Modalı */}
+            <PreviewModal
+                open={previewModal.open}
+                onClose={handleClosePreview}
+                src={previewModal.src}
+                type={previewModal.type}
+                title={previewModal.title}
+            />
 
             <Snackbar
                 open={!!successMessage}

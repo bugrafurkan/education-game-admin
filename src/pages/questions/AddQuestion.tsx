@@ -11,7 +11,8 @@ import { useEducationStructure } from '../../hooks/useEducationStructure';
 import * as questionService from '../../services/question.service';
 import * as gameService from '../../services/game.service';
 import axios, { AxiosError } from 'axios';
-import { useCategories } from '../../hooks/useCategories'; // Kategori hook'unu ekleyin
+import { useCategories } from '../../hooks/useCategories';
+import ImageUploader from '../../components/ImageUploader'; // ImageUploader bileşenini ekleyin
 
 // Soru tipi seçenekleri
 const questionTypes = [
@@ -72,8 +73,6 @@ const AddQuestion = () => {
 
     // Resim yükleme için state'ler
     const [imagePath, setImagePath] = useState<string | null>(null);
-    const [imageFile, setImageFile] = useState<File | null>(null);
-    const [imageLoading, setImageLoading] = useState(false);
     const [imageError, setImageError] = useState<string | null>(null);
 
     // Cevap verileri
@@ -244,35 +243,9 @@ const AddQuestion = () => {
         ));
     };
 
-    // Resim yükleme fonksiyonu
-    const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (!file) return;
-
-        // Dosya boyutu kontrolü (2MB)
-        if (file.size > 2 * 1024 * 1024) {
-            setImageError("Dosya boyutu 2MB'dan küçük olmalıdır.");
-            return;
-        }
-
-        // Dosya tipi kontrolü
-        if (!file.type.startsWith('image/')) {
-            setImageError("Sadece resim dosyaları yüklenebilir.");
-            return;
-        }
-
-        setImageFile(file);
-        setImageError(null);
-
-        // Önizleme URL'i oluştur
-        const objectUrl = URL.createObjectURL(file);
-        setImagePath(objectUrl);
-    };
-
-    // Resmi kaldırma fonksiyonu
-    const handleRemoveImage = () => {
-        setImagePath(null);
-        setImageFile(null);
+    // Resim yolunu değiştir (ImageUploader bileşeninden gelen callback)
+    const handleImagePathChange = (path: string | null) => {
+        setImagePath(path);
     };
 
     // Formu gönder
@@ -300,28 +273,8 @@ const AddQuestion = () => {
                 answers
             };
 
-            // Resim dosyası varsa, önce onu yükle
-            if (imageFile) {
-                setImageLoading(true);
-                try {
-                    const uploadResponse = await questionService.uploadImage(imageFile);
-                    questionData.image_path = uploadResponse.url;
-                } catch (error) {
-                    if (axios.isAxiosError(error)) {
-                        const axiosError = error as AxiosError<ApiErrorResponse>;
-                        setImageError(axiosError.response?.data?.message || 'Resim yüklenirken bir hata oluştu');
-                        console.error('Error uploading image:', axiosError.response?.data);
-                    } else {
-                        setImageError('Resim yüklenirken beklenmeyen bir hata oluştu');
-                        console.error('Unexpected image upload error:', error);
-                    }
-                    setLoading(false);
-                    setImageLoading(false);
-                    return; // Hata varsa formu göndermeyi durdur
-                }
-                setImageLoading(false);
-            } else if (imagePath && isEdit) {
-                // Düzenleme sırasında mevcut resim yolu
+            // Eğer imagePath varsa, onu ekle (ImageUploader bileşeni zaten yükleme işlemini halletmiş olacak)
+            if (imagePath) {
                 questionData.image_path = imagePath;
             }
 
@@ -466,58 +419,13 @@ const AddQuestion = () => {
                                 />
                             </Grid>
 
+                            {/* ImageUploader bileşeni burada kullanılıyor */}
                             <Grid item xs={12}>
-                                <Typography variant="subtitle1" sx={{ mb: 1 }}>
-                                    Soru Resmi (Opsiyonel)
-                                </Typography>
-
-                                {imagePath && (
-                                    <Box sx={{ mb: 2, position: 'relative', width: 'fit-content' }}>
-                                        <img
-                                            src={imagePath}
-                                            alt="Soru resmi"
-                                            style={{
-                                                maxWidth: '100%',
-                                                maxHeight: '200px',
-                                                border: '1px solid #ddd',
-                                                borderRadius: '4px'
-                                            }}
-                                        />
-                                        <Button
-                                            variant="contained"
-                                            color="error"
-                                            size="small"
-                                            onClick={handleRemoveImage}
-                                            sx={{
-                                                position: 'absolute',
-                                                top: 5,
-                                                right: 5,
-                                                minWidth: '30px',
-                                                width: '30px',
-                                                height: '30px',
-                                                p: 0
-                                            }}
-                                        >
-                                            X
-                                        </Button>
-                                    </Box>
-                                )}
-
-                                <Button
-                                    variant="outlined"
-                                    component="label"
-                                    sx={{ mr: 2 }}
-                                >
-                                    Resim Seç
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        hidden
-                                        onChange={handleImageUpload}
-                                    />
-                                </Button>
-
-                                {imageLoading && <CircularProgress size={20} sx={{ ml: 2 }} />}
+                                <ImageUploader
+                                    imagePath={imagePath}
+                                    onImagePathChange={handleImagePathChange}
+                                    onError={setImageError}
+                                />
 
                                 {imageError && (
                                     <Alert severity="error" sx={{ mt: 1 }}>

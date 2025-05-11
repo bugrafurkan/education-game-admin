@@ -71,6 +71,20 @@ export interface PaginatedResponse<T> {
     last_page: number;
 }
 
+export interface GoogleImage {
+    id: string;
+    preview_url: string;
+    web_format_url: string;
+    large_image_url: string;
+    source: string;
+    title: string;
+}
+
+export interface GoogleSearchResult {
+    total: number;
+    images: GoogleImage[];
+}
+
 // Tüm soruları getir (filtreleme ve sayfalama ile)
 export const getQuestions = async (page = 1, filters: QuestionFilter = {}): Promise<PaginatedResponse<Question>> => {
     const response = await api.get<PaginatedResponse<Question>>('/questions', {
@@ -111,6 +125,36 @@ export const uploadImage = async (file: File): Promise<{ url: string }> => {
         headers: {
             'Content-Type': 'multipart/form-data',
         },
+    });
+
+    return response.data;
+};
+
+// Base64 formatındaki görseli yükle (kopyala-yapıştır için)
+export const uploadBase64Image = async (imageData: string): Promise<{ url: string }> => {
+    const response = await api.post<{ url: string }>('/questions/upload-base64-image', {
+        image_data: imageData,
+    });
+
+    return response.data;
+};
+
+// Google'dan görsel ara
+export const searchImages = async (query: string, page: number = 1): Promise<GoogleSearchResult> => {
+    const response = await api.get<GoogleSearchResult>('/images/search', {
+        params: {
+            query,
+            page,
+        },
+    });
+
+    return response.data;
+};
+
+// Harici URL'den görsel indir ve sunucuya kaydet
+export const saveExternalImage = async (imageUrl: string): Promise<{ url: string }> => {
+    const response = await api.post<{ url: string }>('/images/save-external', {
+        image_url: imageUrl,
     });
 
     return response.data;

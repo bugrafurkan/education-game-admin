@@ -38,16 +38,19 @@ const Layout = () => {
                     width: '100%',
                     display: 'flex',
                     flexDirection: 'column',
-                    alignItems: 'stretch',
+
+                    alignItems: 'stretch',        
+
                     transition: theme.transitions.create(['margin', 'width'], {
                         easing: theme.transitions.easing.sharp,
                         duration: theme.transitions.duration.leavingScreen,
                     }),
-                    p: 0,
+
+                    p: 0,                         
                 }}
             >
                 <Container maxWidth={false} disableGutters sx={{ width: '100%', height: '100%' }}>
-                    <Box sx={{
+                    <Box sx={{ 
                         width: '100%',
                         height: '100%',
                         p: { xs: 2, sm: 3 },

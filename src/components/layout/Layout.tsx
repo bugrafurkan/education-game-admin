@@ -9,8 +9,6 @@ const Layout = () => {
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('md'));
     const [mobileOpen, setMobileOpen] = useState(false);
-    const drawerWidth = 240;
-
     const handleDrawerToggle = () => {
         setMobileOpen(!mobileOpen);
     };
@@ -40,11 +38,14 @@ const Layout = () => {
                     width: '100%',
                     display: 'flex',
                     flexDirection: 'column',
+
                     alignItems: 'stretch',        
+
                     transition: theme.transitions.create(['margin', 'width'], {
                         easing: theme.transitions.easing.sharp,
                         duration: theme.transitions.duration.leavingScreen,
                     }),
+
                     p: 0,                         
                 }}
             >

@@ -3,7 +3,8 @@ import { useState, useEffect } from 'react';
 import {
     Box, Typography, Paper, Button, TextField, InputAdornment, Table, TableBody,
     TableCell, TableContainer, TableHead, TablePagination, TableRow, Grid,
-    CircularProgress, Alert, Select, MenuItem, IconButton, FormControl, InputLabel
+    CircularProgress, Alert, Select, MenuItem, IconButton, FormControl, InputLabel,
+    Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle // Dialog bileşenlerini ekledik
 } from '@mui/material';
 import {
     Add as AddIcon, Search as SearchIcon, Edit as EditIcon, Delete as DeleteIcon,
@@ -28,6 +29,11 @@ const QuestionGroupList = () => {
     const [categoryId, setCategoryId] = useState('');
     const [sortField, setSortField] = useState('created_at');
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+
+    // Silme işlemi için dialog state'leri
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [groupToDelete, setGroupToDelete] = useState<number | null>(null);
+    const [deleteLoading, setDeleteLoading] = useState(false);
 
     const { games } = useGames();
     const { categories } = useCategories();
@@ -54,6 +60,33 @@ const QuestionGroupList = () => {
             setError('Veriler alınamadı');
         }
         setLoading(false);
+    };
+
+    // Silme dialogunu açan fonksiyon
+    const handleDeleteClick = (groupId: number, event: React.MouseEvent) => {
+        event.stopPropagation(); // Event'in parent elementlere geçişini engelle
+        setGroupToDelete(groupId);
+        setDeleteDialogOpen(true);
+    };
+
+    // Silme işlemini gerçekleştiren fonksiyon
+    const handleDeleteConfirm = async () => {
+        if (!groupToDelete) return;
+
+        setDeleteLoading(true);
+        try {
+            await questionGroupService.deleteQuestionGroup(groupToDelete);
+            // Silme başarılı olduğunda listeyi güncelle
+            fetchGroups();
+            setError(null);
+        } catch (e) {
+            console.error('Silme hatası:', e);
+            setError('Etkinlik silinirken bir hata oluştu');
+        } finally {
+            setDeleteLoading(false);
+            setDeleteDialogOpen(false);
+            setGroupToDelete(null);
+        }
     };
 
     const handleSort = (field: string) => {
@@ -177,7 +210,12 @@ const QuestionGroupList = () => {
                                         <TableCell>
                                             <IconButton component={Link} to={`/question-groups/${group.id}`}><ViewIcon /></IconButton>
                                             <IconButton component={Link} to={`/question-groups/${group.id}/edit`}><EditIcon /></IconButton>
-                                            <IconButton color="error"><DeleteIcon /></IconButton>
+                                            <IconButton
+                                                color="error"
+                                                onClick={(e) => handleDeleteClick(group.id, e)}
+                                            >
+                                                <DeleteIcon />
+                                            </IconButton>
                                         </TableCell>
                                     </TableRow>
                                 ))
@@ -199,6 +237,31 @@ const QuestionGroupList = () => {
                     rowsPerPageOptions={[5, 10, 25]}
                 />
             </Paper>
+
+            {/* Silme Onay Dialogu */}
+            <Dialog
+                open={deleteDialogOpen}
+                onClose={() => setDeleteDialogOpen(false)}
+            >
+                <DialogTitle>Etkinliği Sil</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        Bu etkinliği silmek istediğinize emin misiniz? Bu işlem geri alınamaz.
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setDeleteDialogOpen(false)} disabled={deleteLoading}>
+                        İptal
+                    </Button>
+                    <Button
+                        onClick={handleDeleteConfirm}
+                        color="error"
+                        disabled={deleteLoading}
+                    >
+                        {deleteLoading ? <CircularProgress size={24} /> : 'Sil'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 };

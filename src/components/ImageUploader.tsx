@@ -4,7 +4,7 @@ import {
     Box, Typography, Button, TextField, CircularProgress, Alert,
     Dialog, DialogTitle, DialogContent, DialogActions,
     Tabs, Tab, IconButton, Paper, Grid, InputAdornment,
-    Card, CardMedia, CardContent, CardActionArea, Pagination
+    Card, CardMedia, CardActionArea, Pagination
 } from '@mui/material';
 import {
     Upload as UploadIcon,
@@ -492,11 +492,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ imagePath, onImagePathCha
                                                         height="120"
                                                         sx={{ objectFit: 'cover' }}
                                                     />
-                                                    <CardContent sx={{ p: 1 }}>
-                                                        <Typography variant="caption" color="text.secondary">
-                                                            {image.source}
-                                                        </Typography>
-                                                    </CardContent>
+
                                                 </CardActionArea>
                                             </Card>
                                         </Grid>

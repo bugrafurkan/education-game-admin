@@ -249,6 +249,7 @@ const AddQuestion = () => {
     };
 
     // Formu gönder
+// HandleSubmit fonksiyonunda yapılacak değişiklikler
     const handleSubmit = async () => {
         try {
             setLoading(true);
@@ -273,10 +274,11 @@ const AddQuestion = () => {
                 answers
             };
 
-            // Eğer imagePath varsa, onu ekle (ImageUploader bileşeni zaten yükleme işlemini halletmiş olacak)
-            if (imagePath) {
-                questionData.image_path = imagePath;
-            }
+            // ÖNEMLİ DEĞİŞİKLİK: Görsel yolunu her durumda ekle (null olsa bile)
+            // Bu değişiklik, görseli sildiğimizde backend'e null değerini göndermemizi sağlar
+            questionData.image_path = imagePath;
+
+            console.log("Gönderilen veri:", questionData); // Debug için loglama ekleyebilirsiniz
 
             let question;
 

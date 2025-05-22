@@ -84,17 +84,6 @@ const GameList = () => {
         setGameToDelete(null);
     };
 
-    // Oyun tipini Türkçe olarak gösterme
-    const getGameTypeLabel = (type: string) => {
-        switch (type) {
-            case 'jeopardy':
-                return 'Jeopardy';
-            case 'wheel':
-                return 'Bilgi Çarkı';
-            default:
-                return type;
-        }
-    };
 
     return (
         <Box sx={{
@@ -187,7 +176,7 @@ const GameList = () => {
                                                     textShadow: '2px 2px 4px rgba(0,0,0,0.7)'  // Metin okunabilirliği için gölge
                                                 }}
                                             >
-                                                {getGameTypeLabel(game.type)}
+
                                             </Box>
                                         </CardMedia>
 

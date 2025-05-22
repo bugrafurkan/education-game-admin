@@ -127,7 +127,7 @@ const Sidebar = ({ open, onClose, variant }: SidebarProps) => {
         >
             <Box sx={{ p: 2, backgroundColor: headerBgColor }}>
                 <Typography variant="h6" sx={{ color: '#fff', fontWeight: 'bold' }}>
-                    Eğitim Oyun Platformu
+                    ARI YAYINCILIK
                 </Typography>
             </Box>
             <Divider sx={{ borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }} />

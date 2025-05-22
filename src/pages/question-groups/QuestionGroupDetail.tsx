@@ -381,21 +381,119 @@ const QuestionGroupDetail = () => {
                                         İframe Hazır
                                     </Typography>
                                 </Box>
-                                <Button
-                                    variant="outlined"
-                                    color="success"
-                                    onClick={() => {
-                                        setIframeCode(questionGroup.iframe_code || null);
-                                        setIframeDialogOpen(true);
-                                        setIframeStatus('completed');
-                                    }}
-                                    fullWidth
-                                    startIcon={<CodeIcon />}
-                                >
-                                    İframe Kodunu Görüntüle
-                                </Button>
+
+                                {/* 1. KISIM: İframe kodunu doğrudan göster */}
+                                <Box sx={{ mb: 3 }}>
+                                    <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                                        İframe Kodu:
+                                    </Typography>
+                                    <Box sx={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        bgcolor: '#f5f5f5',
+                                        p: 2,
+                                        borderRadius: 1,
+                                        border: '1px solid #e0e0e0',
+                                        position: 'relative'
+                                    }}>
+                                        <TextField
+                                            fullWidth
+                                            variant="outlined"
+                                            multiline
+                                            rows={3}
+                                            value={questionGroup.iframe_code || ''}
+                                            InputProps={{
+                                                readOnly: true,
+                                                sx: { fontFamily: 'monospace', pr: 7 }
+                                            }}
+                                            size="small"
+                                        />
+                                        <Tooltip title="Kopyala">
+                                            <IconButton
+                                                sx={{
+                                                    position: 'absolute',
+                                                    right: 8,
+                                                    color: iframeCopied ? 'success.main' : 'primary.main'
+                                                }}
+                                                onClick={() => {
+                                                    if (questionGroup.iframe_code) {
+                                                        navigator.clipboard.writeText(questionGroup.iframe_code);
+                                                        setIframeCopied(true);
+                                                        setTimeout(() => setIframeCopied(false), 3000);
+                                                    }
+                                                }}
+                                            >
+                                                {iframeCopied ? <CheckCircleIcon /> : <CopyIcon />}
+                                            </IconButton>
+                                        </Tooltip>
+                                    </Box>
+                                    {iframeCopied && (
+                                        <Typography variant="caption" color="success.main" sx={{ display: 'block', mt: 1 }}>
+                                            İframe kodu panoya kopyalandı!
+                                        </Typography>
+                                    )}
+                                </Box>
+
+                                {/* 2. KISIM: Sadece URL göster */}
+                                <Box sx={{ mb: 3 }}>
+                                    <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                                        İframe URL:
+                                    </Typography>
+                                    {(() => {
+                                        // iframe kodundan URL'i çıkar
+                                        const iframe = questionGroup.iframe_code || '';
+                                        const srcMatch = iframe.match(/src="([^"]+)"/);
+                                        const iframeUrl = srcMatch ? srcMatch[1] : '';
+
+                                        return (
+                                            <Box sx={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                bgcolor: '#f5f5f5',
+                                                p: 2,
+                                                borderRadius: 1,
+                                                border: '1px solid #e0e0e0',
+                                                position: 'relative'
+                                            }}>
+                                                <TextField
+                                                    fullWidth
+                                                    variant="outlined"
+                                                    value={iframeUrl}
+                                                    InputProps={{
+                                                        readOnly: true,
+                                                        sx: { fontFamily: 'monospace', pr: 7 }
+                                                    }}
+                                                    size="small"
+                                                />
+                                                <Tooltip title="Kopyala">
+                                                    <IconButton
+                                                        sx={{
+                                                            position: 'absolute',
+                                                            right: 8,
+                                                            color: 'primary.main'
+                                                        }}
+                                                        onClick={() => {
+                                                            if (iframeUrl) {
+                                                                navigator.clipboard.writeText(iframeUrl);
+                                                                // URL kopyalandı bildirimi için alert kullanabiliriz
+                                                                alert("URL panoya kopyalandı!");
+                                                            }
+                                                        }}
+                                                    >
+                                                        <CopyIcon />
+                                                    </IconButton>
+                                                </Tooltip>
+                                            </Box>
+                                        );
+                                    })()}
+                                </Box>
+
+                                {/* 3. KISIM: Zip indirme seçeneği */}
                                 {questionGroup.zip_url && (
-                                    <>
+                                    <Box sx={{ mt: 3 }}>
+                                        <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                                            Unity Kaynak Dosyası:
+                                        </Typography>
                                         <Button
                                             variant="outlined"
                                             color="secondary"
@@ -403,17 +501,16 @@ const QuestionGroupDetail = () => {
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             startIcon={<DownloadIcon />}
-                                            sx={{ mt: 2 }}
+                                            fullWidth
+                                            sx={{ justifyContent: 'flex-start' }}
                                         >
                                             Zip Dosyasını İndir
                                         </Button>
-
                                         <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
                                             Bu zip dosyası, Unity için oluşturulmuş tüm verileri içerir. İndirdikten sonra yerel olarak inceleyebilirsiniz.
                                         </Typography>
-                                    </>
+                                    </Box>
                                 )}
-
                             </Box>
                         </Grid>
                     )}

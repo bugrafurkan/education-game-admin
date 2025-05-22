@@ -29,7 +29,7 @@ export interface Question {
     question_text: string;
     question_type: 'multiple_choice' | 'true_false' | 'qa';
     difficulty: 'easy' | 'medium' | 'hard';
-    image_path?: string;
+    image_path?: string ;
     metadata?: Record<string, unknown>;
     user_id?: number;
     answers: Answer[];
@@ -46,7 +46,7 @@ export interface QuestionCreate {
     question_text: string;
     question_type: 'multiple_choice' | 'true_false' | 'qa';
     difficulty: 'easy' | 'medium' | 'hard';
-    image_path?: string;
+    image_path?: string | null;
     metadata?: Record<string, unknown>;
     answers: Omit<Answer, 'id'>[];
 }

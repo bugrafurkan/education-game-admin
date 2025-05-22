@@ -6,7 +6,8 @@ import {
     Select, MenuItem, Alert, CircularProgress, Divider, Table,
     TableBody, TableCell, TableContainer, TableHead, TableRow,
     Chip, Tooltip, LinearProgress, Dialog, DialogActions,
-    DialogContent, DialogContentText, DialogTitle, IconButton
+    DialogContent, DialogContentText, DialogTitle, IconButton, RadioGroup,
+    FormControlLabel, Radio, SelectChangeEvent
 } from '@mui/material';
 import {
     FileUpload as FileUploadIcon,
@@ -26,7 +27,8 @@ import * as XLSX from 'xlsx';
 interface ExcelQuestion {
     id: number;
     question_text: string;
-    is_correct: boolean;
+    is_correct?: boolean;
+    answer_text?: string;
     valid: boolean;
     error?: string;
 }
@@ -48,6 +50,9 @@ const ExcelSoruImport = () => {
     const [subjectId, setSubjectId] = useState<number | ''>('');
     const [unitId, setUnitId] = useState<number | ''>('');
     const [topicId, setTopicId] = useState<number | ''>('');
+
+    // Soru tipi seçimi
+    const [questionType, setQuestionType] = useState<'true_false' | 'text'>('true_false');
 
     // Dosya ve içerik
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -91,6 +96,13 @@ const ExcelSoruImport = () => {
             setTopicId('');
         }
     }, [categoryId, categories]);
+
+    // Soru tipi değiştiğinde seçili dosyayı temizle
+    useEffect(() => {
+        if (selectedFile) {
+            handleClearFile();
+        }
+    }, [questionType]);
 
     // Excel dosyası yükle ve parse et
     const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -136,19 +148,38 @@ const ExcelSoruImport = () => {
                 // İlk satır başlık satırı olduğunu varsayıyoruz
                 const headers = jsonData[0];
 
-                // Gerekli sütunları kontrol et (Soru Metni ve Doğru/Yanlış)
+                // Gerekli sütunları kontrol et
                 const questionColIndex = headers.findIndex((h: string) =>
                     h?.toString().toLowerCase().includes('soru') ||
                     h?.toString().toLowerCase().includes('question'));
 
-                const answerColIndex = headers.findIndex((h: string) =>
-                    h?.toString().toLowerCase().includes('cevap') ||
-                    h?.toString().toLowerCase().includes('doğru') ||
-                    h?.toString().toLowerCase().includes('yanlış') ||
-                    h?.toString().toLowerCase().includes('answer'));
+                // Soru tipi Doğru/Yanlış ise doğru/yanlış sütununu, Klasik ise cevap sütununu ara
+                let answerColIndex = -1;
+
+                if (questionType === 'true_false') {
+                    answerColIndex = headers.findIndex((h: string) =>
+                        h?.toString().toLowerCase().includes('doğru') ||
+                        h?.toString().toLowerCase().includes('yanlış') ||
+                        h?.toString().toLowerCase().includes('dogru') ||
+                        h?.toString().toLowerCase().includes('yanlis') ||
+                        h?.toString().toLowerCase().includes('true') ||
+                        h?.toString().toLowerCase().includes('false'));
+                } else {
+                    answerColIndex = headers.findIndex((h: string) =>
+                        h?.toString().toLowerCase().includes('cevap') ||
+                        h?.toString().toLowerCase().includes('answer'));
+                }
 
                 if (questionColIndex === -1 || answerColIndex === -1) {
-                    setParseError('Excel dosyasında gerekli sütunlar bulunamadı. Lütfen "Soru Metni" ve "Doğru/Yanlış" sütunlarının bulunduğundan emin olun.');
+                    let errorMessage = 'Excel dosyasında gerekli sütunlar bulunamadı. ';
+
+                    if (questionType === 'true_false') {
+                        errorMessage += 'Lütfen "Soru Metni" ve "Doğru/Yanlış" sütunlarının bulunduğundan emin olun.';
+                    } else {
+                        errorMessage += 'Lütfen "Soru Metni" ve "Cevap" sütunlarının bulunduğundan emin olun.';
+                    }
+
+                    setParseError(errorMessage);
                     setLoading(false);
                     return;
                 }
@@ -164,28 +195,39 @@ const ExcelSoruImport = () => {
                     if (!row || row.length === 0 || !row[questionColIndex]) continue;
 
                     const questionText = row[questionColIndex]?.toString().trim();
-                    let isCorrect = false;
                     let valid = true;
                     let error = undefined;
+                    let isCorrect: boolean | undefined = undefined;
+                    let answerText: string | undefined = undefined;
 
-                    // Doğru/Yanlış değerini işle
-                    if (row[answerColIndex]) {
-                        const answerValue = row[answerColIndex]?.toString().toLowerCase().trim();
+                    // Soru tipine göre farklı işlem yap
+                    if (questionType === 'true_false') {
+                        // Doğru/Yanlış değerini işle
+                        if (row[answerColIndex]) {
+                            const answerValue = row[answerColIndex]?.toString().toLowerCase().trim();
 
-                        if (['doğru', 'dogru', 'true', 'd', 't', 'evet', 'yes', '1'].includes(answerValue)) {
-                            isCorrect = true;
-                        } else if (['yanlış', 'yanlis', 'false', 'y', 'f', 'hayır', 'hayir', 'no', '0'].includes(answerValue)) {
-                            isCorrect = false;
+                            if (['doğru', 'dogru', 'true', 'd', 't', 'evet', 'yes', '1'].includes(answerValue)) {
+                                isCorrect = true;
+                            } else if (['yanlış', 'yanlis', 'false', 'y', 'f', 'hayır', 'hayir', 'no', '0'].includes(answerValue)) {
+                                isCorrect = false;
+                            } else {
+                                valid = false;
+                                error = 'Geçersiz doğru/yanlış değeri';
+                            }
                         } else {
                             valid = false;
-                            error = 'Geçersiz doğru/yanlış değeri';
+                            error = 'Doğru/Yanlış değeri eksik';
                         }
                     } else {
-                        valid = false;
-                        error = 'Doğru/Yanlış değeri eksik';
+                        // Klasik soru için cevap metnini kontrol et
+                        answerText = row[answerColIndex]?.toString().trim();
+                        if (!answerText || answerText.length < 1) {
+                            valid = false;
+                            error = 'Cevap metni eksik';
+                        }
                     }
 
-                    // Soru metni kontrolü
+                    // Soru metni kontrolü (her iki tip için ortak)
                     if (!questionText || questionText.length < 3) {
                         valid = false;
                         error = 'Geçersiz soru metni';
@@ -195,6 +237,7 @@ const ExcelSoruImport = () => {
                         id: ++counter,
                         question_text: questionText || '',
                         is_correct: isCorrect,
+                        answer_text: answerText,
                         valid,
                         error
                     });
@@ -265,16 +308,32 @@ const ExcelSoruImport = () => {
         for (const question of validQuestions) {
             try {
                 // QuestionCreate için veri oluştur
-                const questionData: questionService.QuestionCreate = {
-                    category_id: categoryId as number,
-                    question_text: question.question_text,
-                    question_type: 'true_false', // Excel ile sadece doğru-yanlış sorular eklenebilir
-                    difficulty: 'medium', // Varsayılan zorluk
-                    answers: [
-                        { answer_text: 'Doğru', is_correct: question.is_correct },
-                        { answer_text: 'Yanlış', is_correct: !question.is_correct }
-                    ]
-                };
+                let questionData: questionService.QuestionCreate;
+
+                if (questionType === 'true_false') {
+                    // Doğru-Yanlış tipi soru
+                    questionData = {
+                        category_id: categoryId as number,
+                        question_text: question.question_text,
+                        question_type: 'true_false',
+                        difficulty: 'medium',
+                        answers: [
+                            { answer_text: 'Doğru', is_correct: question.is_correct === true },
+                            { answer_text: 'Yanlış', is_correct: question.is_correct === false }
+                        ]
+                    };
+                } else {
+                    // Klasik tipi soru
+                    questionData = {
+                        category_id: categoryId as number,
+                        question_text: question.question_text,
+                        question_type: 'qa',
+                        difficulty: 'medium',
+                        answers: [
+                            { answer_text: question.answer_text || '', is_correct: true }
+                        ]
+                    };
+                }
 
                 // Soruyu kaydet
                 await questionService.createQuestion(questionData);
@@ -304,23 +363,40 @@ const ExcelSoruImport = () => {
     // Örnek Excel dosyası indir
     const handleDownloadTemplate = () => {
         // Örnek veri oluştur
-        const data = [
-            ['Soru Metni', 'Doğru/Yanlış'],
-            ['Türkiye\'nin başkenti Ankara\'dır.', 'Doğru'],
-            ['Dünya düzdür.', 'Yanlış'],
-            ['Su 100 derecede kaynar.', 'Doğru'],
-            ['İnsan kalbi sağ taraftadır.', 'Yanlış']
-        ];
+        type TemplateData = string[][];
+        let data: TemplateData = [];
+
+        if (questionType === 'true_false') {
+            data = [
+                ['Soru Metni', 'Doğru/Yanlış'],
+                ['Türkiye\'nin başkenti Ankara\'dır.', 'Doğru'],
+                ['Dünya düzdür.', 'Yanlış'],
+                ['Su 100 derecede kaynar.', 'Doğru'],
+                ['İnsan kalbi sağ taraftadır.', 'Yanlış']
+            ];
+        } else {
+            data = [
+                ['Soru Metni', 'Cevap'],
+                ['Türkiye\'nin başkenti neresidir?', 'Ankara'],
+                ['2+2 kaçtır?', '4'],
+                ['Dünyanın en büyük okyanusu hangisidir?', 'Pasifik Okyanusu'],
+                ['Cumhuriyet hangi yılda ilan edilmiştir?', '1923']
+            ];
+        }
 
         // Excel çalışma kitabı oluştur
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.aoa_to_sheet(data);
 
         // Çalışma sayfasını çalışma kitabına ekle
-        XLSX.utils.book_append_sheet(wb, ws, 'Doğru-Yanlış Sorular');
+        const fileName = questionType === 'true_false'
+            ? 'dogru-yanlis-sorular-sablonu.xlsx'
+            : 'klasik-sorular-sablonu.xlsx';
+
+        XLSX.utils.book_append_sheet(wb, ws, questionType === 'true_false' ? 'Doğru-Yanlış Sorular' : 'Klasik Sorular');
 
         // Dosyayı indir
-        XLSX.writeFile(wb, 'dogru-yanlis-sorular-sablonu.xlsx');
+        XLSX.writeFile(wb, fileName);
     };
 
     // Dosya seçimini temizle
@@ -352,6 +428,14 @@ const ExcelSoruImport = () => {
         setHelpDialogOpen(false);
     };
 
+    const handleCategoryChange = (event: SelectChangeEvent<number | string>) => {
+        setCategoryId(event.target.value as number);
+    };
+
+    const handleQuestionTypeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        setQuestionType(event.target.value as 'true_false' | 'text');
+    };
+
     return (
         <Box sx={{
             width: '100%',
@@ -359,7 +443,7 @@ const ExcelSoruImport = () => {
             boxSizing: 'border-box'
         }}>
             <Typography variant="h4" gutterBottom sx={{ mb: 4, fontWeight: 'bold' }}>
-                Excel ile Doğru-Yanlış Soruları Ekle
+                Excel ile Soru Ekle
                 <IconButton color="primary" onClick={handleOpenHelpDialog} sx={{ ml: 1, mb: 1 }}>
                     <HelpIcon />
                 </IconButton>
@@ -367,7 +451,7 @@ const ExcelSoruImport = () => {
 
             <Paper sx={{ p: 3, mb: 3, borderRadius: 2 }}>
                 <Typography variant="h6" sx={{ mb: 3 }}>
-                    Kategori Seçimi
+                    Kategori ve Soru Tipi Seçimi
                 </Typography>
 
                 <FormControl fullWidth required sx={{ mb: 3, maxWidth: 400 }}>
@@ -375,7 +459,7 @@ const ExcelSoruImport = () => {
                     <Select
                         value={categoryId}
                         label="Kategori"
-                        onChange={(e) => setCategoryId(e.target.value as number)}
+                        onChange={handleCategoryChange}
                         required
                     >
                         <MenuItem value="" disabled>Kategori Seçin</MenuItem>
@@ -385,6 +469,28 @@ const ExcelSoruImport = () => {
                             </MenuItem>
                         ))}
                     </Select>
+                </FormControl>
+
+                <FormControl component="fieldset" sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 3 }}>
+                    <Typography variant="subtitle1" gutterBottom>
+                        Soru Tipi
+                    </Typography>
+                    <RadioGroup
+                        row
+                        value={questionType}
+                        onChange={handleQuestionTypeChange}
+                    >
+                        <FormControlLabel
+                            value="true_false"
+                            control={<Radio />}
+                            label="Doğru/Yanlış"
+                        />
+                        <FormControlLabel
+                            value="text"
+                            control={<Radio />}
+                            label="Klasik"
+                        />
+                    </RadioGroup>
                 </FormControl>
 
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 3 }}>
@@ -435,13 +541,16 @@ const ExcelSoruImport = () => {
 
                 <Box sx={{ mb: 3 }}>
                     <Chip
-                        label="Doğru-Yanlış Soruları"
+                        label={questionType === 'true_false' ? 'Doğru-Yanlış Soruları' : 'Klasik Sorular'}
                         color="primary"
                         sx={{ fontWeight: 'bold' }}
                     />
                     <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                        Excel ile sadece Doğru-Yanlış tipi sorular yüklenebilir.
-                        Her soru için doğru cevap "Doğru" veya "Yanlış" olarak belirtilmelidir.
+                        {questionType === 'true_false' ? (
+                            'Excel dosyasında her soru için doğru cevap "Doğru" veya "Yanlış" olarak belirtilmelidir.'
+                        ) : (
+                            'Excel dosyasında her soru için cevap metni "Cevap" sütununda belirtilmelidir.'
+                        )}
                     </Typography>
                 </Box>
 
@@ -550,8 +659,10 @@ const ExcelSoruImport = () => {
                                 <TableHead>
                                     <TableRow>
                                         <TableCell width="5%">#</TableCell>
-                                        <TableCell width="70%">Soru Metni</TableCell>
-                                        <TableCell width="15%">Doğru Cevap</TableCell>
+                                        <TableCell width="55%">Soru Metni</TableCell>
+                                        <TableCell width="30%">
+                                            {questionType === 'true_false' ? 'Doğru Cevap' : 'Cevap'}
+                                        </TableCell>
                                         <TableCell width="10%">Durum</TableCell>
                                     </TableRow>
                                 </TableHead>
@@ -581,7 +692,11 @@ const ExcelSoruImport = () => {
                                                 </Tooltip>
                                             </TableCell>
                                             <TableCell>
-                                                {question.is_correct ? 'Doğru' : 'Yanlış'}
+                                                {questionType === 'true_false' ? (
+                                                    question.is_correct === true ? 'Doğru' : 'Yanlış'
+                                                ) : (
+                                                    question.answer_text
+                                                )}
                                             </TableCell>
                                             <TableCell>
                                                 {question.valid ? (
@@ -667,74 +782,77 @@ const ExcelSoruImport = () => {
                             </li>
                             <li>
                                 <Typography>
-                                    <strong>"Doğru/Yanlış"</strong> adında bir sütun içermelidir.
+                                    {questionType === 'true_false' ? (
+                                        <span><strong>"Doğru/Yanlış"</strong> adında bir sütun içermelidir.</span>
+                                    ) : (
+                                        <span><strong>"Cevap"</strong> adında bir sütun içermelidir.</span>
+                                    )}
                                 </Typography>
                             </li>
                         </ul>
 
+                        {questionType === 'true_false' && (
+                            <>
+                                <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
+                                    Doğru/Yanlış Sütunu Nasıl Doldurulmalı?
+                                </Typography>
+
+                                <Typography paragraph>
+                                    Doğru/Yanlış sütununda aşağıdaki değerler kabul edilir:
+                                </Typography>
+
+                                <TableContainer>
+                                    <Table size="small">
+                                        <TableHead>
+                                            <TableRow>
+                                                <TableCell><strong>Doğru için kabul edilen değerler</strong></TableCell>
+                                                <TableCell><strong>Yanlış için kabul edilen değerler</strong></TableCell>
+                                            </TableRow>
+                                        </TableHead>
+                                        <TableBody>
+                                            <TableRow>
+                                                <TableCell>Doğru, Dogru, True, D, T, Evet, Yes, 1</TableCell>
+                                                <TableCell>Yanlış, Yanlis, False, Y, F, Hayır, Hayir, No, 0</TableCell>
+                                            </TableRow>
+                                        </TableBody>
+                                    </Table>
+                                </TableContainer>
+                            </>
+                        )}
+
+                        {questionType === 'text' && (
+                            <>
+                                <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
+                                    Klasik Sorularda Cevap Sütunu
+                                </Typography>
+
+                                <Typography paragraph>
+                                    "Cevap" sütununda sorunun doğru cevabını belirtmelisiniz. Bu metin öğrencilere gösterilecek doğru cevaptır.
+                                </Typography>
+                            </>
+                        )}
+
                         <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
-                            Doğru/Yanlış Sütunu Nasıl Doldurulmalı?
+                            Örnek Excel Şablonu
                         </Typography>
 
                         <Typography paragraph>
-                            Doğru/Yanlış sütununda aşağıdaki değerler kabul edilir:
+                            Doğru formatta bir Excel dosyası oluşturmak için "Örnek Şablon İndir" düğmesini kullanabilirsiniz.
+                            İndirilen şablonu doldurduktan sonra yükleyebilirsiniz.
                         </Typography>
-
-                        <TableContainer>
-                            <Table size="small">
-                                <TableHead>
-                                    <TableRow>
-                                        <TableCell><strong>Doğru için:</strong></TableCell>
-                                        <TableCell><strong>Yanlış için:</strong></TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    <TableRow>
-                                        <TableCell>Doğru, dogru, D, Evet, True, T, Yes, 1</TableCell>
-                                        <TableCell>Yanlış, Yanlis, Y, Hayır, Hayir, False, F, No, 0</TableCell>
-                                    </TableRow>
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
 
                         <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
-                            Örnek:
+                            Hata ve Uyarılar
                         </Typography>
 
-                        <TableContainer sx={{ mb: 3 }}>
-                            <Table size="small" sx={{ border: '1px solid #ddd' }}>
-                                <TableHead>
-                                    <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                                        <TableCell><strong>Soru Metni</strong></TableCell>
-                                        <TableCell><strong>Doğru/Yanlış</strong></TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    <TableRow>
-                                        <TableCell>Türkiye'nin başkenti Ankara'dır.</TableCell>
-                                        <TableCell>Doğru</TableCell>
-                                    </TableRow>
-                                    <TableRow>
-                                        <TableCell>Dünya düzdür.</TableCell>
-                                        <TableCell>Yanlış</TableCell>
-                                    </TableRow>
-                                    <TableRow>
-                                        <TableCell>Su 100 derecede kaynar.</TableCell>
-                                        <TableCell>Doğru</TableCell>
-                                    </TableRow>
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
-
-                        <Typography>
-                            Hazır bir şablon kullanmak için "Örnek Şablon İndir" butonunu kullanabilirsiniz.
+                        <Typography paragraph>
+                            Yüklenen dosyadaki sorunlu satırlar kırmızı olarak işaretlenir ve hata nedeni gösterilir.
+                            Sadece geçerli olarak işaretlenen sorular kaydedilecektir.
                         </Typography>
                     </DialogContentText>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={handleCloseHelpDialog} color="primary">
-                        Anladım
-                    </Button>
+                    <Button onClick={handleCloseHelpDialog}>Kapat</Button>
                 </DialogActions>
             </Dialog>
         </Box>

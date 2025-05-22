@@ -38,6 +38,20 @@ const QuestionGroupList = () => {
     const { games } = useGames();
     const { categories } = useCategories();
 
+    // Soru tiplerini kullanıcı dostu formata dönüştüren yardımcı fonksiyon
+    const getQuestionTypeLabel = (type: string): string => {
+        switch (type) {
+            case 'multiple_choice':
+                return 'Çoktan Seçmeli';
+            case 'true_false':
+                return 'Doğru-Yanlış';
+            case 'qa':
+                return 'Klasik';
+            default:
+                return type;
+        }
+    };
+
     useEffect(() => {
         fetchGroups();
     }, [page, rowsPerPage, search, questionType, gameId, categoryId, sortField, sortDirection]);
@@ -204,7 +218,7 @@ const QuestionGroupList = () => {
                                 groups.map((group) => (
                                     <TableRow key={group.id}>
                                         <TableCell>{group.name}</TableCell>
-                                        <TableCell>{group.question_type}</TableCell>
+                                        <TableCell>{getQuestionTypeLabel(group.question_type)}</TableCell>
                                         <TableCell>{group.game?.name || '-'}</TableCell>
                                         <TableCell>{group.questions_count}</TableCell>
                                         <TableCell>

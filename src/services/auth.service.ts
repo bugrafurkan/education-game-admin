@@ -21,9 +21,9 @@ export interface User {
 export const login = async (email: string, password: string): Promise<LoginResponse> => {
     const response = await api.post<LoginResponse>('/login', { email, password });
 
-    // Token'ı oturumda sakla
+    // Token'ı localStorage'da sakla (sessionStorage yerine)
     if (response.data.token) {
-        sessionStorage.setItem('auth_token', response.data.token);
+        localStorage.setItem('auth_token', response.data.token);
     }
 
     return response.data;
@@ -33,10 +33,10 @@ export const logout = async (): Promise<{ message: string }> => {
     try {
         const response = await api.post<{ message: string }>('/logout');
         // Her durumda token'ı temizle
-        sessionStorage.removeItem('auth_token');
+        localStorage.removeItem('auth_token');
         return response.data;
     } catch (error) {
-        sessionStorage.removeItem('auth_token');
+        localStorage.removeItem('auth_token');
         throw error;
     }
 };
@@ -48,5 +48,5 @@ export const getCurrentUser = async (): Promise<User> => {
 
 // Kullanıcının giriş yapmış olup olmadığını kontrol et
 export const isAuthenticated = (): boolean => {
-    return !!sessionStorage.getItem('auth_token');
+    return !!localStorage.getItem('auth_token');
 };

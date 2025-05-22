@@ -19,6 +19,7 @@ import {
 import { useEducationStructure } from '../../hooks/useEducationStructure';
 import { useCategories } from '../../hooks/useCategories';
 import * as questionService from '../../services/question.service';
+import * as gameService from '../../services/game.service';
 import axios, { AxiosError } from 'axios';
 
 // Soru tipi seçenekleri
@@ -308,7 +309,7 @@ const TopluSoruEkleme = () => {
         return allValid;
     };
 
-    // Soruları kaydet
+    // Soruları kaydet ve tüm oyunlara ekle
     const handleSaveQuestions = async () => {
         if (!validateQuestions()) {
             return;
@@ -348,6 +349,34 @@ const TopluSoruEkleme = () => {
                 // Soruyu kaydet
                 const savedQuestion = await questionService.createQuestion(questionData);
                 savedQuestions.push(savedQuestion);
+            }
+
+            // Tüm soruları oyunlara ekle
+            try {
+                // Tüm oyunları getir
+                const gamesResponse = await gameService.getGames(1);
+                const games = gamesResponse.data;
+
+                // Her oyun için
+                for (const game of games) {
+                    // Her soruyu oyuna ekle
+                    for (const question of savedQuestions) {
+                        try {
+                            await gameService.addQuestionToGame(game.id, {
+                                question_id: question.id,
+                                points: 100 // Varsayılan puan
+                            });
+                        } catch (error) {
+                            console.error(`Soru (ID: ${question.id}) oyuna (ID: ${game.id}) eklenirken hata:`, error);
+                            // Oyuna ekleme hatası genel akışı etkilemesin
+                        }
+                    }
+                }
+
+                console.log(`${savedQuestions.length} soru ${games.length} oyuna başarıyla eklendi`);
+            } catch (error) {
+                console.error('Oyunlar alınırken veya sorular oyunlara eklenirken hata:', error);
+                // Oyunlara ekleme hatası genel akışı etkilemesin
             }
 
             setSuccess(true);

@@ -214,6 +214,7 @@ const Advertisements = () => {
     const [grade, setGrade] = useState('');
     const [subject, setSubject] = useState('');
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
+    const [duration, setDuration] = useState<number>(5);
 
     // Önizleme modalı için state
     const [previewModal, setPreviewModal] = useState({
@@ -250,6 +251,7 @@ const Advertisements = () => {
             setEndDate(ad.end_date ? new Date(ad.end_date) : null);
             setGrade(ad.grade || '');
             setSubject(ad.subject || '');
+            setDuration(ad.duration ?? 5);
         } else {
             setIsEditMode(false);
             setCurrentAd(null);
@@ -273,6 +275,7 @@ const Advertisements = () => {
         setSubject('');
         setIsEditMode(false);
         setCurrentAd(null);
+        setDuration(5);
     };
 
     // Tarihi değiştirme işleyicileri
@@ -302,7 +305,12 @@ const Advertisements = () => {
             setSelectedFile(file);
         }
     };
-
+    // Tarih formatını değiştiren yardımcı fonksiyon
+    const formatDateForServer = (date: Date | null): string | null => {
+        if (!date) return null;
+        // MySQL uyumlu YYYY-MM-DD formatı
+        return date.toISOString().split('T')[0];
+    };
     const handleSubmit = async () => {
         if (!adName.trim()) {
             alert('Lütfen bir reklam adı girin.');
@@ -318,10 +326,11 @@ const Advertisements = () => {
         if (isEditMode && currentAd) {
             const success = await updateAdDetails(currentAd.id, {
                 name: adName,
-                start_date: startDate.toISOString(),
-                end_date: endDate ? endDate.toISOString() : null,
+                start_date: formatDateForServer(startDate) !,
+                end_date:formatDateForServer(endDate),
                 grade: grade || undefined,
-                subject: subject || undefined
+                subject: subject || undefined,
+                duration: duration ?? undefined
             });
 
             if (success) {
@@ -340,10 +349,12 @@ const Advertisements = () => {
                 adName,
                 adType,
                 selectedFile,
-                startDate.toISOString(),
-                endDate ? endDate.toISOString() : null,
+                formatDateForServer(startDate)!,        // ← ISO yerine MySQL formatı
+                formatDateForServer(endDate),
+                duration,
                 grade || undefined,
-                subject || undefined
+                subject || undefined,
+
             );
 
             if (success) {
@@ -439,6 +450,7 @@ const Advertisements = () => {
                                 <TableCell width="9%">Durum</TableCell>
                                 <TableCell width="10%">Sınıf</TableCell>
                                 <TableCell width="10%">Ders</TableCell>
+                                <TableCell width="8%">Süre</TableCell>
                                 <TableCell width="12%">Başlangıç Tarihi</TableCell>
                                 <TableCell width="12%">Bitiş Tarihi</TableCell>
                                 <TableCell width="13%" align="right">İşlemler</TableCell>
@@ -462,6 +474,7 @@ const Advertisements = () => {
                                     </TableCell>
                                     <TableCell>{ad.grade || '-'}</TableCell>
                                     <TableCell>{ad.subject || '-'}</TableCell>
+                                    <TableCell>{ad.duration ? `${ad.duration} sn` : '-'}</TableCell>
                                     <TableCell><Typography variant="body2">{formatDate(ad.start_date)}</Typography></TableCell>
                                     <TableCell><Typography variant="body2">{ad.end_date ? formatDate(ad.end_date) : '-'}</Typography></TableCell>
                                     <TableCell align="right">
@@ -532,6 +545,18 @@ const Advertisements = () => {
                                 minDate={startDate || undefined} // Eğer startDate varsa, onu minimum değer olarak ayarla
                             />
                         </Box>
+
+                        <TextField
+                            label="Süre (saniye)"
+                            type="number"
+                            inputProps={{ min: 1, max: 10 }}
+                            fullWidth
+                            margin="normal"
+                            value={duration} // Artık hiçbir zaman boş olmayacak
+                            onChange={(e) => setDuration(Number(e.target.value) || 5)} // Boş değer girilirse 5 kullan
+                            helperText="Reklamın gösterim süresi (1-10 saniye arası)"
+                        />
+
 
                         <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
                             <FormControl fullWidth>

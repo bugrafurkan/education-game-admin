@@ -10,8 +10,8 @@ export const useAuth = () => {
     const navigate = useNavigate();
 
     useEffect(() => {
-        // Component mount olduğunda role'ü localStorage'dan al
-        const role = localStorage.getItem('user_role');
+        // Component mount olduğunda role'ü session storage'dan al
+        const role = sessionStorage.getItem('user_role');
         setUserRole(role);
     }, []);
 
@@ -22,9 +22,9 @@ export const useAuth = () => {
             const data = await authService.login(email, password);
             const role = data.user?.role;
 
-            // Kullanıcı rolünü localStorage'a kaydet
+            // Kullanıcı rolünü session storage'a kaydet
             if (role) {
-                localStorage.setItem('user_role', role);
+                sessionStorage.setItem('user_role', role);
                 setUserRole(role);
             }
 
@@ -51,7 +51,7 @@ export const useAuth = () => {
             setLoading(true);
             await authService.logout();
             // Kullanıcı rolünü temizle
-            localStorage.removeItem('user_role');
+            sessionStorage.removeItem('user_role');
             setUserRole(null);
             setLoading(false);
             navigate('/login');

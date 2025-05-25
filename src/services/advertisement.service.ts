@@ -14,6 +14,7 @@ export interface Advertisement {
     end_date: string | null;
     grade?: string;
     subject?: string;
+    duration?: number;
 }
 
 // Tüm reklamları getir
@@ -25,12 +26,14 @@ export const getAdvertisements = async (): Promise<Advertisement[]> => {
 // Yeni reklam ekle
 export const createAdvertisement = async (
     name: string,
-    type: 'image' | 'video',
+    type: "image" | "video",
     file: File,
     start_date: string,
     end_date?: string | null,
-    grade?: string,
-    subject?: string
+    duration?: number | null,
+    grade?: string | undefined,
+    subject?: string | undefined
+
 ): Promise<Advertisement> => {
     const formData = new FormData();
     formData.append('name', name);
@@ -38,8 +41,13 @@ export const createAdvertisement = async (
     formData.append('file', file);
     formData.append('start_date', start_date);
     if (end_date) formData.append('end_date', end_date);
-    if (grade) formData.append('grade', grade);
+    if (grade !== null && grade !== undefined) {
+        formData.append('grade', grade.toString());
+    }
     if (subject) formData.append('subject', subject);
+    if (duration !== undefined && duration !== null) {
+        formData.append('duration', duration.toString());
+    }
 
     const response = await api.post<Advertisement>('/advertisements', formData, {
         headers: {
@@ -66,6 +74,7 @@ export const updateAdvertisement = async (
         subject?: string;
         start_date?: string;
         end_date?: string | null;
+        duration?: number;
     }
 ): Promise<Advertisement> => {
     const response = await api.put<Advertisement>(`/advertisements/${id}`, data);

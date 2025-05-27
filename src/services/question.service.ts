@@ -56,7 +56,9 @@ export interface QuestionFilter {
     type?: string;
     difficulty?: string;
     category_id?: number;
+    category_ids?: number[];
     user_id?: number;
+    publisher?: string;
     grade_id?: number;
     subject_id?: number;
     unit_id?: number;

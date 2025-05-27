@@ -144,12 +144,13 @@ const TopluSoruEkleme = () => {
 
     // Seçilen kombinasyona göre kategori durumunu kontrol et
     useEffect(() => {
-        if (gradeId && subjectId) {
+        // Kategori kontrolü için tüm 4 alan gerekli: gradeId, subjectId, unitId, topicId
+        if (gradeId && subjectId && unitId && topicId) {
             const matchingCategory = categories.find(category =>
                 category.grade_id === gradeId &&
                 category.subject_id === subjectId &&
-                (unitId ? category.unit_id === unitId : !category.unit_id) &&
-                (topicId ? category.topic_id === topicId : !category.topic_id)
+                category.unit_id === unitId &&
+                category.topic_id === topicId
             );
 
             if (matchingCategory) {
@@ -188,8 +189,8 @@ const TopluSoruEkleme = () => {
 
     // Yeni kategori oluştur
     const handleCreateCategory = async () => {
-        if (!gradeId || !subjectId) {
-            setError('Sınıf ve ders seçimi zorunludur.');
+        if (!gradeId || !subjectId || !unitId || !topicId) {
+            setError('Sınıf, ders, ünite ve konu seçimi zorunludur.');
             return;
         }
 
@@ -201,8 +202,8 @@ const TopluSoruEkleme = () => {
                 name: generateCategoryName(),
                 grade_id: gradeId as number,
                 subject_id: subjectId as number,
-                unit_id: unitId ? (unitId as number) : undefined,
-                topic_id: topicId ? (topicId as number) : undefined
+                unit_id: unitId as number,
+                topic_id: topicId as number
             };
 
             const newCategory = await categoryService.createCategory(categoryData);
@@ -635,8 +636,9 @@ const TopluSoruEkleme = () => {
                                 value={unitId}
                                 label="Ünite"
                                 onChange={handleUnitChange}
+                                disabled={!gradeId || !subjectId || filteredUnits.length === 0}
                             >
-                                <MenuItem value="">Ünite Seçin (Opsiyonel)</MenuItem>
+                                <MenuItem value="">Ünite Seçin </MenuItem>
                                 {filteredUnits.map((unit) => (
                                     <MenuItem key={unit.id} value={unit.id}>
                                         {unit.name}
@@ -651,8 +653,9 @@ const TopluSoruEkleme = () => {
                                 value={topicId}
                                 label="Konu"
                                 onChange={handleTopicChange}
+                                disabled={!unitId || filteredTopics.length === 0}
                             >
-                                <MenuItem value="">Konu Seçin (Opsiyonel)</MenuItem>
+                                <MenuItem value="">Konu Seçin </MenuItem>
                                 {filteredTopics.map((topic) => (
                                     <MenuItem key={topic.id} value={topic.id}>
                                         {topic.name}
@@ -660,7 +663,6 @@ const TopluSoruEkleme = () => {
                                 ))}
                             </Select>
                         </FormControl>
-
 
                         {gradeId && subjectId && unitId && topicId && !categoryExists && (
                             <Button
@@ -682,7 +684,7 @@ const TopluSoruEkleme = () => {
                         )}
                     </Box>
 
-                    {gradeId && subjectId && (
+                    {gradeId && subjectId && unitId && topicId && (
                         <Alert
                             severity={categoryExists ? "success" : "info"}
                             sx={{ mt: 2 }}

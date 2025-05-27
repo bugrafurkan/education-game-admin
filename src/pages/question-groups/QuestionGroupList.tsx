@@ -4,7 +4,8 @@ import {
     Box, Typography, Paper, Button, TextField, InputAdornment, Table, TableBody,
     TableCell, TableContainer, TableHead, TablePagination, TableRow, Grid,
     CircularProgress, Alert, Select, MenuItem, IconButton, FormControl, InputLabel,
-    Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle // Dialog bileşenlerini ekledik
+    Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle,
+    SelectChangeEvent
 } from '@mui/material';
 import {
     Add as AddIcon, Search as SearchIcon, Edit as EditIcon, Delete as DeleteIcon,
@@ -14,6 +15,7 @@ import { Link } from 'react-router-dom';
 import * as questionGroupService from '../../services/question-group.service';
 import { useGames } from '../../hooks/useGames';
 import { useCategories } from '../../hooks/useCategories';
+import { useEducationStructure } from '../../hooks/useEducationStructure';
 
 const QuestionGroupList = () => {
     const [loading, setLoading] = useState(true);
@@ -26,9 +28,14 @@ const QuestionGroupList = () => {
     const [search, setSearch] = useState('');
     const [questionType, setQuestionType] = useState<'multiple_choice' | 'true_false' | 'qa' | ''>('');
     const [gameId, setGameId] = useState('');
-    const [categoryId, setCategoryId] = useState('');
     const [sortField, setSortField] = useState('created_at');
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+
+    // YENİ: Eğitim yapısı filtreleri
+    const [gradeIdFilter, setGradeIdFilter] = useState<number | ''>('');
+    const [subjectIdFilter, setSubjectIdFilter] = useState<number | ''>('');
+    const [unitIdFilter, setUnitIdFilter] = useState<number | ''>('');
+    const [topicIdFilter, setTopicIdFilter] = useState<number | ''>('');
 
     // Silme işlemi için dialog state'leri
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -37,6 +44,79 @@ const QuestionGroupList = () => {
 
     const { games } = useGames();
     const { categories } = useCategories();
+    // YENİ: Eğitim yapısı verilerini yükle
+    const { grades, subjects, units, topics } = useEducationStructure();
+
+    // Filtrelenmiş listeler
+    const [filteredUnits, setFilteredUnits] = useState<any[]>([]);
+    const [filteredTopics, setFilteredTopics] = useState<any[]>([]);
+
+    // Grade ve Subject değiştiğinde ilgili üniteleri filtrele
+    useEffect(() => {
+        if (gradeIdFilter && subjectIdFilter) {
+            const filtered = units.filter(
+                unit => unit.grade_id === gradeIdFilter && unit.subject_id === subjectIdFilter
+            );
+            setFilteredUnits(filtered);
+
+            // Eğer seçili ünite bu filtrelere uygun değilse, seçimi sıfırla
+            if (unitIdFilter && !filtered.some(unit => unit.id === unitIdFilter)) {
+                setUnitIdFilter('');
+                setTopicIdFilter('');
+            }
+        } else {
+            setFilteredUnits([]);
+            setUnitIdFilter('');
+            setTopicIdFilter('');
+        }
+    }, [gradeIdFilter, subjectIdFilter, units, unitIdFilter]);
+
+    // Unit değiştiğinde ilgili konuları filtrele
+    useEffect(() => {
+        if (unitIdFilter) {
+            const filtered = topics.filter(topic => topic.unit_id === unitIdFilter);
+            setFilteredTopics(filtered);
+
+            // Eğer seçili konu bu filtreye uygun değilse, seçimi sıfırla
+            if (topicIdFilter && !filtered.some(topic => topic.id === topicIdFilter)) {
+                setTopicIdFilter('');
+            }
+        } else {
+            setFilteredTopics([]);
+            setTopicIdFilter('');
+        }
+    }, [unitIdFilter, topics, topicIdFilter]);
+
+    // Seçilen filtrelere göre kategori ID'lerini bul
+    const getMatchingCategoryIds = (): number[] | null => {
+        if (!gradeIdFilter && !subjectIdFilter && !unitIdFilter && !topicIdFilter) {
+            return null; // Hiçbir filtre seçilmediyse null döndür (tüm etkinlikler)
+        }
+
+        const matchingCategories = categories.filter(category => {
+            // Her filtre için kontrol yap
+            const gradeMatch = !gradeIdFilter || category.grade_id === gradeIdFilter;
+            const subjectMatch = !subjectIdFilter || category.subject_id === subjectIdFilter;
+            const unitMatch = !unitIdFilter || category.unit_id === unitIdFilter;
+            const topicMatch = !topicIdFilter || category.topic_id === topicIdFilter;
+
+            return gradeMatch && subjectMatch && unitMatch && topicMatch;
+        });
+
+        const categoryIds = matchingCategories.map(category => category.id);
+
+        // Debug için console.log
+        console.log('Etkinlik Filtreler:', {
+            gradeIdFilter,
+            subjectIdFilter,
+            unitIdFilter,
+            topicIdFilter
+        });
+        console.log('Eşleşen kategoriler:', matchingCategories);
+        console.log('Kategori ID\'leri:', categoryIds);
+
+        return categoryIds; // Boş array da olabilir
+    };
 
     // Soru tiplerini kullanıcı dostu formata dönüştüren yardımcı fonksiyon
     const getQuestionTypeLabel = (type: string): string => {
@@ -54,19 +134,26 @@ const QuestionGroupList = () => {
 
     useEffect(() => {
         fetchGroups();
-    }, [page, rowsPerPage, search, questionType, gameId, categoryId, sortField, sortDirection]);
+    }, [page, rowsPerPage, search, questionType, gameId, sortField, sortDirection, gradeIdFilter, subjectIdFilter, unitIdFilter, topicIdFilter]);
 
     const fetchGroups = async () => {
         setLoading(true);
         try {
-            const response = await questionGroupService.getQuestionGroups(page, {
+            // YENİ: Çoklu kategori filtreleme - Boş kategori sorunu çözümü
+            const matchingCategoryIds = getMatchingCategoryIds();
+            const filters: questionGroupService.QuestionGroupFilters = {
                 search,
                 question_type: questionType || undefined,
                 game_id: gameId,
-                category_id: categoryId,
                 sort_field: sortField,
-                sort_direction: sortDirection
-            });
+                sort_direction: sortDirection,
+                // Eğer eşleşen kategori varsa category_ids gönder, yoksa [-1] gönder
+                ...(matchingCategoryIds !== null ? {
+                    category_ids: matchingCategoryIds.length > 0 ? matchingCategoryIds : [-1]
+                } : {})
+            };
+
+            const response = await questionGroupService.getQuestionGroups(page, filters);
             setGroups(response.data);
             setTotalItems(response.total);
         } catch (e) {
@@ -74,6 +161,54 @@ const QuestionGroupList = () => {
             setError('Veriler alınamadı');
         }
         setLoading(false);
+    };
+
+    // Debug bilgileri güncellemesi
+    const matchingCategoryIds = getMatchingCategoryIds();
+    const hasEducationFilter = gradeIdFilter || subjectIdFilter || unitIdFilter || topicIdFilter;
+
+    // YENİ: Kategori filtre değişiklik fonksiyonları
+    const handleGradeChange = (event: SelectChangeEvent<number | ''>) => {
+        setGradeIdFilter(event.target.value as number | '');
+        setPage(1);
+    };
+
+    const handleSubjectChange = (event: SelectChangeEvent<number | ''>) => {
+        setSubjectIdFilter(event.target.value as number | '');
+        setPage(1);
+    };
+
+    const handleUnitChange = (event: SelectChangeEvent<number | ''>) => {
+        setUnitIdFilter(event.target.value as number | '');
+        setPage(1);
+    };
+
+    const handleTopicChange = (event: SelectChangeEvent<number | ''>) => {
+        setTopicIdFilter(event.target.value as number | '');
+        setPage(1);
+    };
+
+    // YENİ: Tüm filtreleri temizle
+    const handleResetFilters = () => {
+        setSearch('');
+        setQuestionType('');
+        setGameId('');
+        setGradeIdFilter('');
+        setSubjectIdFilter('');
+        setUnitIdFilter('');
+        setTopicIdFilter('');
+        setPage(1);
+    };
+
+    // YENİ: Herhangi bir filtre aktif mi kontrol et
+    const isAnyFilterActive = () => {
+        return search ||
+            questionType ||
+            gameId ||
+            gradeIdFilter ||
+            subjectIdFilter ||
+            unitIdFilter ||
+            topicIdFilter;
     };
 
     // Silme dialogunu açan fonksiyon
@@ -125,9 +260,11 @@ const QuestionGroupList = () => {
         }}>
             <Typography variant="h4" sx={{ fontWeight: 'bold', mb: 3 }}>Etkinlikler</Typography>
 
+            {/* Filtreler */}
             <Paper sx={{ p: 2, mb: 3 }}>
                 <Grid container spacing={2}>
-                    <Grid item xs={12} md={4}>
+                    {/* Arama */}
+                    <Grid item xs={12} md={3}>
                         <TextField
                             fullWidth
                             label="Etkinlik Ara"
@@ -143,6 +280,7 @@ const QuestionGroupList = () => {
                         />
                     </Grid>
 
+                    {/* Soru Tipi */}
                     <Grid item xs={12} md={3}>
                         <FormControl fullWidth>
                             <InputLabel>Soru Tipi</InputLabel>
@@ -155,9 +293,9 @@ const QuestionGroupList = () => {
                                 <MenuItem value="qa">Klasik</MenuItem>
                             </Select>
                         </FormControl>
-
                     </Grid>
 
+                    {/* Oyun */}
                     <Grid item xs={12} md={3}>
                         <FormControl fullWidth>
                             <InputLabel>Oyun</InputLabel>
@@ -170,30 +308,122 @@ const QuestionGroupList = () => {
                         </FormControl>
                     </Grid>
 
+                    {/* Sınıf */}
                     <Grid item xs={12} md={3}>
                         <FormControl fullWidth>
-                            <InputLabel>Kategori</InputLabel>
-                            <Select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-                                <MenuItem value="">Tüm Kategoriler</MenuItem>
-                                {categories.map((cat) => (
-                                    <MenuItem key={cat.id} value={cat.id}>{cat.name}</MenuItem>
+                            <InputLabel>Sınıf</InputLabel>
+                            <Select
+                                value={gradeIdFilter}
+                                label="Sınıf"
+                                onChange={handleGradeChange}
+                            >
+                                <MenuItem value="">Tümü</MenuItem>
+                                {grades.map(grade => (
+                                    <MenuItem key={grade.id} value={grade.id}>{grade.name}</MenuItem>
                                 ))}
                             </Select>
                         </FormControl>
                     </Grid>
 
-                    <Grid item xs={12} md={12} sx={{ textAlign: 'right' }}>
-                        <Button
-                            component={Link}
-                            to="/question-groups/add"
-                            variant="contained"
-                            startIcon={<AddIcon />}
-                        >
-                            Yeni Ekle
-                        </Button>
+                    {/* Ders */}
+                    <Grid item xs={12} md={3}>
+                        <FormControl fullWidth>
+                            <InputLabel>Ders</InputLabel>
+                            <Select
+                                value={subjectIdFilter}
+                                label="Ders"
+                                onChange={handleSubjectChange}
+                            >
+                                <MenuItem value="">Tümü</MenuItem>
+                                {subjects.map(subject => (
+                                    <MenuItem key={subject.id} value={subject.id}>{subject.name}</MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                    </Grid>
+
+                    {/* Ünite */}
+                    <Grid item xs={12} md={3}>
+                        <FormControl fullWidth>
+                            <InputLabel>Ünite</InputLabel>
+                            <Select
+                                value={unitIdFilter}
+                                label="Ünite"
+                                onChange={handleUnitChange}
+                                disabled={!gradeIdFilter || !subjectIdFilter || filteredUnits.length === 0}
+                            >
+                                <MenuItem value="">Tümü</MenuItem>
+                                {filteredUnits.map(unit => (
+                                    <MenuItem key={unit.id} value={unit.id}>{unit.name}</MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                    </Grid>
+
+                    {/* Konu */}
+                    <Grid item xs={12} md={3}>
+                        <FormControl fullWidth>
+                            <InputLabel>Konu</InputLabel>
+                            <Select
+                                value={topicIdFilter}
+                                label="Konu"
+                                onChange={handleTopicChange}
+                                disabled={!unitIdFilter || filteredTopics.length === 0}
+                            >
+                                <MenuItem value="">Tümü</MenuItem>
+                                {filteredTopics.map(topic => (
+                                    <MenuItem key={topic.id} value={topic.id}>{topic.name}</MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                    </Grid>
+
+                    {/* Butonlar */}
+                    <Grid item xs={12} md={12}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Box>
+                                {/* Filtre Temizle Butonu */}
+                                {isAnyFilterActive() && (
+                                    <Button
+                                        variant="outlined"
+                                        color="error"
+                                        onClick={handleResetFilters}
+                                        sx={{ mr: 2 }}
+                                    >
+                                        Filtreleri Temizle
+                                    </Button>
+                                )}
+                            </Box>
+                            <Button
+                                component={Link}
+                                to="/question-groups/add"
+                                variant="contained"
+                                startIcon={<AddIcon />}
+                            >
+                                Yeni Ekle
+                            </Button>
+                        </Box>
                     </Grid>
                 </Grid>
             </Paper>
+
+            {/* Debug bilgileri */}
+            {hasEducationFilter && (
+                <Paper sx={{ p: 2, mb: 2, bgcolor: '#f5f5f5' }}>
+                    <Typography variant="caption" color="text.secondary">
+                        {matchingCategoryIds && matchingCategoryIds.length > 0 ? (
+                            <>
+                                Filtrelenen Kategori Sayısı: {matchingCategoryIds.length}
+                                {matchingCategoryIds.length <= 5 && ` (ID'ler: ${matchingCategoryIds.join(', ')})`}
+                            </>
+                        ) : (
+                            <span style={{ color: '#f44336' }}>
+                                ⚠️ Seçilen filtrelere uygun kategori bulunamadı. Sonuç listesi boş olacak.
+                            </span>
+                        )}
+                    </Typography>
+                </Paper>
+            )}
 
             {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
@@ -206,14 +436,15 @@ const QuestionGroupList = () => {
                                 <TableCell onClick={() => handleSort('question_type')} sx={{ cursor: 'pointer' }}>Soru Tipi {getSortIcon('question_type')}</TableCell>
                                 <TableCell onClick={() => handleSort('game_id')} sx={{ cursor: 'pointer' }}>Oyun {getSortIcon('game_id')}</TableCell>
                                 <TableCell>Soru Sayısı</TableCell>
+                                <TableCell>Kategori</TableCell>
                                 <TableCell>İşlemler</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
                             {loading ? (
-                                <TableRow><TableCell colSpan={5} align="center"><CircularProgress /></TableCell></TableRow>
+                                <TableRow><TableCell colSpan={6} align="center"><CircularProgress /></TableCell></TableRow>
                             ) : groups.length === 0 ? (
-                                <TableRow><TableCell colSpan={5} align="center">Kayıt bulunamadı</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={6} align="center">Kayıt bulunamadı</TableCell></TableRow>
                             ) : (
                                 groups.map((group) => (
                                     <TableRow key={group.id}>
@@ -221,6 +452,7 @@ const QuestionGroupList = () => {
                                         <TableCell>{getQuestionTypeLabel(group.question_type)}</TableCell>
                                         <TableCell>{group.game?.name || '-'}</TableCell>
                                         <TableCell>{group.questions_count}</TableCell>
+                                        <TableCell>{group.category?.name || '-'}</TableCell>
                                         <TableCell>
                                             <IconButton component={Link} to={`/question-groups/${group.id}`}><ViewIcon /></IconButton>
                                             <IconButton component={Link} to={`/question-groups/${group.id}/edit`}><EditIcon /></IconButton>

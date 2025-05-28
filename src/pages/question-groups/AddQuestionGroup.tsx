@@ -15,6 +15,8 @@ import {
 import * as questionGroupService from '../../services/question-group.service';
 import * as gameService from '../../services/game.service';
 import { useCategories } from '../../hooks/useCategories';
+import * as categoryService from '../../services/category.service';
+import {useEducationStructure} from "../../hooks/useEducationStructure.ts";
 
 const steps = ['Etkinlik Bilgileri', 'Soru Seçimi', 'Önizleme'];
 
@@ -47,7 +49,19 @@ const AddQuestionGroup = () => {
     const [questionType, setQuestionType] = useState<'multiple_choice' | 'true_false' | 'qa'>('multiple_choice');
     const [gameId, setGameId] = useState<string>('');
     const [categoryId, setCategoryId] = useState<string>('');
+    const [categoryExists, setCategoryExists] = useState<boolean>(false);
+    const [creatingCategory, setCreatingCategory] = useState<boolean>(false);
     const [selectedQuestions, setSelectedQuestions] = useState<number[]>([]);
+
+    // Filtrelenmiş listeler
+    const [filteredUnits, setFilteredUnits] = useState<any[]>([]);
+    const [filteredTopics, setFilteredTopics] = useState<any[]>([]);
+
+    // Manuel seçim alanları
+    const [gradeId, setGradeId] = useState<number | ''>('');
+    const [subjectId, setSubjectId] = useState<number | ''>('');
+    const [unitId, setUnitId] = useState<number | ''>('');
+    const [topicId, setTopicId] = useState<number | ''>('');
 
     // Görsel yükleme için yeni state değişkenleri
     const [imageFile, setImageFile] = useState<File | null>(null);
@@ -67,7 +81,8 @@ const AddQuestionGroup = () => {
     const [questionsPage, setQuestionsPage] = useState(1);
     const [totalQuestionsPages, setTotalQuestionsPages] = useState(1);
 
-    const { categories } = useCategories();
+    const { grades, subjects, units, topics } = useEducationStructure();
+    const { categories, refreshCategories } = useCategories();
 
 
     // Oyunları yükle
@@ -87,6 +102,66 @@ const AddQuestionGroup = () => {
 
         fetchGames();
     }, []);
+
+    // Grade ve Subject değiştiğinde ilgili üniteleri filtrele
+    useEffect(() => {
+        if (gradeId && subjectId) {
+            const filtered = units.filter(
+                unit => unit.grade_id === gradeId && unit.subject_id === subjectId
+            );
+            setFilteredUnits(filtered);
+
+            // Eğer seçili ünite bu filtrelere uygun değilse, seçimi sıfırla
+            if (unitId && !filtered.some(unit => unit.id === unitId)) {
+                setUnitId('');
+                setTopicId('');
+            }
+        } else {
+            setFilteredUnits([]);
+            setUnitId('');
+            setTopicId('');
+        }
+    }, [gradeId, subjectId, units, unitId]);
+
+    // Unit değiştiğinde ilgili konuları filtrele
+    useEffect(() => {
+        if (unitId) {
+            const filtered = topics.filter(topic => topic.unit_id === unitId);
+            setFilteredTopics(filtered);
+
+            // Eğer seçili konu bu filtreye uygun değilse, seçimi sıfırla
+            if (topicId && !filtered.some(topic => topic.id === topicId)) {
+                setTopicId('');
+            }
+        } else {
+            setFilteredTopics([]);
+            setTopicId('');
+        }
+    }, [unitId, topics, topicId]);
+
+    // Seçilen kombinasyona göre kategori durumunu kontrol et
+    useEffect(() => {
+        // Kategori kontrolü için tüm 4 alan gerekli: gradeId, subjectId, unitId, topicId
+        if (gradeId && subjectId && unitId && topicId) {
+            const matchingCategory = categories.find(category =>
+                category.grade_id === gradeId &&
+                category.subject_id === subjectId &&
+                category.unit_id === unitId &&
+                category.topic_id === topicId
+            );
+
+            if (matchingCategory) {
+                setCategoryExists(true);
+                setCategoryId(matchingCategory.id.toString());
+            } else {
+                setCategoryExists(false);
+                setCategoryId('');
+            }
+        } else {
+            setCategoryExists(false);
+            setCategoryId('');
+        }
+    }, [gradeId, subjectId, unitId, topicId, categories]);
 
     // Seçilen oyun ve soru tipine göre uygun soruları yükle
     useEffect(() => {
@@ -135,8 +210,72 @@ const AddQuestionGroup = () => {
         setSelectedQuestions([]); // Oyun değiştiğinde seçili soruları sıfırla
     };
 
-    const handleCategoryChange = (event: SelectChangeEvent) => {
-        setCategoryId(event.target.value);
+    // Kategori adını oluştur
+    const generateCategoryName = (): string => {
+        const gradeName = grades.find(g => g.id === gradeId)?.name || '';
+        const subjectName = subjects.find(s => s.id === subjectId)?.name || '';
+        const unitName = unitId ? units.find(u => u.id === unitId)?.name : '';
+        const topicName = topicId ? topics.find(t => t.id === topicId)?.name : '';
+
+        let categoryName = `${gradeName} - ${subjectName}`;
+        if (unitName) categoryName += ` - ${unitName}`;
+        if (topicName) categoryName += ` - ${topicName}`;
+
+        return categoryName;
+    };
+
+    // Yeni kategori oluştur
+    const handleCreateCategory = async () => {
+        if (!gradeId || !subjectId || !unitId || !topicId) {
+            setError('Sınıf, ders, ünite ve konu seçimi zorunludur.');
+            return;
+        }
+
+        setCreatingCategory(true);
+        setError(null);
+
+        try {
+            const categoryData: categoryService.CategoryCreate = {
+                name: generateCategoryName(),
+                grade_id: gradeId as number,
+                subject_id: subjectId as number,
+                unit_id: unitId as number,
+                topic_id: topicId as number
+            };
+
+            const newCategory = await categoryService.createCategory(categoryData);
+
+            // Kategorileri yenile
+            await refreshCategories();
+
+            // Yeni kategoriyi seç
+            setCategoryId(newCategory.id.toString());
+            setCategoryExists(true);
+
+            setError(null);
+        } catch (err) {
+            console.error('Error creating category:', err);
+            setError('Kategori oluşturulurken bir hata oluştu.');
+        } finally {
+            setCreatingCategory(false);
+        }
+    };
+
+    // Form alanları için handle fonksiyonları
+    const handleGradeChange = (event: SelectChangeEvent<number | ''>) => {
+        setGradeId(event.target.value as number | '');
+    };
+
+    const handleSubjectChange = (event: SelectChangeEvent<number | ''>) => {
+        setSubjectId(event.target.value as number | '');
+    };
+
+    const handleUnitChange = (event: SelectChangeEvent<number | ''>) => {
+        setUnitId(event.target.value as number | '');
+    };
+
+    const handleTopicChange = (event: SelectChangeEvent<number | ''>) => {
+        setTopicId(event.target.value as number | '');
     };
 
 
@@ -332,21 +471,110 @@ const AddQuestionGroup = () => {
                             </Grid>
 
                             <Grid item xs={12} sm={6}>
-                                <FormControl fullWidth>
-                                    <InputLabel>Kategori</InputLabel>
-                                    <Select
-                                        value={categoryId}
-                                        label="Kategori"
-                                        onChange={handleCategoryChange}
+                                <Typography variant="subtitle1" gutterBottom>
+                                    Kategori Seçimi
+                                </Typography>
+                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'end' }}>
+                                    <FormControl fullWidth required sx={{ mb: 2, maxWidth: 200 }}>
+                                        <InputLabel>Sınıf</InputLabel>
+                                        <Select
+                                            value={gradeId}
+                                            label="Sınıf"
+                                            onChange={handleGradeChange}
+                                            required
+                                        >
+                                            <MenuItem value="" disabled>Sınıf Seçin</MenuItem>
+                                            {grades.map((grade) => (
+                                                <MenuItem key={grade.id} value={grade.id}>
+                                                    {grade.name}
+                                                </MenuItem>
+                                            ))}
+                                        </Select>
+                                    </FormControl>
+
+                                    <FormControl fullWidth required sx={{ mb: 2, maxWidth: 200 }}>
+                                        <InputLabel>Ders</InputLabel>
+                                        <Select
+                                            value={subjectId}
+                                            label="Ders"
+                                            onChange={handleSubjectChange}
+                                            required
+                                        >
+                                            <MenuItem value="" disabled>Ders Seçin</MenuItem>
+                                            {subjects.map((subject) => (
+                                                <MenuItem key={subject.id} value={subject.id}>
+                                                    {subject.name}
+                                                </MenuItem>
+                                            ))}
+                                        </Select>
+                                    </FormControl>
+
+                                    <FormControl sx={{ mb: 2, maxWidth: 200 }}>
+                                        <InputLabel>Ünite</InputLabel>
+                                        <Select
+                                            value={unitId}
+                                            label="Ünite"
+                                            onChange={handleUnitChange}
+                                            disabled={!gradeId || !subjectId || filteredUnits.length === 0}
+                                        >
+                                            <MenuItem value="">Ünite Seçin </MenuItem>
+                                            {filteredUnits.map((unit) => (
+                                                <MenuItem key={unit.id} value={unit.id}>
+                                                    {unit.name}
+                                                </MenuItem>
+                                            ))}
+                                        </Select>
+                                    </FormControl>
+
+                                    <FormControl sx={{ mb: 2, maxWidth: 200 }}>
+                                        <InputLabel>Konu</InputLabel>
+                                        <Select
+                                            value={topicId}
+                                            label="Konu"
+                                            onChange={handleTopicChange}
+                                            disabled={!unitId || filteredTopics.length === 0}
+                                        >
+                                            <MenuItem value="">Konu Seçin </MenuItem>
+                                            {filteredTopics.map((topic) => (
+                                                <MenuItem key={topic.id} value={topic.id}>
+                                                    {topic.name}
+                                                </MenuItem>
+                                            ))}
+                                        </Select>
+                                    </FormControl>
+
+                                    {gradeId && subjectId && unitId && topicId && !categoryExists && (
+                                        <Button
+                                            variant="contained"
+                                            color="secondary"
+                                            onClick={handleCreateCategory}
+                                            disabled={creatingCategory}
+                                            sx={{ mb: 2, height: 'fit-content' }}
+                                        >
+                                            {creatingCategory ? (
+                                                <>
+                                                    <CircularProgress size={20} sx={{ mr: 1 }} />
+                                                    Oluşturuluyor...
+                                                </>
+                                            ) : (
+                                                'Kategoriyi Ekle'
+                                            )}
+                                        </Button>
+                                    )}
+                                </Box>
+
+                                {gradeId && subjectId && unitId && topicId && (
+                                    <Alert
+                                        severity={categoryExists ? "success" : "info"}
+                                        sx={{ mt: 2 }}
                                     >
-                                        <MenuItem value="">Seçiniz</MenuItem>
-                                        {categories.map((cat) => (
-                                            <MenuItem key={cat.id} value={cat.id.toString()}>
-                                                {cat.name}
-                                            </MenuItem>
-                                        ))}
-                                    </Select>
-                                </FormControl>
+                                        {categoryExists
+                                            ? `Kategori mevcut: ${generateCategoryName()}`
+                                            : `Bu kombinasyon için kategori bulunamadı: ${generateCategoryName()}`
+                                        }
+                                    </Alert>
+                                )}
+
                             </Grid>
 
                             <Grid item xs={12} sm={6}>

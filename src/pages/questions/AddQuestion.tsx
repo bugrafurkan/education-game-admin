@@ -13,7 +13,6 @@ import * as gameService from '../../services/game.service';
 import axios, { AxiosError } from 'axios';
 import { useCategories } from '../../hooks/useCategories';
 import ImageUploader from '../../components/ImageUploader';
-import * as categoryService from '../../services/category.service';
 
 
 // Soru tipi seçenekleri
@@ -49,7 +48,7 @@ const AddQuestion = () => {
     const [error, setError] = useState<string | null>(null);
     const { grades, subjects, units, topics } = useEducationStructure();
     // Kategorileri yükle
-    const { categories, refreshCategories } = useCategories();
+    const { categories } = useCategories();
 
     // Form verileri
     const [questionType, setQuestionType] = useState<string>('');
@@ -62,12 +61,6 @@ const AddQuestion = () => {
     const [subjectId, setSubjectId] = useState<number | ''>('');
     const [unitId, setUnitId] = useState<number | ''>('');
     const [topicId, setTopicId] = useState<number | ''>('');
-    const [categoryExists, setCategoryExists] = useState(false);
-    const [creatingCategory, setCreatingCategory] = useState(false);
-
-    // Filtrelenmiş listeler
-    const [filteredUnits, setFilteredUnits] = useState<any[]>([]);
-    const [filteredTopics, setFilteredTopics] = useState<any[]>([]);
 
     // Resim yükleme için state'ler
     const [imagePath, setImagePath] = useState<string | null>(null);
@@ -82,117 +75,6 @@ const AddQuestion = () => {
         { id: 'C', text: '', isCorrect: false },
         { id: 'D', text: '', isCorrect: false }
     ]);
-
-    // Grade ve Subject değiştiğinde ilgili üniteleri filtrele
-    useEffect(() => {
-        if (gradeId && subjectId) {
-            const filtered = units.filter(
-                unit => unit.grade_id === gradeId && unit.subject_id === subjectId
-            );
-            setFilteredUnits(filtered);
-
-            // Eğer seçili ünite bu filtrelere uygun değilse, seçimi sıfırla
-            if (unitId && !filtered.some(unit => unit.id === unitId)) {
-                setUnitId('');
-                setTopicId('');
-            }
-        } else {
-            setFilteredUnits([]);
-            setUnitId('');
-            setTopicId('');
-        }
-    }, [gradeId, subjectId, units, unitId]);
-
-    // Unit değiştiğinde ilgili konuları filtrele
-    useEffect(() => {
-        if (unitId) {
-            const filtered = topics.filter(topic => topic.unit_id === unitId);
-            setFilteredTopics(filtered);
-
-            // Eğer seçili konu bu filtreye uygun değilse, seçimi sıfırla
-            if (topicId && !filtered.some(topic => topic.id === topicId)) {
-                setTopicId('');
-            }
-        } else {
-            setFilteredTopics([]);
-            setTopicId('');
-        }
-    }, [unitId, topics, topicId]);
-
-    // Seçilen kombinasyona göre kategori durumunu kontrol et
-    useEffect(() => {
-        // Kategori kontrolü için tüm 4 alan gerekli: gradeId, subjectId, unitId, topicId
-        if (gradeId && subjectId && unitId && topicId) {
-            const matchingCategory = categories.find(category =>
-                category.grade_id === gradeId &&
-                category.subject_id === subjectId &&
-                category.unit_id === unitId &&
-                category.topic_id === topicId
-            );
-
-            if (matchingCategory) {
-                setCategoryExists(true);
-                setCategoryId(matchingCategory.id);
-            } else {
-                setCategoryExists(false);
-                setCategoryId('');
-            }
-        } else {
-            setCategoryExists(false);
-            setCategoryId('');
-        }
-    }, [gradeId, subjectId, unitId, topicId, categories]);
-
-    // Kategori adını oluştur
-    const generateCategoryName = (): string => {
-        const gradeName = grades.find(g => g.id === gradeId)?.name || '';
-        const subjectName = subjects.find(s => s.id === subjectId)?.name || '';
-        const unitName = unitId ? units.find(u => u.id === unitId)?.name : '';
-        const topicName = topicId ? topics.find(t => t.id === topicId)?.name : '';
-
-        let categoryName = `${gradeName} - ${subjectName}`;
-        if (unitName) categoryName += ` - ${unitName}`;
-        if (topicName) categoryName += ` - ${topicName}`;
-
-        return categoryName;
-    };
-
-    // Yeni kategori oluştur
-    const handleCreateCategory = async () => {
-        if (!gradeId || !subjectId || !unitId || !topicId) {
-            setError('Sınıf, ders, ünite ve konu seçimi zorunludur.');
-            return;
-        }
-
-        setCreatingCategory(true);
-        setError(null);
-
-        try {
-            const categoryData: categoryService.CategoryCreate = {
-                name: generateCategoryName(),
-                grade_id: gradeId as number,
-                subject_id: subjectId as number,
-                unit_id: unitId as number,
-                topic_id: topicId as number
-            };
-
-            const newCategory = await categoryService.createCategory(categoryData);
-
-            // Kategorileri yenile
-            await refreshCategories();
-
-            // Yeni kategoriyi seç
-            setCategoryId(newCategory.id);
-            setCategoryExists(true);
-
-            setError(null);
-        } catch (err) {
-            console.error('Error creating category:', err);
-            setError('Kategori oluşturulurken bir hata oluştu.');
-        } finally {
-            setCreatingCategory(false);
-        }
-    };
 
     // Kategori değiştiğinde ilgili bilgileri otomatik doldur
     useEffect(() => {
@@ -292,23 +174,9 @@ const AddQuestion = () => {
         setDifficulty(event.target.value);
     };
 
-
-
-    // Form alanları için handle fonksiyonları
-    const handleGradeChange = (event: SelectChangeEvent<number | ''>) => {
-        setGradeId(event.target.value as number | '');
-    };
-
-    const handleSubjectChange = (event: SelectChangeEvent<number | ''>) => {
-        setSubjectId(event.target.value as number | '');
-    };
-
-    const handleUnitChange = (event: SelectChangeEvent<number | ''>) => {
-        setUnitId(event.target.value as number | '');
-    };
-
-    const handleTopicChange = (event: SelectChangeEvent<number | ''>) => {
-        setTopicId(event.target.value as number | '');
+    // Kategori değiştir
+    const handleCategoryChange = (event: SelectChangeEvent<number | ''>) => {
+        setCategoryId(event.target.value as number | '');
     };
 
     // Doğru/Yanlış değiştir
@@ -526,131 +394,90 @@ const AddQuestion = () => {
                             </Grid>
 
                             {/* Kategori Seçimi - edit modunda disabled */}
-                            <Box sx={{ mb: 3 }}>
-                                <FormControl component="fieldset" sx={{ mb: 3 }}>
-                                    <Typography variant="subtitle1" gutterBottom>
-                                        Soru Tipi
-                                    </Typography>
-                                    <RadioGroup
-                                        row
-                                        value={questionType}
-                                        onChange={(e) => setQuestionType(e.target.value)}
+                            <Grid item xs={12}>
+                                <FormControl fullWidth required>
+                                    <InputLabel>Kategori</InputLabel>
+                                    <Select
+                                        value={categoryId}
+                                        label="Kategori"
+                                        onChange={handleCategoryChange}
+                                        required
+                                        disabled={isEdit} // Edit modunda değiştirilemesin
                                     >
-                                        {questionTypes.map((type) => (
-                                            <FormControlLabel
-                                                key={type.value}
-                                                value={type.value}
-                                                control={<Radio />}
-                                                label={type.label}
-                                            />
+                                        <MenuItem value="" disabled>Kategori Seçin</MenuItem>
+                                        {categories.map((category) => (
+                                            <MenuItem key={category.id} value={category.id}>
+                                                {category.name}
+                                            </MenuItem>
                                         ))}
-                                    </RadioGroup>
+                                    </Select>
                                 </FormControl>
+                            </Grid>
 
-                                <Typography variant="subtitle1" gutterBottom>
-                                    Kategori Seçimi
-                                </Typography>
-                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'end' }}>
-                                    <FormControl fullWidth required sx={{ mb: 2, maxWidth: 200 }}>
-                                        <InputLabel>Sınıf</InputLabel>
-                                        <Select
-                                            value={gradeId}
-                                            label="Sınıf"
-                                            onChange={handleGradeChange}
-                                            required
-                                        >
-                                            <MenuItem value="" disabled>Sınıf Seçin</MenuItem>
-                                            {grades.map((grade) => (
-                                                <MenuItem key={grade.id} value={grade.id}>
-                                                    {grade.name}
-                                                </MenuItem>
-                                            ))}
-                                        </Select>
-                                    </FormControl>
-
-                                    <FormControl fullWidth required sx={{ mb: 2, maxWidth: 200 }}>
-                                        <InputLabel>Ders</InputLabel>
-                                        <Select
-                                            value={subjectId}
-                                            label="Ders"
-                                            onChange={handleSubjectChange}
-                                            required
-                                        >
-                                            <MenuItem value="" disabled>Ders Seçin</MenuItem>
-                                            {subjects.map((subject) => (
-                                                <MenuItem key={subject.id} value={subject.id}>
-                                                    {subject.name}
-                                                </MenuItem>
-                                            ))}
-                                        </Select>
-                                    </FormControl>
-
-                                    <FormControl sx={{ mb: 2, maxWidth: 200 }}>
-                                        <InputLabel>Ünite</InputLabel>
-                                        <Select
-                                            value={unitId}
-                                            label="Ünite"
-                                            onChange={handleUnitChange}
-                                            disabled={!gradeId || !subjectId || filteredUnits.length === 0}
-                                        >
-                                            <MenuItem value="">Ünite Seçin </MenuItem>
-                                            {filteredUnits.map((unit) => (
-                                                <MenuItem key={unit.id} value={unit.id}>
-                                                    {unit.name}
-                                                </MenuItem>
-                                            ))}
-                                        </Select>
-                                    </FormControl>
-
-                                    <FormControl sx={{ mb: 2, maxWidth: 200 }}>
-                                        <InputLabel>Konu</InputLabel>
-                                        <Select
-                                            value={topicId}
-                                            label="Konu"
-                                            onChange={handleTopicChange}
-                                            disabled={!unitId || filteredTopics.length === 0}
-                                        >
-                                            <MenuItem value="">Konu Seçin </MenuItem>
-                                            {filteredTopics.map((topic) => (
-                                                <MenuItem key={topic.id} value={topic.id}>
-                                                    {topic.name}
-                                                </MenuItem>
-                                            ))}
-                                        </Select>
-                                    </FormControl>
-
-                                    {gradeId && subjectId && unitId && topicId && !categoryExists && (
-                                        <Button
-                                            variant="contained"
-                                            color="secondary"
-                                            onClick={handleCreateCategory}
-                                            disabled={creatingCategory}
-                                            sx={{ mb: 2, height: 'fit-content' }}
-                                        >
-                                            {creatingCategory ? (
-                                                <>
-                                                    <CircularProgress size={20} sx={{ mr: 1 }} />
-                                                    Oluşturuluyor...
-                                                </>
-                                            ) : (
-                                                'Kategoriyi Ekle'
-                                            )}
-                                        </Button>
-                                    )}
-                                </Box>
-
-                                {gradeId && subjectId && unitId && topicId && (
-                                    <Alert
-                                        severity={categoryExists ? "success" : "info"}
-                                        sx={{ mt: 2 }}
+                            {/* Otomatik doldurulan ve seçilemeyen alanlar */}
+                            <Grid item xs={12} sm={6} md={3}>
+                                <FormControl fullWidth disabled>
+                                    <InputLabel>Sınıf</InputLabel>
+                                    <Select
+                                        value={gradeId}
+                                        label="Sınıf"
                                     >
-                                        {categoryExists
-                                            ? `Kategori mevcut: ${generateCategoryName()}`
-                                            : `Bu kombinasyon için kategori bulunamadı: ${generateCategoryName()}`
-                                        }
-                                    </Alert>
-                                )}
-                            </Box>
+                                        {grades.map((grade) => (
+                                            <MenuItem key={grade.id} value={grade.id}>
+                                                {grade.name}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+
+                            <Grid item xs={12} sm={6} md={3}>
+                                <FormControl fullWidth disabled>
+                                    <InputLabel>Ders</InputLabel>
+                                    <Select
+                                        value={subjectId}
+                                        label="Ders"
+                                    >
+                                        {subjects.map((subject) => (
+                                            <MenuItem key={subject.id} value={subject.id}>
+                                                {subject.name}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+
+                            <Grid item xs={12} sm={6} md={3}>
+                                <FormControl fullWidth disabled>
+                                    <InputLabel>Ünite</InputLabel>
+                                    <Select
+                                        value={unitId}
+                                        label="Ünite"
+                                    >
+                                        {units.map((unit) => (
+                                            <MenuItem key={unit.id} value={unit.id}>
+                                                {unit.name}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+
+                            <Grid item xs={12} sm={6} md={3}>
+                                <FormControl fullWidth disabled>
+                                    <InputLabel>Konu</InputLabel>
+                                    <Select
+                                        value={topicId}
+                                        label="Konu"
+                                    >
+                                        {topics.map((topic) => (
+                                            <MenuItem key={topic.id} value={topic.id}>
+                                                {topic.name}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </Grid>
 
                             <Grid item xs={12} sm={6}>
                                 <FormControl fullWidth>

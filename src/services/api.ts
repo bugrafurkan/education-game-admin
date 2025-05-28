@@ -16,7 +16,7 @@ const api = axios.create({
 // İstek gönderilmeden önce çalışacak interceptor - token ekleme
 api.interceptors.request.use(
     (config) => {
-        const token = sessionStorage.getItem('auth_token');
+        const token = localStorage.getItem('auth_token');
         if (token && config.headers) {
             config.headers.Authorization = `Bearer ${token}`;
         }
@@ -33,7 +33,7 @@ api.interceptors.response.use(
     async (error) => {
         // 401 Unauthorized hatası - token süresi dolmuş veya geçersiz
         if (error.response?.status === 401) {
-            sessionStorage.removeItem('auth_token');
+            localStorage.removeItem('auth_token');
             window.location.href = '/login';
         }
         return Promise.reject(error);

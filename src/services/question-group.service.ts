@@ -84,6 +84,11 @@ export interface EligibleQuestionsParams {
     game_id: number;
     question_type: 'multiple_choice' | 'true_false' | 'qa';
     category_id?: number;
+    category_ids?: number[]; // YENİ: Çoklu kategori desteği
+    grade_id?: number; // YENİ: Eğitim yapısı filtreleri
+    subject_id?: number;
+    unit_id?: number;
+    topic_id?: number;
     page?: number;
 }
 
@@ -92,6 +97,11 @@ export interface QuestionGroupFilters {
     question_type?: 'multiple_choice' | 'true_false' | 'qa';
     game_id?: string | number;
     category_id?: string | number;
+    category_ids?: number[]; // YENİ: Çoklu kategori desteği
+    grade_id?: number; // YENİ: Eğitim yapısı filtreleri
+    subject_id?: number;
+    unit_id?: number;
+    topic_id?: number;
     sort_field?: string;
     sort_direction?: 'asc' | 'desc';
 }

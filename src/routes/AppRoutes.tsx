@@ -37,7 +37,7 @@ interface AuthGuardProps {
 }
 
 const AuthGuard: FC<AuthGuardProps> = ({ children }) => {
-    const isAuthenticated = !!sessionStorage.getItem('auth_token');
+    const isAuthenticated = !!localStorage.getItem('auth_token');
 
     if (!isAuthenticated) {
         return <Navigate to="/login" />;
@@ -52,7 +52,7 @@ interface GuestGuardProps {
 }
 
 const GuestGuard: FC<GuestGuardProps> = ({ children }) => {
-    const isAuthenticated = !!sessionStorage.getItem('auth_token');
+    const isAuthenticated = !!localStorage.getItem('auth_token');
 
     if (isAuthenticated) {
         return <Navigate to="/" />;

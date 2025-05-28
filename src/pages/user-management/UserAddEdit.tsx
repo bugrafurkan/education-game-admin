@@ -11,16 +11,11 @@ import {
     Paper,
     Button,
     TextField,
-    MenuItem,
-    FormControl,
-    InputLabel,
-    Select,
     Grid,
     CircularProgress,
     Alert,
     Breadcrumbs,
-    Link as MuiLink,
-    SelectChangeEvent
+    Link as MuiLink
 } from '@mui/material';
 import {
     Save as SaveIcon,
@@ -33,6 +28,7 @@ interface UserFormData {
     email: string;
     password: string;
     role: string;
+    publisher: string;
 }
 
 const UserAddEdit: React.FC = () => {
@@ -45,7 +41,8 @@ const UserAddEdit: React.FC = () => {
         name: '',
         email: '',
         password: '',
-        role: 'user'
+        role: 'admin',
+        publisher: 'Arı Yayıncılık'
     });
 
     const [loading, setLoading] = useState<boolean>(false);
@@ -67,7 +64,8 @@ const UserAddEdit: React.FC = () => {
                     name: userData.name,
                     email: userData.email,
                     password: '',
-                    role: userData.role
+                    role: userData.role,
+                    publisher: userData.publisher || 'Arı Yayıncılık'
                 });
             } else {
                 setError('Kullanıcı bulunamadı.');
@@ -87,14 +85,6 @@ const UserAddEdit: React.FC = () => {
             [name]: value
         }));
     };
-
-    const handleRoleChange = (e: SelectChangeEvent) => {
-        setFormData(prev => ({
-            ...prev,
-            role: e.target.value
-        }));
-    };
-
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
@@ -102,11 +92,17 @@ const UserAddEdit: React.FC = () => {
         setSuccess(null);
 
         try {
+            // Rol her zaman admin olarak gönder
+            const submitData = {
+                ...formData,
+                role: 'admin'
+            };
+
             if (isEditMode) {
-                await updateUser(Number(id), formData);
+                await updateUser(Number(id), submitData);
                 setSuccess('Kullanıcı başarıyla güncellendi!');
             } else {
-                await signup(formData);
+                await signup(submitData);
                 setSuccess('Yeni kullanıcı başarıyla oluşturuldu!');
             }
 
@@ -201,20 +197,31 @@ const UserAddEdit: React.FC = () => {
                                 />
                             </Grid>
                             <Grid item xs={12} md={6}>
-                                <FormControl fullWidth variant="outlined">
-                                    <InputLabel id="role-label">Rol</InputLabel>
-                                    <Select
-                                        labelId="role-label"
-                                        id="role"
-                                        name="role"
-                                        value={formData.role}
-                                        onChange={handleRoleChange}
-                                        label="Rol"
-                                    >
-                                        <MenuItem value="admin">Admin</MenuItem>
-                                        <MenuItem value="user">Kullanıcı</MenuItem>
-                                    </Select>
-                                </FormControl>
+                                <TextField
+                                    label="Yayınevi"
+                                    name="publisher"
+                                    value={formData.publisher}
+                                    onChange={handleInputChange}
+                                    fullWidth
+                                    variant="outlined"
+                                    helperText="Varsayılan: Arı Yayıncılık"
+                                />
+                            </Grid>
+                            <Grid item xs={12} md={6}>
+                                <TextField
+                                    label="Rol"
+                                    value="Admin"
+                                    fullWidth
+                                    variant="outlined"
+                                    disabled
+                                    helperText="Tüm yeni kullanıcılar admin rolünde oluşturulur"
+                                    sx={{
+                                        '& .MuiInputBase-input.Mui-disabled': {
+                                            WebkitTextFillColor: '#666',
+                                            backgroundColor: '#f5f5f5'
+                                        }
+                                    }}
+                                />
                             </Grid>
                             <Grid item xs={12} sx={{ mt: 2 }}>
                                 <Box sx={{ display: 'flex', gap: 2 }}>

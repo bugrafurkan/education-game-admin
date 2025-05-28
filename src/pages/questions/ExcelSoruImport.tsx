@@ -22,6 +22,7 @@ import {
 import { useEducationStructure } from '../../hooks/useEducationStructure';
 import { useCategories } from '../../hooks/useCategories';
 import * as questionService from '../../services/question.service';
+import * as gameService from '../../services/game.service';
 import * as XLSX from 'xlsx';
 
 interface ExcelQuestion {
@@ -278,6 +279,7 @@ const ExcelSoruImport = () => {
     };
 
     // Soruları kaydet
+    // Soruları kaydet ve tüm oyunlara ekle
     const handleSaveQuestions = async () => {
         if (!categoryId) {
             setGlobalError('Lütfen bir kategori seçin.');
@@ -303,6 +305,9 @@ const ExcelSoruImport = () => {
             saved: 0,
             failed: 0
         };
+
+        // Kaydedilen soruların ID'lerini tutacak dizi
+        const savedQuestionIds: number[] = [];
 
         // Her bir soruyu sırayla kaydet
         for (const question of validQuestions) {
@@ -336,13 +341,50 @@ const ExcelSoruImport = () => {
                 }
 
                 // Soruyu kaydet
-                await questionService.createQuestion(questionData);
+                const savedQuestion = await questionService.createQuestion(questionData);
+
+                // Kaydedilen sorunun ID'sini diziye ekle
+                if (savedQuestion && savedQuestion.id) {
+                    savedQuestionIds.push(savedQuestion.id);
+                }
+
                 newStats.saved++;
 
             } catch (error) {
                 console.error(`Soru kaydedilirken hata (ID: ${question.id}):`, error);
                 newStats.failed++;
             }
+        }
+
+        // Tüm oyunları al ve kaydedilen soruları tüm oyunlara ekle
+        try {
+            // Eğer başarıyla kaydedilen sorular varsa
+            if (savedQuestionIds.length > 0) {
+                // Tüm oyunları getir
+                const gamesResponse = await gameService.getGames(1);
+                const games = gamesResponse.data;
+
+                // Her oyun için
+                for (const game of games) {
+                    // Her soruyu oyuna ekle
+                    for (const questionId of savedQuestionIds) {
+                        try {
+                            await gameService.addQuestionToGame(game.id, {
+                                question_id: questionId,
+                                points: 100 // Varsayılan puan
+                            });
+                        } catch (error) {
+                            console.error(`Soru (ID: ${questionId}) oyuna (ID: ${game.id}) eklenirken hata:`, error);
+                            // Oyuna ekleme hatası genel istatistikleri etkilemesin
+                        }
+                    }
+                }
+
+                console.log(`${savedQuestionIds.length} soru ${games.length} oyuna başarıyla eklendi`);
+            }
+        } catch (error) {
+            console.error('Oyunlar alınırken veya sorular oyunlara eklenirken hata:', error);
+            // Oyunlara ekleme hatası genel istatistikleri etkilemesin
         }
 
         setStats(newStats);

@@ -135,6 +135,7 @@ const UserManagement: React.FC = () => {
                                 <TableCell sx={{ fontWeight: 'bold' }}>Ad Soyad</TableCell>
                                 <TableCell sx={{ fontWeight: 'bold' }}>Email</TableCell>
                                 <TableCell sx={{ fontWeight: 'bold' }}>Rol</TableCell>
+                                <TableCell sx={{ fontWeight: 'bold' }}>Yayınevi</TableCell>
                                 <TableCell sx={{ fontWeight: 'bold' }}>Kayıt Tarihi</TableCell>
                                 <TableCell sx={{ fontWeight: 'bold' }}>İşlemler</TableCell>
                             </TableRow>
@@ -142,7 +143,7 @@ const UserManagement: React.FC = () => {
                         <TableBody>
                             {users.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
+                                    <TableCell colSpan={7} align="center" sx={{ py: 3 }}>
                                         <Typography variant="body1" color="text.secondary">
                                             Henüz kullanıcı bulunmamaktadır.
                                         </Typography>
@@ -155,6 +156,19 @@ const UserManagement: React.FC = () => {
                                         <TableCell>{user.name}</TableCell>
                                         <TableCell>{user.email}</TableCell>
                                         <TableCell>{getRoleChip(user.role)}</TableCell>
+                                        <TableCell>
+                                            <Chip
+                                                label={user.publisher || 'Arı Yayıncılık'}
+                                                variant="outlined"
+                                                size="small"
+                                                sx={{
+                                                    fontWeight: 'medium',
+                                                    backgroundColor: '#f0f8ff',
+                                                    borderColor: '#2196f3',
+                                                    color: '#1976d2'
+                                                }}
+                                            />
+                                        </TableCell>
                                         <TableCell>
                                             {new Date(user.created_at).toLocaleDateString('tr-TR')}
                                         </TableCell>

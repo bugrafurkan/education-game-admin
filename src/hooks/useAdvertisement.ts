@@ -13,8 +13,15 @@ interface UseAdvertisementsReturn {
     loading: boolean;
     error: Error | null;
     refreshAdvertisements: () => Promise<void>;
-    addAdvertisement: (name: string, type: 'image' | 'video', file: File, start_date: string, end_date: string | null, grade?: string, subject?: string) => Promise<boolean>;
-    updateAdDetails: (id: number, data: { name?: string; is_active?: boolean; start_date?: string; end_date?: string | null; grade?: string; subject?: string; }) => Promise<boolean>;
+    addAdvertisement: (name: string, type: "image" | "video", file: File, start_date: string, end_date: string | null, duration: number | null, grade?: string | undefined, subject?: string | undefined) => Promise<boolean>;
+    updateAdDetails: (id: number, data: {
+        name: string;
+        start_date: string;
+        end_date: string | null;
+        grade: string | undefined;
+        subject: string | undefined;
+        duration: number | undefined
+    }) => Promise<boolean>;
     toggleAdvertisementStatus: (id: number, isActive: boolean) => Promise<boolean>;
     removeAdvertisement: (id: number) => Promise<boolean>;
     isSubmitting: boolean;
@@ -52,12 +59,13 @@ export const useAdvertisements = (): UseAdvertisementsReturn => {
         file: File,
         start_date: string,
         end_date: string | null,
-        grade?: string,
+        duration: number | null, // duration tipi burada number | null
+        grade?: string, // grade ve subject opsiyonel
         subject?: string
     ): Promise<boolean> => {
         setIsSubmitting(true);
         try {
-            const newAd = await createAdvertisement(name, type, file, start_date, end_date, grade, subject);
+            const newAd = await createAdvertisement(name, type, file, start_date, end_date, duration, grade, subject);
             setAdvertisements((prevAds) => [newAd, ...prevAds]);
             return true;
         } catch (err) {
@@ -67,6 +75,7 @@ export const useAdvertisements = (): UseAdvertisementsReturn => {
             setIsSubmitting(false);
         }
     };
+
 
     // Reklam detaylarını güncelle
     const updateAdDetails = async (

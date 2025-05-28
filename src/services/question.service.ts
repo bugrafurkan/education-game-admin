@@ -32,12 +32,14 @@ export interface Question {
     image_path?: string ;
     metadata?: Record<string, unknown>;
     user_id?: number;
+    publisher?: string;
     answers: Answer[];
     category?: Category;
     user?: {
         id: number;
         name: string;
         email: string;
+        publisher?: string;
     };
 }
 
@@ -48,6 +50,7 @@ export interface QuestionCreate {
     difficulty: 'easy' | 'medium' | 'hard';
     image_path?: string | null;
     metadata?: Record<string, unknown>;
+    publisher?: string;
     answers: Omit<Answer, 'id'>[];
 }
 

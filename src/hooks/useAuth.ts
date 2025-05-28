@@ -22,9 +22,10 @@ export const useAuth = () => {
             const data = await authService.login(email, password);
             const role = data.user?.role;
 
-            // Kullanıcı rolünü local storage'a kaydet
-            if (role) {
+            // Kullanıcı bilgilerini local storage'a kaydet
+            if (data.user) {
                 localStorage.setItem('user_role', role);
+                localStorage.setItem('user_data', JSON.stringify(data.user));
                 setUserRole(role);
             }
 
@@ -52,6 +53,7 @@ export const useAuth = () => {
             await authService.logout();
             // Kullanıcı rolünü temizle
             localStorage.removeItem('user_role');
+            localStorage.removeItem('user_data');
             setUserRole(null);
             setLoading(false);
             navigate('/login');

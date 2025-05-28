@@ -23,6 +23,7 @@ import { useEducationStructure } from '../../hooks/useEducationStructure';
 import { useCategories } from '../../hooks/useCategories';
 import * as questionService from '../../services/question.service';
 import * as gameService from '../../services/game.service';
+import * as categoryService from '../../services/category.service';
 import * as XLSX from 'xlsx';
 
 interface ExcelQuestion {
@@ -45,12 +46,20 @@ interface ImportStats {
 const ExcelSoruImport = () => {
     const navigate = useNavigate();
 
-    // Kategori seçimi
-    const [categoryId, setCategoryId] = useState<number | ''>('');
+    // Manuel seçim alanları
     const [gradeId, setGradeId] = useState<number | ''>('');
     const [subjectId, setSubjectId] = useState<number | ''>('');
     const [unitId, setUnitId] = useState<number | ''>('');
     const [topicId, setTopicId] = useState<number | ''>('');
+
+    // Kategori durumu
+    const [categoryId, setCategoryId] = useState<number | ''>('');
+    const [categoryExists, setCategoryExists] = useState<boolean>(false);
+    const [creatingCategory, setCreatingCategory] = useState<boolean>(false);
+
+    // Filtrelenmiş listeler
+    const [filteredUnits, setFilteredUnits] = useState<any[]>([]);
+    const [filteredTopics, setFilteredTopics] = useState<any[]>([]);
 
     // Soru tipi seçimi
     const [questionType, setQuestionType] = useState<'true_false' | 'text'>('true_false');
@@ -78,9 +87,69 @@ const ExcelSoruImport = () => {
 
     // Eğitim yapısı verilerini yükle
     const { grades, subjects, units, topics } = useEducationStructure();
-    const { categories } = useCategories();
+    const { categories, refreshCategories } = useCategories();
 
-    // Kategori değişikliğini takip et
+    // Grade ve Subject değiştiğinde ilgili üniteleri filtrele
+    useEffect(() => {
+        if (gradeId && subjectId) {
+            const filtered = units.filter(
+                unit => unit.grade_id === gradeId && unit.subject_id === subjectId
+            );
+            setFilteredUnits(filtered);
+
+            // Eğer seçili ünite bu filtrelere uygun değilse, seçimi sıfırla
+            if (unitId && !filtered.some(unit => unit.id === unitId)) {
+                setUnitId('');
+                setTopicId('');
+            }
+        } else {
+            setFilteredUnits([]);
+            setUnitId('');
+            setTopicId('');
+        }
+    }, [gradeId, subjectId, units, unitId]);
+
+    // Unit değiştiğinde ilgili konuları filtrele
+    useEffect(() => {
+        if (unitId) {
+            const filtered = topics.filter(topic => topic.unit_id === unitId);
+            setFilteredTopics(filtered);
+
+            // Eğer seçili konu bu filtreye uygun değilse, seçimi sıfırla
+            if (topicId && !filtered.some(topic => topic.id === topicId)) {
+                setTopicId('');
+            }
+        } else {
+            setFilteredTopics([]);
+            setTopicId('');
+        }
+    }, [unitId, topics, topicId]);
+
+    // Seçilen kombinasyona göre kategori durumunu kontrol et
+    useEffect(() => {
+        // Kategori kontrolü için tüm 4 alan gerekli: gradeId, subjectId, unitId, topicId
+        if (gradeId && subjectId && unitId && topicId) {
+            const matchingCategory = categories.find(category =>
+                category.grade_id === gradeId &&
+                category.subject_id === subjectId &&
+                category.unit_id === unitId &&
+                category.topic_id === topicId
+            );
+
+            if (matchingCategory) {
+                setCategoryExists(true);
+                setCategoryId(matchingCategory.id);
+            } else {
+                setCategoryExists(false);
+                setCategoryId('');
+            }
+        } else {
+            setCategoryExists(false);
+            setCategoryId('');
+        }
+    }, [gradeId, subjectId, unitId, topicId, categories]);
+
+    // Kategori değişikliğini takip et - artık kullanılmıyor
     useEffect(() => {
         if (categoryId) {
             const selectedCategory = categories.find(c => c.id === categoryId);
@@ -278,7 +347,6 @@ const ExcelSoruImport = () => {
         reader.readAsBinaryString(file);
     };
 
-    // Soruları kaydet
     // Soruları kaydet ve tüm oyunlara ekle
     const handleSaveQuestions = async () => {
         if (!categoryId) {
@@ -458,7 +526,7 @@ const ExcelSoruImport = () => {
     };
 
     // Kategorinin seçili olup olmadığını kontrol et
-    const isCategorySelected = categoryId !== '';
+    const isCategorySelected = categoryExists;
 
     // Yardım diyaloğunu aç
     const handleOpenHelpDialog = () => {
@@ -472,6 +540,74 @@ const ExcelSoruImport = () => {
 
     const handleCategoryChange = (event: SelectChangeEvent<number | string>) => {
         setCategoryId(event.target.value as number);
+    };
+
+    // Form alanları için handle fonksiyonları
+    const handleGradeChange = (event: SelectChangeEvent<number | ''>) => {
+        setGradeId(event.target.value as number | '');
+    };
+
+    const handleSubjectChange = (event: SelectChangeEvent<number | ''>) => {
+        setSubjectId(event.target.value as number | '');
+    };
+
+    const handleUnitChange = (event: SelectChangeEvent<number | ''>) => {
+        setUnitId(event.target.value as number | '');
+    };
+
+    const handleTopicChange = (event: SelectChangeEvent<number | ''>) => {
+        setTopicId(event.target.value as number | '');
+    };
+
+    // Kategori adını oluştur
+    const generateCategoryName = (): string => {
+        const gradeName = grades.find(g => g.id === gradeId)?.name || '';
+        const subjectName = subjects.find(s => s.id === subjectId)?.name || '';
+        const unitName = unitId ? units.find(u => u.id === unitId)?.name : '';
+        const topicName = topicId ? topics.find(t => t.id === topicId)?.name : '';
+
+        let categoryName = `${gradeName} - ${subjectName}`;
+        if (unitName) categoryName += ` - ${unitName}`;
+        if (topicName) categoryName += ` - ${topicName}`;
+
+        return categoryName;
+    };
+
+    // Yeni kategori oluştur
+    const handleCreateCategory = async () => {
+        if (!gradeId || !subjectId || !unitId || !topicId) {
+            setGlobalError('Sınıf, ders, ünite ve konu seçimi zorunludur.');
+            return;
+        }
+
+        setCreatingCategory(true);
+        setGlobalError(null);
+
+        try {
+            const categoryData: categoryService.CategoryCreate = {
+                name: generateCategoryName(),
+                grade_id: gradeId as number,
+                subject_id: subjectId as number,
+                unit_id: unitId as number,
+                topic_id: topicId as number
+            };
+
+            const newCategory = await categoryService.createCategory(categoryData);
+
+            // Kategorileri yenile
+            await refreshCategories();
+
+            // Yeni kategoriyi seç
+            setCategoryId(newCategory.id);
+            setCategoryExists(true);
+
+            setGlobalError(null);
+        } catch (err) {
+            console.error('Error creating category:', err);
+            setGlobalError('Kategori oluşturulurken bir hata oluştu.');
+        } finally {
+            setCreatingCategory(false);
+        }
     };
 
     const handleQuestionTypeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -496,22 +632,109 @@ const ExcelSoruImport = () => {
                     Kategori ve Soru Tipi Seçimi
                 </Typography>
 
-                <FormControl fullWidth required sx={{ mb: 3, maxWidth: 400 }}>
-                    <InputLabel>Kategori</InputLabel>
-                    <Select
-                        value={categoryId}
-                        label="Kategori"
-                        onChange={handleCategoryChange}
-                        required
+                <Typography variant="subtitle1" gutterBottom>
+                    Kategori Seçimi
+                </Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'end', mb: 3 }}>
+                    <FormControl fullWidth required sx={{ mb: 2, maxWidth: 200 }}>
+                        <InputLabel>Sınıf</InputLabel>
+                        <Select
+                            value={gradeId}
+                            label="Sınıf"
+                            onChange={handleGradeChange}
+                            required
+                        >
+                            <MenuItem value="" disabled>Sınıf Seçin</MenuItem>
+                            {grades.map((grade) => (
+                                <MenuItem key={grade.id} value={grade.id}>
+                                    {grade.name}
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
+
+                    <FormControl fullWidth required sx={{ mb: 2, maxWidth: 200 }}>
+                        <InputLabel>Ders</InputLabel>
+                        <Select
+                            value={subjectId}
+                            label="Ders"
+                            onChange={handleSubjectChange}
+                            required
+                        >
+                            <MenuItem value="" disabled>Ders Seçin</MenuItem>
+                            {subjects.map((subject) => (
+                                <MenuItem key={subject.id} value={subject.id}>
+                                    {subject.name}
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
+
+                    <FormControl fullWidth sx={{ mb: 2, maxWidth: 200 }}>
+                        <InputLabel>Ünite</InputLabel>
+                        <Select
+                            value={unitId}
+                            label="Ünite"
+                            onChange={handleUnitChange}
+                            disabled={!gradeId || !subjectId || filteredUnits.length === 0}
+                        >
+                            <MenuItem value="">Ünite Seçin</MenuItem>
+                            {filteredUnits.map((unit) => (
+                                <MenuItem key={unit.id} value={unit.id}>
+                                    {unit.name}
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
+
+                    <FormControl fullWidth sx={{ mb: 2, maxWidth: 200 }}>
+                        <InputLabel>Konu</InputLabel>
+                        <Select
+                            value={topicId}
+                            label="Konu"
+                            onChange={handleTopicChange}
+                            disabled={!unitId || filteredTopics.length === 0}
+                        >
+                            <MenuItem value="">Konu Seçin</MenuItem>
+                            {filteredTopics.map((topic) => (
+                                <MenuItem key={topic.id} value={topic.id}>
+                                    {topic.name}
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
+
+                    {gradeId && subjectId && unitId && topicId && !categoryExists && (
+                        <Button
+                            variant="contained"
+                            color="secondary"
+                            onClick={handleCreateCategory}
+                            disabled={creatingCategory}
+                            sx={{ mb: 2, height: 'fit-content' }}
+                        >
+                            {creatingCategory ? (
+                                <>
+                                    <CircularProgress size={20} sx={{ mr: 1 }} />
+                                    Oluşturuluyor...
+                                </>
+                            ) : (
+                                'Kategoriyi Ekle'
+                            )}
+                        </Button>
+                    )}
+                </Box>
+
+                {gradeId && subjectId && unitId && topicId && (
+                    <Alert
+                        severity={categoryExists ? "success" : "info"}
+                        sx={{ mb: 3 }}
                     >
-                        <MenuItem value="" disabled>Kategori Seçin</MenuItem>
-                        {categories.map((category) => (
-                            <MenuItem key={category.id} value={category.id}>
-                                {category.name}
-                            </MenuItem>
-                        ))}
-                    </Select>
-                </FormControl>
+                        {categoryExists
+                            ? `Kategori mevcut: ${generateCategoryName()}`
+                            : `Bu kombinasyon için kategori bulunamadı: ${generateCategoryName()}`
+                        }
+                    </Alert>
+                )}
 
                 <FormControl component="fieldset" sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 3 }}>
                     <Typography variant="subtitle1" gutterBottom>
@@ -534,52 +757,6 @@ const ExcelSoruImport = () => {
                         />
                     </RadioGroup>
                 </FormControl>
-
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 3 }}>
-                    <FormControl sx={{ minWidth: 150 }} disabled>
-                        <InputLabel>Sınıf</InputLabel>
-                        <Select value={gradeId} label="Sınıf">
-                            {grades.map((grade) => (
-                                <MenuItem key={grade.id} value={grade.id}>
-                                    {grade.name}
-                                </MenuItem>
-                            ))}
-                        </Select>
-                    </FormControl>
-
-                    <FormControl sx={{ minWidth: 150 }} disabled>
-                        <InputLabel>Ders</InputLabel>
-                        <Select value={subjectId} label="Ders">
-                            {subjects.map((subject) => (
-                                <MenuItem key={subject.id} value={subject.id}>
-                                    {subject.name}
-                                </MenuItem>
-                            ))}
-                        </Select>
-                    </FormControl>
-
-                    <FormControl sx={{ minWidth: 150 }} disabled>
-                        <InputLabel>Ünite</InputLabel>
-                        <Select value={unitId} label="Ünite">
-                            {units.map((unit) => (
-                                <MenuItem key={unit.id} value={unit.id}>
-                                    {unit.name}
-                                </MenuItem>
-                            ))}
-                        </Select>
-                    </FormControl>
-
-                    <FormControl sx={{ minWidth: 150 }} disabled>
-                        <InputLabel>Konu</InputLabel>
-                        <Select value={topicId} label="Konu">
-                            {topics.map((topic) => (
-                                <MenuItem key={topic.id} value={topic.id}>
-                                    {topic.name}
-                                </MenuItem>
-                            ))}
-                        </Select>
-                    </FormControl>
-                </Box>
 
                 <Box sx={{ mb: 3 }}>
                     <Chip

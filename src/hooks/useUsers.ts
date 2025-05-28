@@ -1,16 +1,10 @@
 // src/hooks/useUsers.ts
 import { useEffect, useState } from 'react';
 import * as userService from '../services/user.service';
-
-export interface UserFormData {
-    name: string;
-    email: string;
-    password?: string;
-    role: string;
-}
+import { User, UserFormData } from '../types/user';
 
 export const useUsers = () => {
-    const [users, setUsers] = useState<any[]>([]);
+    const [users, setUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
 

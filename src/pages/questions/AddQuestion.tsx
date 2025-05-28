@@ -5,11 +5,14 @@ import {
     Box, Typography, Paper, Stepper, Step, StepLabel, Button,
     Grid, FormControl, FormLabel, RadioGroup, FormControlLabel, Radio,
     TextField, Divider, Alert, MenuItem, Select, SelectChangeEvent,
-    CircularProgress, InputLabel
+    CircularProgress, InputLabel, Autocomplete
 } from '@mui/material';
 import { useEducationStructure } from '../../hooks/useEducationStructure';
+import { usePublishers } from '../../hooks/usePublishers';
 import * as questionService from '../../services/question.service';
 import * as gameService from '../../services/game.service';
+import * as categoryService from '../../services/category.service';
+import * as userService from '../../services/user.service';
 import axios, { AxiosError } from 'axios';
 import { useCategories } from '../../hooks/useCategories';
 import ImageUploader from '../../components/ImageUploader';
@@ -48,19 +51,31 @@ const AddQuestion = () => {
     const [error, setError] = useState<string | null>(null);
     const { grades, subjects, units, topics } = useEducationStructure();
     // Kategorileri yükle
-    const { categories } = useCategories();
+    const { categories, refreshCategories } = useCategories();
+    // Yayınevlerini yükle
+    const { publishers } = usePublishers();
 
     // Form verileri
     const [questionType, setQuestionType] = useState<string>('');
     const [questionText, setQuestionText] = useState('');
     const [difficulty, setDifficulty] = useState('medium');
-    const [categoryId, setCategoryId] = useState<number | ''>('');
+    const [publisherId, setPublisherId] = useState<string>('');
+    const [publisherLoaded, setPublisherLoaded] = useState<boolean>(false); // Publisher yüklenip yüklenmediğini takip et
 
-    // Kategori seçimi için state'ler
+    // Manuel seçim alanları
     const [gradeId, setGradeId] = useState<number | ''>('');
     const [subjectId, setSubjectId] = useState<number | ''>('');
     const [unitId, setUnitId] = useState<number | ''>('');
     const [topicId, setTopicId] = useState<number | ''>('');
+
+    // Kategori durumu
+    const [categoryId, setCategoryId] = useState<number | ''>('');
+    const [categoryExists, setCategoryExists] = useState<boolean>(false);
+    const [creatingCategory, setCreatingCategory] = useState<boolean>(false);
+
+    // Filtrelenmiş listeler
+    const [filteredUnits, setFilteredUnits] = useState<any[]>([]);
+    const [filteredTopics, setFilteredTopics] = useState<any[]>([]);
 
     // Resim yükleme için state'ler
     const [imagePath, setImagePath] = useState<string | null>(null);
@@ -76,29 +91,103 @@ const AddQuestion = () => {
         { id: 'D', text: '', isCorrect: false }
     ]);
 
-    // Kategori değiştiğinde ilgili bilgileri otomatik doldur
+    // Grade ve Subject değiştiğinde ilgili üniteleri filtrele
     useEffect(() => {
-        if (categoryId) {
-            const selectedCategory = categories.find(c => c.id === categoryId);
-            if (selectedCategory) {
-                setGradeId(selectedCategory.grade_id);
-                setSubjectId(selectedCategory.subject_id);
-                setUnitId(selectedCategory.unit_id ?? '');
-                setTopicId(selectedCategory.topic_id ?? '');
+        if (gradeId && subjectId) {
+            const filtered = units.filter(
+                unit => unit.grade_id === gradeId && unit.subject_id === subjectId
+            );
+            setFilteredUnits(filtered);
+
+            // Eğer seçili ünite bu filtrelere uygun değilse, seçimi sıfırla
+            if (unitId && !filtered.some(unit => unit.id === unitId)) {
+                setUnitId('');
+                setTopicId('');
             }
         } else {
-            // Kategori seçilmediğinde alanları temizle
-            setGradeId('');
-            setSubjectId('');
+            setFilteredUnits([]);
             setUnitId('');
             setTopicId('');
         }
-    }, [categoryId, categories]);
+    }, [gradeId, subjectId, units, unitId]);
+
+    // Unit değiştiğinde ilgili konuları filtrele
+    useEffect(() => {
+        if (unitId) {
+            const filtered = topics.filter(topic => topic.unit_id === unitId);
+            setFilteredTopics(filtered);
+
+            // Eğer seçili konu bu filtreye uygun değilse, seçimi sıfırla
+            if (topicId && !filtered.some(topic => topic.id === topicId)) {
+                setTopicId('');
+            }
+        } else {
+            setFilteredTopics([]);
+            setTopicId('');
+        }
+    }, [unitId, topics, topicId]);
+
+    // Seçilen kombinasyona göre kategori durumunu kontrol et
+    useEffect(() => {
+        // Kategori kontrolü için tüm 4 alan gerekli: gradeId, subjectId, unitId, topicId
+        if (gradeId && subjectId && unitId && topicId) {
+            const matchingCategory = categories.find(category =>
+                category.grade_id === gradeId &&
+                category.subject_id === subjectId &&
+                category.unit_id === unitId &&
+                category.topic_id === topicId
+            );
+
+            if (matchingCategory) {
+                setCategoryExists(true);
+                setCategoryId(matchingCategory.id);
+            } else {
+                setCategoryExists(false);
+                setCategoryId('');
+            }
+        } else {
+            setCategoryExists(false);
+            setCategoryId('');
+        }
+    }, [gradeId, subjectId, unitId, topicId, categories]);
+
+    // Current user'ı yükle ve default publisher'ı set et
+    useEffect(() => {
+        const fetchCurrentUser = async () => {
+            if (!publisherLoaded) { // Sadece ilk yüklemede publisher set et
+                try {
+                    // API'den güncel user bilgisini al
+                    const user = await userService.getCurrentUser();
+                    if (user.publisher) {
+                        setPublisherId(user.publisher);
+                    }
+                } catch (error) {
+                    // Hata durumunda localStorage'dan al
+                    try {
+                        const userData = localStorage.getItem('user_data');
+                        if (userData) {
+                            const user = JSON.parse(userData);
+                            if (user.publisher) {
+                                setPublisherId(user.publisher);
+                            }
+                        }
+                    } catch (fallbackError) {
+                        // Silent fail
+                    }
+                }
+                setPublisherLoaded(true); // Publisher yüklendiğini işaretle
+            }
+        };
+
+        if (!isEdit) { // Sadece yeni soru ekleme modunda
+            fetchCurrentUser();
+        }
+    }, [isEdit, publisherLoaded]);
 
     // Düzenleme durumunda soruyu yükle
     useEffect(() => {
         const fetchQuestion = async () => {
-            if (isEdit && questionId) {
+            if (isEdit && questionId && categories.length > 0) {
                 try {
                     setLoading(true);
                     const question = await questionService.getQuestion(questionId);
@@ -108,6 +197,47 @@ const AddQuestion = () => {
                     setQuestionText(question.question_text);
                     setDifficulty(question.difficulty);
                     setCategoryId(question.category_id);
+
+                    // Publisher bilgisini yükle
+                    // Edit modunda öncelik sırası:
+                    // 1. question.publisher (backend'den gelen)
+                    // 2. question.user.publisher (soruyu oluşturan kullanıcının publisher'ı)
+                    // 3. Sadece ilk yüklemede localStorage'dan current user'ın publisher'ı
+                    
+                    if (!publisherLoaded) { // Sadece ilk yüklemede publisher set et
+                        let publisherToSet = '';
+                        
+                        if (question.publisher) {
+                            publisherToSet = question.publisher;
+                        } else if (question.user && question.user.publisher) {
+                            publisherToSet = question.user.publisher;
+                        } else {
+                            // Backend'den publisher bilgisi gelmiyorsa localStorage'dan yükle
+                            try {
+                                const user = await userService.getCurrentUser();
+                                if (user.publisher) {
+                                    publisherToSet = user.publisher;
+                                }
+                            } catch (error) {
+                                // Silent fail
+                            }
+                        }
+                        
+                        if (publisherToSet) {
+                            setPublisherId(publisherToSet);
+                        }
+                        setPublisherLoaded(true); // Publisher yüklendiğini işaretle
+                    }
+
+                    // Kategori bilgilerinden sınıf, ders, ünite, konu bilgilerini doldur
+                    const selectedCategory = categories.find(c => c.id === question.category_id);
+                    if (selectedCategory) {
+                        setGradeId(selectedCategory.grade_id);
+                        setSubjectId(selectedCategory.subject_id);
+                        setUnitId(selectedCategory.unit_id ?? '');
+                        setTopicId(selectedCategory.topic_id ?? '');
+                        setCategoryExists(true);
+                    }
 
                     // Resim yolunu ayarla
                     if (question.image_path) {
@@ -142,10 +272,8 @@ const AddQuestion = () => {
                     if (axios.isAxiosError(error)) {
                         const axiosError = error as AxiosError<ApiErrorResponse>;
                         setError(axiosError.response?.data?.message || 'Soru yüklenirken bir hata oluştu');
-                        console.error('Error fetching question:', axiosError.response?.data);
                     } else {
                         setError('Soru yüklenirken beklenmeyen bir hata oluştu');
-                        console.error('Unexpected error:', error);
                     }
                     setLoading(false);
                 }
@@ -153,7 +281,7 @@ const AddQuestion = () => {
         };
 
         fetchQuestion();
-    }, [isEdit, questionId]);
+    }, [isEdit, questionId, categories]);
 
     // Adım kontrolü
     const handleNext = () => {
@@ -177,6 +305,23 @@ const AddQuestion = () => {
     // Kategori değiştir
     const handleCategoryChange = (event: SelectChangeEvent<number | ''>) => {
         setCategoryId(event.target.value as number | '');
+    };
+
+    // Form alanları için handle fonksiyonları
+    const handleGradeChange = (event: SelectChangeEvent<number | ''>) => {
+        setGradeId(event.target.value as number | '');
+    };
+
+    const handleSubjectChange = (event: SelectChangeEvent<number | ''>) => {
+        setSubjectId(event.target.value as number | '');
+    };
+
+    const handleUnitChange = (event: SelectChangeEvent<number | ''>) => {
+        setUnitId(event.target.value as number | '');
+    };
+
+    const handleTopicChange = (event: SelectChangeEvent<number | ''>) => {
+        setTopicId(event.target.value as number | '');
     };
 
     // Doğru/Yanlış değiştir
@@ -203,79 +348,53 @@ const AddQuestion = () => {
         setImagePath(path);
     };
 
-    // Formu gönder - Tüm oyunlara otomatik soru ekleme ile güncellenmiş
-    const handleSubmit = async () => {
+    // Kategori adını oluştur
+    const generateCategoryName = (): string => {
+        const gradeName = grades.find(g => g.id === gradeId)?.name || '';
+        const subjectName = subjects.find(s => s.id === subjectId)?.name || '';
+        const unitName = unitId ? units.find(u => u.id === unitId)?.name : '';
+        const topicName = topicId ? topics.find(t => t.id === topicId)?.name : '';
+
+        let categoryName = `${gradeName} - ${subjectName}`;
+        if (unitName) categoryName += ` - ${unitName}`;
+        if (topicName) categoryName += ` - ${topicName}`;
+
+        return categoryName;
+    };
+
+    // Yeni kategori oluştur
+    const handleCreateCategory = async () => {
+        if (!gradeId || !subjectId || !unitId || !topicId) {
+            setError('Sınıf, ders, ünite ve konu seçimi zorunludur.');
+            return;
+        }
+
+        setCreatingCategory(true);
+        setError(null);
+
         try {
-            setLoading(true);
-            setError(null);
-
-            // Kategori ID kontrol et
-            if (!categoryId) {
-                setError('Lütfen geçerli bir kategori seçin');
-                setLoading(false);
-                return;
-            }
-
-            // Soru tipine göre cevapları hazırla
-            const answers = getAnswersBasedOnType();
-
-            // QuestionCreate için veri oluştur
-            const questionData: questionService.QuestionCreate = {
-                category_id: categoryId as number,
-                question_text: questionText,
-                question_type: questionType as 'multiple_choice' | 'true_false' | 'qa',
-                difficulty: difficulty as 'easy' | 'medium' | 'hard',
-                answers,
-                image_path: imagePath
+            const categoryData: categoryService.CategoryCreate = {
+                name: generateCategoryName(),
+                grade_id: gradeId as number,
+                subject_id: subjectId as number,
+                unit_id: unitId as number,
+                topic_id: topicId as number
             };
 
-            console.log("Gönderilen veri:", questionData);
+            const newCategory = await categoryService.createCategory(categoryData);
 
-            let question;
+            // Kategorileri yenile
+            await refreshCategories();
 
-            // Yeni soru mu, düzenleme mi?
-            if (isEdit && questionId) {
-                question = await questionService.updateQuestion(questionId, questionData);
-            } else {
-                question = await questionService.createQuestion(questionData);
-            }
+            // Yeni kategoriyi seç
+            setCategoryId(newCategory.id);
+            setCategoryExists(true);
 
-            // Soru başarıyla oluşturuldu/güncellendi, şimdi tüm oyunlara ekleyelim
-            if (question && !isEdit) { // Sadece yeni soru ekleme durumunda oyunlara ekle
-                try {
-                    // Tüm oyunları getir
-                    const gamesResponse = await gameService.getGames(1);
-                    const games = gamesResponse.data;
-
-                    // Her oyuna soruyu ekle
-                    for (const game of games) {
-                        await gameService.addQuestionToGame(game.id, {
-                            question_id: question.id,
-                            points: 100 // Varsayılan puan
-                        });
-                    }
-
-                    console.log(`Soru ${games.length} oyuna başarıyla eklendi`);
-                } catch (error) {
-                    console.error('Soru oyunlara eklenirken hata oluştu:', error);
-                    // Oyunlara ekleme hatası oluşsa bile kullanıcıya gösterme, çünkü soru zaten başarıyla oluşturuldu
-                }
-            }
-
-            // Kullanıcıya herhangi bir bildirim göstermeden doğrudan soru listesine yönlendir
-            navigate('/questions');
-
-        } catch (error) {
-            if (axios.isAxiosError(error)) {
-                const axiosError = error as AxiosError<ApiErrorResponse>;
-                setError(axiosError.response?.data?.message || (isEdit ? 'Soru güncellenirken bir hata oluştu' : 'Soru eklenirken bir hata oluştu'));
-                console.error('Error submitting question:', axiosError.response?.data);
-            } else {
-                setError(isEdit ? 'Soru güncellenirken beklenmeyen bir hata oluştu' : 'Soru eklenirken beklenmeyen bir hata oluştu');
-                console.error('Unexpected error:', error);
-            }
+            setError(null);
+        } catch (err) {
+            setError('Kategori oluşturulurken bir hata oluştu.');
         } finally {
-            setLoading(false);
+            setCreatingCategory(false);
         }
     };
 
@@ -299,6 +418,80 @@ const AddQuestion = () => {
         }
     };
 
+    // Formu gönder - Tüm oyunlara otomatik soru ekleme ile güncellenmiş
+    const handleSubmit = async () => {
+        try {
+            setLoading(true);
+            setError(null);
+
+            // Kategori ID kontrol et
+            if (!categoryId) {
+                setError('Lütfen geçerli bir kategori seçin');
+                setLoading(false);
+                return;
+            }
+
+            // Soru tipine göre cevapları hazırla
+            const answers = getAnswersBasedOnType();
+
+            // QuestionCreate için veri oluştur
+            const questionData: questionService.QuestionCreate = {
+                category_id: categoryId as number,
+                question_text: questionText,
+                question_type: questionType as 'multiple_choice' | 'true_false' | 'qa',
+                difficulty: difficulty as 'easy' | 'medium' | 'hard',
+                answers,
+                image_path: imagePath,
+                publisher: publisherId
+            };
+
+            let savedQuestion;
+
+            // Yeni soru mu, düzenleme mi?
+            if (isEdit && questionId) {
+                savedQuestion = await questionService.updateQuestion(questionId, questionData);
+            } else {
+                savedQuestion = await questionService.createQuestion(questionData);
+            }
+
+            // Soru başarıyla oluşturuldu/güncellendi, şimdi tüm oyunlara ekleyelim
+            if (savedQuestion && !isEdit) { // Sadece yeni soru ekleme durumunda oyunlara ekle
+                try {
+                    // Tüm oyunları getir
+                    const gamesResponse = await gameService.getGames(1);
+                    const games = gamesResponse.data;
+
+                    // Her oyuna soruyu ekle
+                    for (const game of games) {
+                        try {
+                            await gameService.addQuestionToGame(game.id, {
+                                question_id: savedQuestion.id,
+                                points: 100 // Varsayılan puan
+                            });
+                        } catch (error) {
+                            // Oyuna ekleme hatası genel akışı etkilemesin
+                        }
+                    }
+                } catch (error) {
+                    // Oyunlara ekleme hatası genel akışı etkilemesin
+                }
+            }
+
+            // Kullanıcıya herhangi bir bildirim göstermeden doğrudan soru listesine yönlendir
+            navigate('/questions');
+
+        } catch (error) {
+            if (axios.isAxiosError(error)) {
+                const axiosError = error as AxiosError<ApiErrorResponse>;
+                setError(axiosError.response?.data?.message || (isEdit ? 'Soru güncellenirken bir hata oluştu' : 'Soru eklenirken bir hata oluştu'));
+            } else {
+                setError(isEdit ? 'Soru güncellenirken beklenmeyen bir hata oluştu' : 'Soru eklenirken beklenmeyen bir hata oluştu');
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
     // İlk adım geçerli mi
     const isFirstStepValid = () => {
         return questionType !== '';
@@ -306,7 +499,7 @@ const AddQuestion = () => {
 
     // İkinci adım geçerli mi
     const isSecondStepValid = () => {
-        if (!questionText || !categoryId) return false;
+        if (!questionText || (!isEdit && !categoryExists) || !publisherId) return false;
 
         switch (questionType) {
             case 'multiple_choice':
@@ -393,90 +586,143 @@ const AddQuestion = () => {
                                 )}
                             </Grid>
 
-                            {/* Kategori Seçimi - edit modunda disabled */}
+                            {/* Kategori Seçimi - Manuel seçim ve oluşturma */}
                             <Grid item xs={12}>
-                                <FormControl fullWidth required>
-                                    <InputLabel>Kategori</InputLabel>
-                                    <Select
-                                        value={categoryId}
-                                        label="Kategori"
-                                        onChange={handleCategoryChange}
-                                        required
-                                        disabled={isEdit} // Edit modunda değiştirilemesin
+                                <Typography variant="subtitle1" gutterBottom>
+                                    Kategori Seçimi
+                                </Typography>
+                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'end' }}>
+                                    <FormControl fullWidth required sx={{ mb: 2, maxWidth: 200 }}>
+                                        <InputLabel>Sınıf</InputLabel>
+                                        <Select
+                                            value={gradeId}
+                                            label="Sınıf"
+                                            onChange={handleGradeChange}
+                                            required
+                                            disabled={isEdit}
+                                        >
+                                            <MenuItem value="" disabled>Sınıf Seçin</MenuItem>
+                                            {grades.map((grade) => (
+                                                <MenuItem key={grade.id} value={grade.id}>
+                                                    {grade.name}
+                                                </MenuItem>
+                                            ))}
+                                        </Select>
+                                    </FormControl>
+
+                                    <FormControl fullWidth required sx={{ mb: 2, maxWidth: 200 }}>
+                                        <InputLabel>Ders</InputLabel>
+                                        <Select
+                                            value={subjectId}
+                                            label="Ders"
+                                            onChange={handleSubjectChange}
+                                            required
+                                            disabled={isEdit}
+                                        >
+                                            <MenuItem value="" disabled>Ders Seçin</MenuItem>
+                                            {subjects.map((subject) => (
+                                                <MenuItem key={subject.id} value={subject.id}>
+                                                    {subject.name}
+                                                </MenuItem>
+                                            ))}
+                                        </Select>
+                                    </FormControl>
+
+                                    <FormControl fullWidth sx={{ mb: 2, maxWidth: 200 }}>
+                                        <InputLabel>Ünite</InputLabel>
+                                        <Select
+                                            value={unitId}
+                                            label="Ünite"
+                                            onChange={handleUnitChange}
+                                            disabled={isEdit || !gradeId || !subjectId || filteredUnits.length === 0}
+                                        >
+                                            <MenuItem value="">Ünite Seçin</MenuItem>
+                                            {filteredUnits.map((unit) => (
+                                                <MenuItem key={unit.id} value={unit.id}>
+                                                    {unit.name}
+                                                </MenuItem>
+                                            ))}
+                                        </Select>
+                                    </FormControl>
+
+                                    <FormControl fullWidth sx={{ mb: 2, maxWidth: 200 }}>
+                                        <InputLabel>Konu</InputLabel>
+                                        <Select
+                                            value={topicId}
+                                            label="Konu"
+                                            onChange={handleTopicChange}
+                                            disabled={isEdit || !unitId || filteredTopics.length === 0}
+                                        >
+                                            <MenuItem value="">Konu Seçin</MenuItem>
+                                            {filteredTopics.map((topic) => (
+                                                <MenuItem key={topic.id} value={topic.id}>
+                                                    {topic.name}
+                                                </MenuItem>
+                                            ))}
+                                        </Select>
+                                    </FormControl>
+
+                                    {gradeId && subjectId && unitId && topicId && !categoryExists && !isEdit && (
+                                        <Button
+                                            variant="contained"
+                                            color="secondary"
+                                            onClick={handleCreateCategory}
+                                            disabled={creatingCategory}
+                                            sx={{ mb: 2, height: 'fit-content' }}
+                                        >
+                                            {creatingCategory ? (
+                                                <>
+                                                    <CircularProgress size={20} sx={{ mr: 1 }} />
+                                                    Oluşturuluyor...
+                                                </>
+                                            ) : (
+                                                'Kategoriyi Ekle'
+                                            )}
+                                        </Button>
+                                    )}
+                                </Box>
+
+                                {gradeId && subjectId && unitId && topicId && !isEdit && (
+                                    <Alert
+                                        severity={categoryExists ? "success" : "info"}
+                                        sx={{ mt: 2 }}
                                     >
-                                        <MenuItem value="" disabled>Kategori Seçin</MenuItem>
-                                        {categories.map((category) => (
-                                            <MenuItem key={category.id} value={category.id}>
-                                                {category.name}
-                                            </MenuItem>
-                                        ))}
-                                    </Select>
-                                </FormControl>
+                                        {categoryExists
+                                            ? `Kategori mevcut: ${generateCategoryName()}`
+                                            : `Bu kombinasyon için kategori bulunamadı: ${generateCategoryName()}`
+                                        }
+                                    </Alert>
+                                )}
+
+                                {/* Edit modunda kategori bilgilerini göster */}
+                                {isEdit && gradeId && subjectId && (
+                                    <Alert severity="info" sx={{ mt: 2 }}>
+                                        Kategori: {generateCategoryName()}
+                                    </Alert>
+                                )}
                             </Grid>
 
-                            {/* Otomatik doldurulan ve seçilemeyen alanlar */}
-                            <Grid item xs={12} sm={6} md={3}>
-                                <FormControl fullWidth disabled>
-                                    <InputLabel>Sınıf</InputLabel>
-                                    <Select
-                                        value={gradeId}
-                                        label="Sınıf"
-                                    >
-                                        {grades.map((grade) => (
-                                            <MenuItem key={grade.id} value={grade.id}>
-                                                {grade.name}
-                                            </MenuItem>
-                                        ))}
-                                    </Select>
-                                </FormControl>
-                            </Grid>
-
-                            <Grid item xs={12} sm={6} md={3}>
-                                <FormControl fullWidth disabled>
-                                    <InputLabel>Ders</InputLabel>
-                                    <Select
-                                        value={subjectId}
-                                        label="Ders"
-                                    >
-                                        {subjects.map((subject) => (
-                                            <MenuItem key={subject.id} value={subject.id}>
-                                                {subject.name}
-                                            </MenuItem>
-                                        ))}
-                                    </Select>
-                                </FormControl>
-                            </Grid>
-
-                            <Grid item xs={12} sm={6} md={3}>
-                                <FormControl fullWidth disabled>
-                                    <InputLabel>Ünite</InputLabel>
-                                    <Select
-                                        value={unitId}
-                                        label="Ünite"
-                                    >
-                                        {units.map((unit) => (
-                                            <MenuItem key={unit.id} value={unit.id}>
-                                                {unit.name}
-                                            </MenuItem>
-                                        ))}
-                                    </Select>
-                                </FormControl>
-                            </Grid>
-
-                            <Grid item xs={12} sm={6} md={3}>
-                                <FormControl fullWidth disabled>
-                                    <InputLabel>Konu</InputLabel>
-                                    <Select
-                                        value={topicId}
-                                        label="Konu"
-                                    >
-                                        {topics.map((topic) => (
-                                            <MenuItem key={topic.id} value={topic.id}>
-                                                {topic.name}
-                                            </MenuItem>
-                                        ))}
-                                    </Select>
-                                </FormControl>
+                            {/* Yayınevi Seçimi */}
+                            <Grid item xs={12} sm={6}>
+                                <Autocomplete
+                                    freeSolo
+                                    options={publishers.map(p => p.publisher)}
+                                    value={publisherId}
+                                    onChange={(event, newValue) => {
+                                        setPublisherId(newValue || '');
+                                    }}
+                                    onInputChange={(event, newInputValue) => {
+                                        setPublisherId(newInputValue);
+                                    }}
+                                    renderInput={(params) => (
+                                        <TextField
+                                            {...params}
+                                            label="Yayınevi"
+                                            required
+                                            helperText="Mevcut yayınevi seçin veya yeni yayınevi yazın"
+                                        />
+                                    )}
+                                />
                             </Grid>
 
                             <Grid item xs={12} sm={6}>

@@ -1,8 +1,8 @@
 // src/services/api.ts
 import axios from 'axios';
 
-// API temel URL'si
-const API_URL = 'https://etkinlik.app/api';
+// API temel URL'si - geliştirme ortamında proxy kullan
+const API_URL = import.meta.env.DEV ? '/api' : 'https://etkinlik.app/api';
 
 // axios örneğini oluştur
 const api = axios.create({

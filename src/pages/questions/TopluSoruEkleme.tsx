@@ -630,7 +630,7 @@ const TopluSoruEkleme = () => {
                             </Select>
                         </FormControl>
 
-                        <FormControl sx={{ mb: 2, maxWidth: 200 }}>
+                        <FormControl fullWidth sx={{ mb: 2, maxWidth: 200 }}>
                             <InputLabel>Ünite</InputLabel>
                             <Select
                                 value={unitId}
@@ -647,7 +647,7 @@ const TopluSoruEkleme = () => {
                             </Select>
                         </FormControl>
 
-                        <FormControl sx={{ mb: 2, maxWidth: 200 }}>
+                        <FormControl fullWidth sx={{ mb: 2, maxWidth: 200 }}>
                             <InputLabel>Konu</InputLabel>
                             <Select
                                 value={topicId}

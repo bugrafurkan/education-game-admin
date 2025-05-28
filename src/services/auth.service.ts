@@ -7,6 +7,7 @@ export interface LoginResponse {
         name: string;
         email: string;
         role: string;
+        publisher?: string;
     };
     token: string;
 }
@@ -16,6 +17,8 @@ export interface User {
     name: string;
     email: string;
     role: string;
+    publisher?: string;
+    created_at?: string;
 }
 
 export const login = async (email: string, password: string): Promise<LoginResponse> => {

@@ -29,7 +29,7 @@ const Header = ({ onMenuToggle }: HeaderProps) => {
 
     const handleLogout = () => {
         // Logout logic
-        sessionStorage.removeItem('auth_token');
+        localStorage.removeItem('auth_token');
         navigate('/login');
     };
 

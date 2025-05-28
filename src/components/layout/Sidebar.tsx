@@ -89,7 +89,7 @@ const Sidebar = ({ open, onClose, variant }: SidebarProps) => {
     const subMenuTextColor = isDark ? '#e0e0e0' : '#444444';
 
     useEffect(() => {
-        const role = sessionStorage.getItem('user_role');
+        const role = localStorage.getItem('user_role');
         setUserRole(role);
     }, [isAuthenticated]);
 

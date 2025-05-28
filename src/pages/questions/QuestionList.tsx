@@ -23,6 +23,7 @@ import { QuestionFilter } from '../../services/question.service';
 import { useEducationStructure } from '../../hooks/useEducationStructure';
 import { useCategories } from '../../hooks/useCategories';
 import { useUsers } from '../../hooks/useUsers';
+import { usePublishers } from '../../hooks/usePublishers';
 
 const QuestionList = () => {
     const [page, setPage] = useState(1);
@@ -32,6 +33,7 @@ const QuestionList = () => {
     const [difficultyFilter, setDifficultyFilter] = useState<string>('');
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [questionToDelete, setQuestionToDelete] = useState<number | null>(null);
+
 
     // Eğitim yapısı verilerini yükle
     const { grades, subjects, units, topics} = useEducationStructure();
@@ -43,8 +45,10 @@ const QuestionList = () => {
     const [topicIdFilter, setTopicIdFilter] = useState<number | ''>('');
 
     const { users } = useUsers();
+    const { publishers } = usePublishers();
     const { categories } = useCategories();
     const [userFilter, setUserFilter] = useState<string>('');
+    const [publisherFilter, setPublisherFilter] = useState<string>('');
 
     // Filtrelenmiş listeler
     const [filteredUnits, setFilteredUnits] = useState<any[]>([]);
@@ -128,8 +132,8 @@ const QuestionList = () => {
         type: typeFilter || undefined,
         difficulty: difficultyFilter || undefined,
         user_id: userFilter ? Number(userFilter) : undefined,
+        publisher: publisherFilter || undefined,
 
-        // YENİ YAKLAŞIM: Boş kategori sorunu çözümü
         ...(matchingCategoryIds !== null ? {
             category_ids: matchingCategoryIds.length > 0 ? matchingCategoryIds : [-1] // Boş array yerine [-1] gönder
         } : {})
@@ -185,6 +189,7 @@ const QuestionList = () => {
         setUnitIdFilter('');
         setTopicIdFilter('');
         setUserFilter('');
+        setPublisherFilter('');
         setPage(1);
     };
 
@@ -256,7 +261,8 @@ const QuestionList = () => {
             subjectIdFilter ||
             unitIdFilter ||
             topicIdFilter ||
-            userFilter;
+            userFilter ||
+            publisherFilter;
     };
 
     return (
@@ -356,6 +362,25 @@ const QuestionList = () => {
                                     {users.map((user) => (
                                         <MenuItem key={user.id} value={user.id}>
                                             {user.name}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        </Grid>
+
+                        {/* Yayınevi */}
+                        <Grid item xs={12} sm={6} md={4}>
+                            <FormControl fullWidth>
+                                <InputLabel>Yayınevi</InputLabel>
+                                <Select
+                                    value={publisherFilter}
+                                    label="Yayınevi"
+                                    onChange={(e) => setPublisherFilter(e.target.value)}
+                                >
+                                    <MenuItem value="">Tümü</MenuItem>
+                                    {publishers.map((pub) => (
+                                        <MenuItem key={pub.publisher} value={pub.publisher}>
+                                            {pub.publisher} ({pub.count})
                                         </MenuItem>
                                     ))}
                                 </Select>

@@ -29,17 +29,17 @@ export interface Question {
     question_text: string;
     question_type: 'multiple_choice' | 'true_false' | 'qa';
     difficulty: 'easy' | 'medium' | 'hard';
-    image_path?: string ;
+    image_path?: string;
     metadata?: Record<string, unknown>;
     user_id?: number;
-    publisher?: string;
+    publisher?: string; // YENİ: Publisher alanı artık Question'da
     answers: Answer[];
     category?: Category;
     user?: {
         id: number;
         name: string;
         email: string;
-        publisher?: string;
+        publisher?: string; // Fallback için hala kullanılabilir
     };
 }
 
@@ -50,7 +50,7 @@ export interface QuestionCreate {
     difficulty: 'easy' | 'medium' | 'hard';
     image_path?: string | null;
     metadata?: Record<string, unknown>;
-    publisher?: string;
+    publisher?: string; // YENİ: Publisher artık zorunlu değil ama eklenebilir
     answers: Omit<Answer, 'id'>[];
 }
 
@@ -61,7 +61,7 @@ export interface QuestionFilter {
     category_id?: number;
     category_ids?: number[];
     user_id?: number;
-    publisher?: string;
+    publisher?: string; // YENİ: Publisher filtresi artık doğrudan question'dan
     grade_id?: number;
     subject_id?: number;
     unit_id?: number;
@@ -162,5 +162,11 @@ export const saveExternalImage = async (imageUrl: string): Promise<{ url: string
         image_url: imageUrl,
     });
 
+    return response.data;
+};
+
+// YENİ: Publisher'ları getir - artık questions tablosundan
+export const getPublishers = async (): Promise<{ publisher: string; count: number }[]> => {
+    const response = await api.get<{ publisher: string; count: number }[]>('/questions/publishers');
     return response.data;
 };

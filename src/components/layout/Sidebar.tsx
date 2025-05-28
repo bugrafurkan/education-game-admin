@@ -26,6 +26,7 @@ import {
     MenuBook as SubjectIcon,
     ViewModule as UnitIcon,
     Description as TopicIcon,
+    List as ListIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../../hooks/useAuth';
 import { useSettings } from '../../hooks/useSettings';
@@ -211,6 +212,9 @@ const Sidebar = ({ open, onClose, variant }: SidebarProps) => {
                                         },
                                     }}
                                 >
+                                    <ListItemIcon sx={{ color: iconColor }}>
+                                        <ListIcon />
+                                    </ListItemIcon>
                                     <ListItemText primary="Kategori Listesi" />
                                 </ListItemButton>
 
@@ -291,7 +295,7 @@ const Sidebar = ({ open, onClose, variant }: SidebarProps) => {
                                     <ListItemIcon sx={{ color: iconColor }}>
                                         <TopicIcon />
                                     </ListItemIcon>
-                                    <ListItemText primary="Bölümler" />
+                                    <ListItemText primary="Konular" />
                                 </ListItemButton>
                             </List>
                         </Collapse>

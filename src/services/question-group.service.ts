@@ -8,12 +8,13 @@ export interface QuestionGroup {
     question_type: 'multiple_choice' | 'true_false' | 'qa';
     game_id: number;
     created_by: number;
+    publisher?: string; // YENİ: Publisher alanı eklendi
     questions_count: number;
     created_at: string;
     updated_at: string;
-    image_url?: string; // Etkinlik görseli için URL eklendi
+    image_url?: string;
 
-    // İframe ile ilgili eklenen yeni alanlar
+    // İframe ile ilgili alanlar
     iframe_url?: string;
     iframe_code?: string;
     iframe_status?: 'pending' | 'processing' | 'completed' | 'failed';
@@ -34,6 +35,7 @@ export interface QuestionGroup {
         name: string;
     };
 }
+
 export interface Question {
     id: number;
     category_id: number;
@@ -42,6 +44,7 @@ export interface Question {
     difficulty: 'easy' | 'medium' | 'hard';
     image_path?: string;
     user_id?: number;
+    publisher?: string; // YENİ: Question'da da publisher var
     category?: {
         id: number;
         name: string;
@@ -72,11 +75,13 @@ export interface QuestionGroupCreate {
     name: string;
     question_type: 'multiple_choice' | 'true_false' | 'qa';
     game_id: number;
+    publisher?: string; // YENİ: Publisher eklendi
     question_ids: number[];
 }
 
 export interface QuestionGroupUpdate {
     name?: string;
+    publisher?: string; // YENİ: Publisher eklendi
     question_ids?: number[];
 }
 
@@ -84,11 +89,12 @@ export interface EligibleQuestionsParams {
     game_id: number;
     question_type: 'multiple_choice' | 'true_false' | 'qa';
     category_id?: number;
-    category_ids?: number[]; // YENİ: Çoklu kategori desteği
-    grade_id?: number; // YENİ: Eğitim yapısı filtreleri
+    category_ids?: number[];
+    grade_id?: number;
     subject_id?: number;
     unit_id?: number;
     topic_id?: number;
+    publisher?: string; // YENİ: Publisher filtresi
     page?: number;
 }
 
@@ -97,15 +103,15 @@ export interface QuestionGroupFilters {
     question_type?: 'multiple_choice' | 'true_false' | 'qa';
     game_id?: string | number;
     category_id?: string | number;
-    category_ids?: number[]; // YENİ: Çoklu kategori desteği
-    grade_id?: number; // YENİ: Eğitim yapısı filtreleri
+    category_ids?: number[];
+    grade_id?: number;
     subject_id?: number;
     unit_id?: number;
     topic_id?: number;
+    publisher?: string; // YENİ: Publisher filtresi
     sort_field?: string;
     sort_direction?: 'asc' | 'desc';
 }
-
 
 // Tüm soru gruplarını getir
 export const getQuestionGroups = async (
@@ -117,8 +123,6 @@ export const getQuestionGroups = async (
     });
     return response.data;
 };
-
-
 
 // Belirli bir soru grubunu getir
 export const getQuestionGroup = async (id: number): Promise<QuestionGroup> => {
@@ -172,5 +176,11 @@ export const deleteQuestionGroup = async (id: number): Promise<void> => {
 // Uygun soruları getir (grup oluşturma için)
 export const getEligibleQuestions = async (params: EligibleQuestionsParams): Promise<PaginatedResponse<Question>> => {
     const response = await api.get<PaginatedResponse<Question>>('/eligible-questions', { params });
+    return response.data;
+};
+
+// YENİ: Publisher'ları getir - question-groups tablosundan
+export const getPublishers = async (): Promise<{ publisher: string; count: number }[]> => {
+    const response = await api.get<{ publisher: string; count: number }[]>('/question-groups/publishers');
     return response.data;
 };

@@ -43,6 +43,7 @@ const EditQuestionGroup = () => {
     const [questionType, setQuestionType] = useState<string>('');
     const [gameId, setGameId] = useState<number>(0);
     const [selectedQuestions, setSelectedQuestions] = useState<number[]>([]);
+    const [publisherId, setPublisherId] = useState<string>(''); // YENİ: Publisher alanı
 
     // Görsel yükleme için yeni state değişkenleri
     const [imageFile, setImageFile] = useState<File | null>(null);
@@ -82,17 +83,19 @@ const EditQuestionGroup = () => {
             setAllGroupQuestions(response.questions || []);
             setSelectedQuestions(response.questions?.map(q => q.id) || []);
 
+            // YENİ: Publisher bilgisini yükle
+            if (response.publisher) {
+                setPublisherId(response.publisher);
+            }
+
             // Mevcut görseli ayarla
             if (response.image_url) {
                 const fullImageUrl = response.image_url;
                 setImagePreview(fullImageUrl);
-                // existingImage değişkenini kullanıyoruz
                 setExistingImage(fullImageUrl);
             }
 
             setLoading(false);
-
-            // Uygun soruları yükle
 
         } catch (err) {
             console.error('Error fetching question group:', err);
@@ -144,6 +147,11 @@ const EditQuestionGroup = () => {
 
         setSelectedQuestions(newSelectedQuestions);
         setError(null);
+    };
+
+    // YENİ: Publisher değiştir
+    const handlePublisherChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        setPublisherId(event.target.value);
     };
 
     // Görsel yükleme işlemleri
@@ -211,7 +219,7 @@ const EditQuestionGroup = () => {
         setUploadError(null);
     };
 
-    // Form gönderme
+    // Form gönderme - YENİ: Publisher dahil
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
@@ -235,6 +243,7 @@ const EditQuestionGroup = () => {
             // FormData oluştur
             const formData = new FormData();
             formData.append('name', name);
+            formData.append('publisher', publisherId); // YENİ: Publisher eklendi
             formData.append('_method', 'PUT'); // Laravel'de PUT/PATCH için gerekli
 
             // Seçili soruları ekle
@@ -293,7 +302,7 @@ const EditQuestionGroup = () => {
     return (
         <Box sx={{
             width: '100%',
-            px: 2,            // Responsive boşluk (varsayılan container gibi)
+            px: 2,
             boxSizing: 'border-box'
         }}>
             <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -332,6 +341,17 @@ const EditQuestionGroup = () => {
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
                                 required
+                            />
+                        </Grid>
+
+                        {/* YENİ: Publisher Alanı */}
+                        <Grid item xs={12} sm={6}>
+                            <TextField
+                                label="Yayınevi"
+                                fullWidth
+                                value={publisherId}
+                                onChange={handlePublisherChange}
+                                helperText="Yayınevi adını girin veya düzenleyin"
                             />
                         </Grid>
 

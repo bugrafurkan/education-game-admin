@@ -170,7 +170,10 @@ const UserManagement: React.FC = () => {
                                             />
                                         </TableCell>
                                         <TableCell>
-                                            {new Date(user.created_at).toLocaleDateString('tr-TR')}
+                                            {user.created_at
+                                                ? new Date(user.created_at).toLocaleDateString('tr-TR')
+                                                : '—'}
+
                                         </TableCell>
                                         <TableCell>
                                             <Box sx={{ display: 'flex', gap: 1 }}>

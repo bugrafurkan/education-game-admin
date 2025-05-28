@@ -80,3 +80,41 @@ export const useQuestions = (page = 1, filters: QuestionFilter = {}) => {
         deleteQuestion
     };
 };
+
+// YENİ: Publisher'ları getiren hook
+export const usePublishers = () => {
+    const [publishers, setPublishers] = useState<{ publisher: string; count: number }[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    const fetchPublishers = async () => {
+        try {
+            setLoading(true);
+            setError(null);
+            const response = await questionService.getPublishers();
+            setPublishers(response);
+            setLoading(false);
+        } catch (error) {
+            if (axios.isAxiosError(error)) {
+                const axiosError = error as AxiosError<ApiErrorResponse>;
+                setError(axiosError.response?.data?.message || 'Yayınevleri yüklenirken bir hata oluştu');
+                console.error('Error fetching publishers:', axiosError.response?.data);
+            } else {
+                setError('Yayınevleri yüklenirken beklenmeyen bir hata oluştu');
+                console.error('Unexpected error:', error);
+            }
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchPublishers();
+    }, []);
+
+    return {
+        publishers,
+        loading,
+        error,
+        refresh: fetchPublishers
+    };
+};

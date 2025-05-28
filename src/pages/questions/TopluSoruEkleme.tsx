@@ -18,6 +18,7 @@ import {
 } from '@mui/icons-material';
 import { useEducationStructure } from '../../hooks/useEducationStructure';
 import { useCategories } from '../../hooks/useCategories';
+import { usePublishers } from '../../hooks/usePublishers';
 import * as questionService from '../../services/question.service';
 import * as gameService from '../../services/game.service';
 import * as categoryService from '../../services/category.service';
@@ -57,6 +58,7 @@ interface QuestionTemplate {
     imageFile: File | null;
     imagePath: string | null;
     difficulty: string;
+    publisherName: string;
     correctAnswer: string;
     trueOrFalse: string;
     choices: {
@@ -78,6 +80,7 @@ const TopluSoruEkleme = () => {
 
     // Genel ayarlar
     const [questionType, setQuestionType] = useState<string>('');
+    const [globalPublisherName, setGlobalPublisherName] = useState<string>('');
 
     // Manuel seçim alanları
     const [gradeId, setGradeId] = useState<number | ''>('');
@@ -105,6 +108,7 @@ const TopluSoruEkleme = () => {
     // Eğitim yapısı ve kategorileri yükle
     const { grades, subjects, units, topics } = useEducationStructure();
     const { categories, refreshCategories } = useCategories();
+    const { publishers } = usePublishers();
 
     // Grade ve Subject değiştiğinde ilgili üniteleri filtrele
     useEffect(() => {
@@ -114,7 +118,6 @@ const TopluSoruEkleme = () => {
             );
             setFilteredUnits(filtered);
 
-            // Eğer seçili ünite bu filtrelere uygun değilse, seçimi sıfırla
             if (unitId && !filtered.some(unit => unit.id === unitId)) {
                 setUnitId('');
                 setTopicId('');
@@ -132,7 +135,6 @@ const TopluSoruEkleme = () => {
             const filtered = topics.filter(topic => topic.unit_id === unitId);
             setFilteredTopics(filtered);
 
-            // Eğer seçili konu bu filtreye uygun değilse, seçimi sıfırla
             if (topicId && !filtered.some(topic => topic.id === topicId)) {
                 setTopicId('');
             }
@@ -144,7 +146,6 @@ const TopluSoruEkleme = () => {
 
     // Seçilen kombinasyona göre kategori durumunu kontrol et
     useEffect(() => {
-        // Kategori kontrolü için tüm 4 alan gerekli: gradeId, subjectId, unitId, topicId
         if (gradeId && subjectId && unitId && topicId) {
             const matchingCategory = categories.find(category =>
                 category.grade_id === gradeId &&
@@ -172,6 +173,17 @@ const TopluSoruEkleme = () => {
             setConfirmDialogOpen(true);
         }
     }, [questionType]);
+
+    // Global publisher değiştiğinde tüm soruların publisher'ını güncelle
+    useEffect(() => {
+        if (globalPublisherName && questions.length > 0) {
+            const updatedQuestions = questions.map(q => ({
+                ...q,
+                publisherName: globalPublisherName
+            }));
+            setQuestions(updatedQuestions);
+        }
+    }, [globalPublisherName, questions.length]);
 
     // Kategori adını oluştur
     const generateCategoryName = (): string => {
@@ -207,14 +219,9 @@ const TopluSoruEkleme = () => {
             };
 
             const newCategory = await categoryService.createCategory(categoryData);
-
-            // Kategorileri yenile
             await refreshCategories();
-
-            // Yeni kategoriyi seç
             setCategoryId(newCategory.id);
             setCategoryExists(true);
-
             setError(null);
         } catch (err) {
             console.error('Error creating category:', err);
@@ -249,6 +256,7 @@ const TopluSoruEkleme = () => {
             imageFile: null,
             imagePath: null,
             difficulty: 'medium',
+            publisherName: globalPublisherName,
             correctAnswer: '',
             trueOrFalse: 'true',
             choices: JSON.parse(JSON.stringify(emptyChoiceTemplate)),
@@ -293,6 +301,13 @@ const TopluSoruEkleme = () => {
     const handleDifficultyChange = (value: string, questionIndex: number) => {
         const updatedQuestions = [...questions];
         updatedQuestions[questionIndex].difficulty = value;
+        setQuestions(updatedQuestions);
+    };
+
+    // Publisher'ı güncelle
+    const handlePublisherChange = (value: string, questionIndex: number) => {
+        const updatedQuestions = [...questions];
+        updatedQuestions[questionIndex].publisherName = value;
         setQuestions(updatedQuestions);
     };
 
@@ -374,8 +389,8 @@ const TopluSoruEkleme = () => {
 
     // Tüm soruları doğrula
     const validateQuestions = (): boolean => {
-        if (!questionType || !categoryId) {
-            setError('Lütfen soru tipi seçin ve gerekli kategoriyi oluşturun');
+        if (!questionType || !categoryId || !globalPublisherName.trim()) {
+            setError('Lütfen soru tipi seçin, gerekli kategoriyi oluşturun ve yayınevi belirtin');
             return false;
         }
 
@@ -394,14 +409,15 @@ const TopluSoruEkleme = () => {
             if (!question.questionText.trim()) {
                 valid = false;
                 question.error = 'Soru metni boş olamaz';
+            } else if (!question.publisherName.trim()) {
+                valid = false;
+                question.error = 'Yayınevi seçimi zorunludur';
             } else {
                 question.error = null;
 
                 // Cevap kontrolü
                 if (questionType === 'multiple_choice') {
-                    // Tüm şıkların dolu olduğunu kontrol et
                     const allChoicesFilled = question.choices.every(choice => choice.text.trim() !== '');
-                    // En az bir doğru şık seçildiğini kontrol et
                     const hasCorrectChoice = question.choices.some(choice => choice.isCorrect);
 
                     if (!allChoicesFilled) {
@@ -417,7 +433,6 @@ const TopluSoruEkleme = () => {
                         question.error = 'Doğru cevabı girin';
                     }
                 }
-                // true_false için özel doğrulama gerekmez
             }
 
             question.valid = valid;
@@ -451,6 +466,7 @@ const TopluSoruEkleme = () => {
                     question_text: question.questionText,
                     question_type: questionType as 'multiple_choice' | 'true_false' | 'qa',
                     difficulty: question.difficulty as 'easy' | 'medium' | 'hard',
+                    publisher: question.publisherName.trim(),
                     answers
                 };
 
@@ -554,7 +570,7 @@ const TopluSoruEkleme = () => {
         }
     };
 
-    const canProceed = questionType !== '' && categoryExists;
+    const canProceed = questionType !== '' && categoryExists && globalPublisherName.trim() !== '';
 
     return (
         <Box sx={{
@@ -630,7 +646,7 @@ const TopluSoruEkleme = () => {
                             </Select>
                         </FormControl>
 
-                        <FormControl fullWidth sx={{ mb: 2, maxWidth: 200 }}>
+                        <FormControl fullWidth required sx={{ mb: 2, maxWidth: 200 }}>
                             <InputLabel>Ünite</InputLabel>
                             <Select
                                 value={unitId}
@@ -638,7 +654,7 @@ const TopluSoruEkleme = () => {
                                 onChange={handleUnitChange}
                                 disabled={!gradeId || !subjectId || filteredUnits.length === 0}
                             >
-                                <MenuItem value="">Ünite Seçin </MenuItem>
+                                <MenuItem value="">Ünite Seçin</MenuItem>
                                 {filteredUnits.map((unit) => (
                                     <MenuItem key={unit.id} value={unit.id}>
                                         {unit.name}
@@ -647,7 +663,7 @@ const TopluSoruEkleme = () => {
                             </Select>
                         </FormControl>
 
-                        <FormControl fullWidth sx={{ mb: 2, maxWidth: 200 }}>
+                        <FormControl fullWidth required sx={{ mb: 2, maxWidth: 200 }}>
                             <InputLabel>Konu</InputLabel>
                             <Select
                                 value={topicId}
@@ -655,7 +671,7 @@ const TopluSoruEkleme = () => {
                                 onChange={handleTopicChange}
                                 disabled={!unitId || filteredTopics.length === 0}
                             >
-                                <MenuItem value="">Konu Seçin </MenuItem>
+                                <MenuItem value="">Konu Seçin</MenuItem>
                                 {filteredTopics.map((topic) => (
                                     <MenuItem key={topic.id} value={topic.id}>
                                         {topic.name}
@@ -687,7 +703,7 @@ const TopluSoruEkleme = () => {
                     {gradeId && subjectId && unitId && topicId && (
                         <Alert
                             severity={categoryExists ? "success" : "info"}
-                            sx={{ mt: 2 }}
+                            sx={{ mt: 2, mb: 3 }}
                         >
                             {categoryExists
                                 ? `Kategori mevcut: ${generateCategoryName()}`
@@ -695,13 +711,50 @@ const TopluSoruEkleme = () => {
                             }
                         </Alert>
                     )}
+
+                    {/* Global Yayınevi Seçimi */}
+                    <Box sx={{ mb: 3 }}>
+                        <Typography variant="subtitle1" gutterBottom>
+                            Yayınevi (Tüm Sorular İçin)
+                        </Typography>
+                        <FormControl fullWidth required sx={{ maxWidth: 300 }}>
+                            <InputLabel>Yayınevi</InputLabel>
+                            <Select
+                                value={globalPublisherName}
+                                label="Yayınevi"
+                                onChange={(e) => setGlobalPublisherName(e.target.value)}
+                                MenuProps={{
+                                    PaperProps: {
+                                        style: {
+                                            maxHeight: 300,
+                                            width: 'auto',
+                                            minWidth: 200,
+                                            zIndex: 1500
+                                        },
+                                    },
+                                }}
+                            >
+                                <MenuItem value="">Yayınevi Seçin</MenuItem>
+                                {publishers.map((publisher) => (
+                                    <MenuItem key={publisher.id} value={publisher.name}>
+                                        {publisher.name}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                            {!globalPublisherName.trim() && (
+                                <Typography variant="caption" color="error" sx={{ mt: 0.5 }}>
+                                    Yayınevi seçimi zorunludur
+                                </Typography>
+                            )}
+                        </FormControl>
+                    </Box>
                 </Box>
 
                 <Divider sx={{ my: 3 }} />
 
                 {!canProceed ? (
                     <Alert severity="info" sx={{ mb: 3 }}>
-                        Lütfen önce soru tipi seçin ve gerekli kategoriyi oluşturun.
+                        Lütfen önce soru tipi seçin, gerekli kategoriyi oluşturun ve yayınevi belirtin.
                     </Alert>
                 ) : (
                     <>
@@ -852,8 +905,8 @@ const TopluSoruEkleme = () => {
                                                 </Button>
                                             </Box>
 
-                                            <Box sx={{ mb: 3 }}>
-                                                <FormControl fullWidth>
+                                            <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+                                                <FormControl sx={{ minWidth: 150 }}>
                                                     <InputLabel>Zorluk Seviyesi</InputLabel>
                                                     <Select
                                                         value={question.difficulty}
@@ -863,6 +916,32 @@ const TopluSoruEkleme = () => {
                                                         {difficultyLevels.map((level) => (
                                                             <MenuItem key={level.value} value={level.value}>
                                                                 {level.label}
+                                                            </MenuItem>
+                                                        ))}
+                                                    </Select>
+                                                </FormControl>
+
+                                                <FormControl sx={{ minWidth: 200 }}>
+                                                    <InputLabel>Yayınevi</InputLabel>
+                                                    <Select
+                                                        value={question.publisherName}
+                                                        label="Yayınevi"
+                                                        onChange={(e) => handlePublisherChange(e.target.value, index)}
+                                                        MenuProps={{
+                                                            PaperProps: {
+                                                                style: {
+                                                                    maxHeight: 300,
+                                                                    width: 'auto',
+                                                                    minWidth: 200,
+                                                                    zIndex: 1500
+                                                                },
+                                                            },
+                                                        }}
+                                                    >
+                                                        <MenuItem value="">Yayınevi Seçin</MenuItem>
+                                                        {publishers.map((publisher) => (
+                                                            <MenuItem key={publisher.id} value={publisher.name}>
+                                                                {publisher.name}
                                                             </MenuItem>
                                                         ))}
                                                     </Select>

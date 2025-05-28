@@ -14,6 +14,7 @@ import {
 } from '@mui/icons-material';
 import * as questionGroupService from '../../services/question-group.service';
 import * as gameService from '../../services/game.service';
+import * as userService from '../../services/user.service';
 import { useCategories } from '../../hooks/useCategories';
 import * as categoryService from '../../services/category.service';
 import {useEducationStructure} from "../../hooks/useEducationStructure.ts";
@@ -52,6 +53,7 @@ const AddQuestionGroup = () => {
     const [categoryExists, setCategoryExists] = useState<boolean>(false);
     const [creatingCategory, setCreatingCategory] = useState<boolean>(false);
     const [selectedQuestions, setSelectedQuestions] = useState<number[]>([]);
+    const [publisherId, setPublisherId] = useState<string>(''); // YENİ: Publisher alanı
 
     // Filtrelenmiş listeler
     const [filteredUnits, setFilteredUnits] = useState<any[]>([]);
@@ -84,6 +86,21 @@ const AddQuestionGroup = () => {
     const { grades, subjects, units, topics } = useEducationStructure();
     const { categories, refreshCategories } = useCategories();
 
+    // YENİ: Current user'ı yükle ve default publisher'ı set et
+    useEffect(() => {
+        const fetchCurrentUser = async () => {
+            try {
+                const user = await userService.getCurrentUser();
+                if (user.publisher) {
+                    setPublisherId(user.publisher);
+                }
+            } catch (error) {
+                console.error('Current user yüklenirken hata:', error);
+            }
+        };
+
+        fetchCurrentUser();
+    }, []);
 
     // Oyunları yükle
     useEffect(() => {
@@ -210,6 +227,11 @@ const AddQuestionGroup = () => {
         setSelectedQuestions([]); // Oyun değiştiğinde seçili soruları sıfırla
     };
 
+    // YENİ: Publisher değiştir
+    const handlePublisherChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        setPublisherId(event.target.value);
+    };
+
     // Kategori adını oluştur
     const generateCategoryName = (): string => {
         const gradeName = grades.find(g => g.id === gradeId)?.name || '';
@@ -277,7 +299,6 @@ const AddQuestionGroup = () => {
     const handleTopicChange = (event: SelectChangeEvent<number | ''>) => {
         setTopicId(event.target.value as number | '');
     };
-
 
     // Soru seçimi
     const handleQuestionToggle = (questionId: number) => {
@@ -379,7 +400,7 @@ const AddQuestionGroup = () => {
         setUploadError(null);
     };
 
-    // Form gönderme
+    // Form gönderme - YENİ: Publisher dahil
     const handleSubmit = async () => {
         try {
             setLoading(true);
@@ -402,6 +423,7 @@ const AddQuestionGroup = () => {
             formData.append('question_type', questionType);
             formData.append('game_id', gameId);
             formData.append('category_id', categoryId);
+            formData.append('publisher', publisherId); // YENİ: Publisher eklendi
 
             selectedQuestions.forEach((id, index) => {
                 formData.append(`question_ids[${index}]`, id.toString());
@@ -436,9 +458,9 @@ const AddQuestionGroup = () => {
         }
     };
 
-    // Adım geçerlilik kontrolleri
+    // Adım geçerlilik kontrolleri - YENİ: Publisher kontrolü eklendi
     const isFirstStepValid = () => {
-        return name.trim() !== '' && gameId !== '';
+        return name.trim() !== '' && gameId !== '' && publisherId.trim() !== '';
     };
 
     const isSecondStepValid = () => {
@@ -452,7 +474,7 @@ const AddQuestionGroup = () => {
                 return (
                     <Box sx={{
                         width: '100%',
-                        px: 2,            // Responsive boşluk (varsayılan container gibi)
+                        px: 2,
                         boxSizing: 'border-box'
                     }}>
                         <Typography variant="h6" sx={{ mb: 3 }}>
@@ -467,6 +489,18 @@ const AddQuestionGroup = () => {
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
                                     required
+                                />
+                            </Grid>
+
+                            {/* YENİ: Publisher Alanı */}
+                            <Grid item xs={12} sm={6}>
+                                <TextField
+                                    label="Yayınevi"
+                                    fullWidth
+                                    value={publisherId}
+                                    onChange={handlePublisherChange}
+                                    required
+                                    helperText="Yayınevi adını girin veya düzenleyin"
                                 />
                             </Grid>
 
@@ -509,7 +543,7 @@ const AddQuestionGroup = () => {
                                         </Select>
                                     </FormControl>
 
-                                    <FormControl sx={{ mb: 2, maxWidth: 200 }}>
+                                    <FormControl fullWidth required sx={{ mb: 2, maxWidth: 200 }}>
                                         <InputLabel>Ünite</InputLabel>
                                         <Select
                                             value={unitId}
@@ -526,7 +560,7 @@ const AddQuestionGroup = () => {
                                         </Select>
                                     </FormControl>
 
-                                    <FormControl sx={{ mb: 2, maxWidth: 200 }}>
+                                    <FormControl fullWidth required sx={{ mb: 2, maxWidth: 200 }}>
                                         <InputLabel>Konu</InputLabel>
                                         <Select
                                             value={topicId}
@@ -844,6 +878,14 @@ const AddQuestionGroup = () => {
                                 <Typography>{name}</Typography>
                             </Grid>
 
+                            {/* YENİ: Publisher Önizleme */}
+                            <Grid item xs={12} sm={6}>
+                                <Typography variant="subtitle1" fontWeight="bold">
+                                    Yayınevi:
+                                </Typography>
+                                <Typography>{publisherId || '-'}</Typography>
+                            </Grid>
+
                             <Grid item xs={12} sm={6}>
                                 <Typography variant="subtitle1" fontWeight="bold">
                                     Soru Tipi:
@@ -971,7 +1013,7 @@ const AddQuestionGroup = () => {
     return (
         <Box>
             <Typography variant="h4" gutterBottom sx={{ mb: 4, fontWeight: 'bold' }}>
-                Yeni Soru Grubu Oluştur
+                Yeni Etkinlik Oluştur
             </Typography>
 
             <Paper sx={{ p: 3, borderRadius: 2 }}>

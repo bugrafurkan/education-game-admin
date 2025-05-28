@@ -5,18 +5,16 @@ import {
     Box, Typography, Paper, Stepper, Step, StepLabel, Button,
     Grid, FormControl, FormLabel, RadioGroup, FormControlLabel, Radio,
     TextField, Divider, Alert, MenuItem, Select, SelectChangeEvent,
-    CircularProgress, InputLabel, Autocomplete
+    CircularProgress, InputLabel
 } from '@mui/material';
 import { useEducationStructure } from '../../hooks/useEducationStructure';
 import { usePublishers } from '../../hooks/usePublishers';
 import * as questionService from '../../services/question.service';
 import * as gameService from '../../services/game.service';
 import * as categoryService from '../../services/category.service';
-import * as userService from '../../services/user.service';
 import axios, { AxiosError } from 'axios';
 import { useCategories } from '../../hooks/useCategories';
 import ImageUploader from '../../components/ImageUploader';
-
 
 // Soru tipi seçenekleri
 const questionTypes = [
@@ -32,7 +30,7 @@ const difficultyLevels = [
     { value: 'hard', label: 'Zor' }
 ];
 
-// Adımlar - Oyun Seçimi adımını kaldırdık
+// Adımlar
 const steps = ['Soru Tipi', 'Soru ve Cevap'];
 
 interface ApiErrorResponse {
@@ -50,17 +48,16 @@ const AddQuestion = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const { grades, subjects, units, topics } = useEducationStructure();
-    // Kategorileri yükle
     const { categories, refreshCategories } = useCategories();
-    // Yayınevlerini yükle
     const { publishers } = usePublishers();
 
     // Form verileri
     const [questionType, setQuestionType] = useState<string>('');
     const [questionText, setQuestionText] = useState('');
     const [difficulty, setDifficulty] = useState('medium');
-    const [publisherId, setPublisherId] = useState<string>('');
-    const [publisherLoaded, setPublisherLoaded] = useState<boolean>(false); // Publisher yüklenip yüklenmediğini takip et
+
+    // Publisher state'leri - Sadece name string'i kullanacağız
+    const [publisherName, setPublisherName] = useState<string>('');
 
     // Manuel seçim alanları
     const [gradeId, setGradeId] = useState<number | ''>('');
@@ -99,7 +96,6 @@ const AddQuestion = () => {
             );
             setFilteredUnits(filtered);
 
-            // Eğer seçili ünite bu filtrelere uygun değilse, seçimi sıfırla
             if (unitId && !filtered.some(unit => unit.id === unitId)) {
                 setUnitId('');
                 setTopicId('');
@@ -117,7 +113,6 @@ const AddQuestion = () => {
             const filtered = topics.filter(topic => topic.unit_id === unitId);
             setFilteredTopics(filtered);
 
-            // Eğer seçili konu bu filtreye uygun değilse, seçimi sıfırla
             if (topicId && !filtered.some(topic => topic.id === topicId)) {
                 setTopicId('');
             }
@@ -129,7 +124,6 @@ const AddQuestion = () => {
 
     // Seçilen kombinasyona göre kategori durumunu kontrol et
     useEffect(() => {
-        // Kategori kontrolü için tüm 4 alan gerekli: gradeId, subjectId, unitId, topicId
         if (gradeId && subjectId && unitId && topicId) {
             const matchingCategory = categories.find(category =>
                 category.grade_id === gradeId &&
@@ -151,39 +145,6 @@ const AddQuestion = () => {
         }
     }, [gradeId, subjectId, unitId, topicId, categories]);
 
-    // Current user'ı yükle ve default publisher'ı set et
-    useEffect(() => {
-        const fetchCurrentUser = async () => {
-            if (!publisherLoaded) { // Sadece ilk yüklemede publisher set et
-                try {
-                    // API'den güncel user bilgisini al
-                    const user = await userService.getCurrentUser();
-                    if (user.publisher) {
-                        setPublisherId(user.publisher);
-                    }
-                } catch (error) {
-                    // Hata durumunda localStorage'dan al
-                    try {
-                        const userData = localStorage.getItem('user_data');
-                        if (userData) {
-                            const user = JSON.parse(userData);
-                            if (user.publisher) {
-                                setPublisherId(user.publisher);
-                            }
-                        }
-                    } catch (fallbackError) {
-                        // Silent fail
-                    }
-                }
-                setPublisherLoaded(true); // Publisher yüklendiğini işaretle
-            }
-        };
-
-        if (!isEdit) { // Sadece yeni soru ekleme modunda
-            fetchCurrentUser();
-        }
-    }, [isEdit, publisherLoaded]);
-
     // Düzenleme durumunda soruyu yükle
     useEffect(() => {
         const fetchQuestion = async () => {
@@ -198,35 +159,12 @@ const AddQuestion = () => {
                     setDifficulty(question.difficulty);
                     setCategoryId(question.category_id);
 
-                    // Publisher bilgisini yükle
-                    // Edit modunda öncelik sırası:
-                    // 1. question.publisher (backend'den gelen)
-                    // 2. question.user.publisher (soruyu oluşturan kullanıcının publisher'ı)
-                    // 3. Sadece ilk yüklemede localStorage'dan current user'ın publisher'ı
-                    
-                    if (!publisherLoaded) { // Sadece ilk yüklemede publisher set et
-                        let publisherToSet = '';
-                        
-                        if (question.publisher) {
-                            publisherToSet = question.publisher;
-                        } else if (question.user && question.user.publisher) {
-                            publisherToSet = question.user.publisher;
-                        } else {
-                            // Backend'den publisher bilgisi gelmiyorsa localStorage'dan yükle
-                            try {
-                                const user = await userService.getCurrentUser();
-                                if (user.publisher) {
-                                    publisherToSet = user.publisher;
-                                }
-                            } catch (error) {
-                                // Silent fail
-                            }
-                        }
-                        
-                        if (publisherToSet) {
-                            setPublisherId(publisherToSet);
-                        }
-                        setPublisherLoaded(true); // Publisher yüklendiğini işaretle
+                    // Publisher bilgisini doldur
+                    if (question.publisher) {
+                        setPublisherName(question.publisher);
+                    } else if (question.user?.publisher) {
+                        // Fallback: User'ın publisher'ı varsa onu kullan
+                        setPublisherName(question.user.publisher);
                     }
 
                     // Kategori bilgilerinden sınıf, ders, ünite, konu bilgilerini doldur
@@ -265,9 +203,7 @@ const AddQuestion = () => {
                     }
 
                     setLoading(false);
-
-                    // Düzenleme modunda ilk adım tipi zaten seçili olduğu için 2. adıma geç
-                    setActiveStep(1);
+                    setActiveStep(1); // Düzenleme modunda direkt 2. adıma geç
                 } catch (error) {
                     if (axios.isAxiosError(error)) {
                         const axiosError = error as AxiosError<ApiErrorResponse>;
@@ -281,7 +217,7 @@ const AddQuestion = () => {
         };
 
         fetchQuestion();
-    }, [isEdit, questionId, categories]);
+    }, [isEdit, questionId, categories, publishers, choices]);
 
     // Adım kontrolü
     const handleNext = () => {
@@ -300,11 +236,6 @@ const AddQuestion = () => {
     // Zorluk seviyesini değiştir
     const handleDifficultyChange = (event: SelectChangeEvent) => {
         setDifficulty(event.target.value);
-    };
-
-    // Kategori değiştir
-    const handleCategoryChange = (event: SelectChangeEvent<number | ''>) => {
-        setCategoryId(event.target.value as number | '');
     };
 
     // Form alanları için handle fonksiyonları
@@ -343,7 +274,7 @@ const AddQuestion = () => {
         ));
     };
 
-    // Resim yolunu değiştir (ImageUploader bileşeninden gelen callback)
+    // Resim yolunu değiştir
     const handleImagePathChange = (path: string | null) => {
         setImagePath(path);
     };
@@ -382,15 +313,11 @@ const AddQuestion = () => {
             };
 
             const newCategory = await categoryService.createCategory(categoryData);
-
-            // Kategorileri yenile
             await refreshCategories();
-
-            // Yeni kategoriyi seç
             setCategoryId(newCategory.id);
             setCategoryExists(true);
-
             setError(null);
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
         } catch (err) {
             setError('Kategori oluşturulurken bir hata oluştu.');
         } finally {
@@ -418,7 +345,7 @@ const AddQuestion = () => {
         }
     };
 
-    // Formu gönder - Tüm oyunlara otomatik soru ekleme ile güncellenmiş
+    // Form submit - Publisher string olarak direkt kullan
     const handleSubmit = async () => {
         try {
             setLoading(true);
@@ -431,10 +358,13 @@ const AddQuestion = () => {
                 return;
             }
 
+            // Publisher string olarak direkt kullan
+            const finalPublisherName = publisherName.trim();
+
             // Soru tipine göre cevapları hazırla
             const answers = getAnswersBasedOnType();
 
-            // QuestionCreate için veri oluştur
+            // QuestionCreate için veri oluştur - Publisher string olarak dahil
             const questionData: questionService.QuestionCreate = {
                 category_id: categoryId as number,
                 question_text: questionText,
@@ -442,7 +372,7 @@ const AddQuestion = () => {
                 difficulty: difficulty as 'easy' | 'medium' | 'hard',
                 answers,
                 image_path: imagePath,
-                publisher: publisherId
+                publisher: finalPublisherName // String olarak publisher name
             };
 
             let savedQuestion;
@@ -468,11 +398,13 @@ const AddQuestion = () => {
                                 question_id: savedQuestion.id,
                                 points: 100 // Varsayılan puan
                             });
-                        } catch (error) {
+                            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                        } catch (_error) {
                             // Oyuna ekleme hatası genel akışı etkilemesin
                         }
                     }
-                } catch (error) {
+                    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                } catch (_error) {
                     // Oyunlara ekleme hatası genel akışı etkilemesin
                 }
             }
@@ -499,18 +431,15 @@ const AddQuestion = () => {
 
     // İkinci adım geçerli mi
     const isSecondStepValid = () => {
-        if (!questionText || (!isEdit && !categoryExists) || !publisherId) return false;
+        if (!questionText || (!isEdit && !categoryExists) || !publisherName.trim()) return false;
 
         switch (questionType) {
             case 'multiple_choice':
-                // Tüm şıkların doldurulduğunu ve bir doğru cevap seçildiğini kontrol et
                 return choices.every(choice => choice.text.trim() !== '') &&
                     choices.some(choice => choice.isCorrect);
             case 'true_false':
-                // True/false için her zaman geçerli
                 return true;
             case 'qa':
-                // Klasik sorular için cevap alanı doldurulmuş olmalı
                 return correctAnswer.trim() !== '';
             default:
                 return false;
@@ -586,7 +515,7 @@ const AddQuestion = () => {
                                 )}
                             </Grid>
 
-                            {/* Kategori Seçimi - Manuel seçim ve oluşturma */}
+                            {/* Kategori Seçimi */}
                             <Grid item xs={12}>
                                 <Typography variant="subtitle1" gutterBottom>
                                     Kategori Seçimi
@@ -702,27 +631,39 @@ const AddQuestion = () => {
                                 )}
                             </Grid>
 
-                            {/* Yayınevi Seçimi */}
+                            {/* Yayınevi Alanı - Dropdown */}
                             <Grid item xs={12} sm={6}>
-                                <Autocomplete
-                                    freeSolo
-                                    options={publishers.map(p => p.publisher)}
-                                    value={publisherId}
-                                    onChange={(event, newValue) => {
-                                        setPublisherId(newValue || '');
-                                    }}
-                                    onInputChange={(event, newInputValue) => {
-                                        setPublisherId(newInputValue);
-                                    }}
-                                    renderInput={(params) => (
-                                        <TextField
-                                            {...params}
-                                            label="Yayınevi"
-                                            required
-                                            helperText="Mevcut yayınevi seçin veya yeni yayınevi yazın"
-                                        />
+                                <FormControl fullWidth required>
+                                    <InputLabel>Yayınevi</InputLabel>
+                                    <Select
+                                        value={publisherName}
+                                        label="Yayınevi"
+                                        onChange={(e) => setPublisherName(e.target.value)}
+                                        error={!publisherName.trim() && activeStep === 1}
+                                        MenuProps={{
+                                            PaperProps: {
+                                                style: {
+                                                    maxHeight: 300,
+                                                    width: 'auto',
+                                                    minWidth: 200,
+                                                    zIndex: 1500
+                                                },
+                                            },
+                                        }}
+                                    >
+                                        <MenuItem value="">Yayınevi Seçin</MenuItem>
+                                        {publishers.map((publisher) => (
+                                            <MenuItem key={publisher.id} value={publisher.name}>
+                                                {publisher.name}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                    {!publisherName.trim() && activeStep === 1 && (
+                                        <Typography variant="caption" color="error" sx={{ mt: 0.5, ml: 1 }}>
+                                            Yayınevi seçimi zorunludur
+                                        </Typography>
                                     )}
-                                />
+                                </FormControl>
                             </Grid>
 
                             <Grid item xs={12} sm={6}>

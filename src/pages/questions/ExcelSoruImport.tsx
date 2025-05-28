@@ -21,6 +21,7 @@ import {
 } from '@mui/icons-material';
 import { useEducationStructure } from '../../hooks/useEducationStructure';
 import { useCategories } from '../../hooks/useCategories';
+import { usePublishers } from '../../hooks/usePublishers';
 import * as questionService from '../../services/question.service';
 import * as gameService from '../../services/game.service';
 import * as categoryService from '../../services/category.service';
@@ -61,8 +62,9 @@ const ExcelSoruImport = () => {
     const [filteredUnits, setFilteredUnits] = useState<any[]>([]);
     const [filteredTopics, setFilteredTopics] = useState<any[]>([]);
 
-    // Soru tipi seçimi
+    // Soru tipi ve yayınevi seçimi
     const [questionType, setQuestionType] = useState<'true_false' | 'text'>('true_false');
+    const [publisherName, setPublisherName] = useState<string>('');
 
     // Dosya ve içerik
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -88,6 +90,7 @@ const ExcelSoruImport = () => {
     // Eğitim yapısı verilerini yükle
     const { grades, subjects, units, topics } = useEducationStructure();
     const { categories, refreshCategories } = useCategories();
+    const { publishers } = usePublishers();
 
     // Grade ve Subject değiştiğinde ilgili üniteleri filtrele
     useEffect(() => {
@@ -97,7 +100,6 @@ const ExcelSoruImport = () => {
             );
             setFilteredUnits(filtered);
 
-            // Eğer seçili ünite bu filtrelere uygun değilse, seçimi sıfırla
             if (unitId && !filtered.some(unit => unit.id === unitId)) {
                 setUnitId('');
                 setTopicId('');
@@ -115,7 +117,6 @@ const ExcelSoruImport = () => {
             const filtered = topics.filter(topic => topic.unit_id === unitId);
             setFilteredTopics(filtered);
 
-            // Eğer seçili konu bu filtreye uygun değilse, seçimi sıfırla
             if (topicId && !filtered.some(topic => topic.id === topicId)) {
                 setTopicId('');
             }
@@ -127,7 +128,6 @@ const ExcelSoruImport = () => {
 
     // Seçilen kombinasyona göre kategori durumunu kontrol et
     useEffect(() => {
-        // Kategori kontrolü için tüm 4 alan gerekli: gradeId, subjectId, unitId, topicId
         if (gradeId && subjectId && unitId && topicId) {
             const matchingCategory = categories.find(category =>
                 category.grade_id === gradeId &&
@@ -148,24 +148,6 @@ const ExcelSoruImport = () => {
             setCategoryId('');
         }
     }, [gradeId, subjectId, unitId, topicId, categories]);
-
-    // Kategori değişikliğini takip et - artık kullanılmıyor
-    useEffect(() => {
-        if (categoryId) {
-            const selectedCategory = categories.find(c => c.id === categoryId);
-            if (selectedCategory) {
-                setGradeId(selectedCategory.grade_id);
-                setSubjectId(selectedCategory.subject_id);
-                setUnitId(selectedCategory.unit_id ?? '');
-                setTopicId(selectedCategory.topic_id ?? '');
-            }
-        } else {
-            setGradeId('');
-            setSubjectId('');
-            setUnitId('');
-            setTopicId('');
-        }
-    }, [categoryId, categories]);
 
     // Soru tipi değiştiğinde seçili dosyayı temizle
     useEffect(() => {
@@ -354,6 +336,11 @@ const ExcelSoruImport = () => {
             return;
         }
 
+        if (!publisherName.trim()) {
+            setGlobalError('Lütfen bir yayınevi seçin.');
+            return;
+        }
+
         if (questions.length === 0) {
             setGlobalError('Kaydedilecek soru bulunamadı.');
             return;
@@ -390,6 +377,7 @@ const ExcelSoruImport = () => {
                         question_text: question.question_text,
                         question_type: 'true_false',
                         difficulty: 'medium',
+                        publisher: publisherName.trim(),
                         answers: [
                             { answer_text: 'Doğru', is_correct: question.is_correct === true },
                             { answer_text: 'Yanlış', is_correct: question.is_correct === false }
@@ -402,6 +390,7 @@ const ExcelSoruImport = () => {
                         question_text: question.question_text,
                         question_type: 'qa',
                         difficulty: 'medium',
+                        publisher: publisherName.trim(),
                         answers: [
                             { answer_text: question.answer_text || '', is_correct: true }
                         ]
@@ -526,7 +515,7 @@ const ExcelSoruImport = () => {
     };
 
     // Kategorinin seçili olup olmadığını kontrol et
-    const isCategorySelected = categoryExists;
+    const isCategorySelected = categoryExists && publisherName.trim() !== '';
 
     // Yardım diyaloğunu aç
     const handleOpenHelpDialog = () => {
@@ -536,10 +525,6 @@ const ExcelSoruImport = () => {
     // Yardım diyaloğunu kapat
     const handleCloseHelpDialog = () => {
         setHelpDialogOpen(false);
-    };
-
-    const handleCategoryChange = (event: SelectChangeEvent<number | string>) => {
-        setCategoryId(event.target.value as number);
     };
 
     // Form alanları için handle fonksiyonları
@@ -736,6 +721,43 @@ const ExcelSoruImport = () => {
                     </Alert>
                 )}
 
+                {/* Yayınevi Seçimi */}
+                <Box sx={{ mb: 3 }}>
+                    <Typography variant="subtitle1" gutterBottom>
+                        Yayınevi Seçimi
+                    </Typography>
+                    <FormControl fullWidth required sx={{ maxWidth: 300 }}>
+                        <InputLabel>Yayınevi</InputLabel>
+                        <Select
+                            value={publisherName}
+                            label="Yayınevi"
+                            onChange={(e) => setPublisherName(e.target.value)}
+                            MenuProps={{
+                                PaperProps: {
+                                    style: {
+                                        maxHeight: 300,
+                                        width: 'auto',
+                                        minWidth: 200,
+                                        zIndex: 1500
+                                    },
+                                },
+                            }}
+                        >
+                            <MenuItem value="">Yayınevi Seçin</MenuItem>
+                            {publishers.map((publisher) => (
+                                <MenuItem key={publisher.id} value={publisher.name}>
+                                    {publisher.name}
+                                </MenuItem>
+                            ))}
+                        </Select>
+                        {!publisherName.trim() && (
+                            <Typography variant="caption" color="error" sx={{ mt: 0.5 }}>
+                                Yayınevi seçimi zorunludur
+                            </Typography>
+                        )}
+                    </FormControl>
+                </Box>
+
                 <FormControl component="fieldset" sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 3 }}>
                     <Typography variant="subtitle1" gutterBottom>
                         Soru Tipi
@@ -818,7 +840,7 @@ const ExcelSoruImport = () => {
 
                 {!isCategorySelected && (
                     <Alert severity="info" sx={{ mb: 3 }}>
-                        Lütfen önce bir kategori seçin.
+                        Lütfen önce bir kategori ve yayınevi seçin.
                     </Alert>
                 )}
 

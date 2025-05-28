@@ -34,7 +34,6 @@ const QuestionList = () => {
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [questionToDelete, setQuestionToDelete] = useState<number | null>(null);
 
-
     // Eğitim yapısı verilerini yükle
     const { grades, subjects, units, topics} = useEducationStructure();
 
@@ -45,7 +44,7 @@ const QuestionList = () => {
     const [topicIdFilter, setTopicIdFilter] = useState<number | ''>('');
 
     const { users } = useUsers();
-    const { publishers } = usePublishers();
+    const { publishers } = usePublishers(); // Güncellenmiş hook kullanılıyor
     const { categories } = useCategories();
     const [userFilter, setUserFilter] = useState<string>('');
     const [publisherFilter, setPublisherFilter] = useState<string>('');
@@ -53,6 +52,8 @@ const QuestionList = () => {
     // Filtrelenmiş listeler
     const [filteredUnits, setFilteredUnits] = useState<any[]>([]);
     const [filteredTopics, setFilteredTopics] = useState<any[]>([]);
+
+
 
     // Grade ve Subject değiştiğinde ilgili üniteleri filtrele
     useEffect(() => {
@@ -176,6 +177,12 @@ const QuestionList = () => {
 
     const handleTopicChange = (event: SelectChangeEvent<number | ''>) => {
         setTopicIdFilter(event.target.value as number | '');
+        setPage(1);
+    };
+
+    // Publisher filtre değişiklik fonksiyonu
+    const handlePublisherChange = (event: SelectChangeEvent) => {
+        setPublisherFilter(event.target.value);
         setPage(1);
     };
 
@@ -368,19 +375,28 @@ const QuestionList = () => {
                             </FormControl>
                         </Grid>
 
-                        {/* Yayınevi */}
+                        {/* Yayınevi - UI Fix */}
                         <Grid item xs={12} sm={6} md={4}>
                             <FormControl fullWidth>
                                 <InputLabel>Yayınevi</InputLabel>
                                 <Select
                                     value={publisherFilter}
                                     label="Yayınevi"
-                                    onChange={(e) => setPublisherFilter(e.target.value)}
+                                    onChange={handlePublisherChange}
+                                    MenuProps={{
+                                        PaperProps: {
+                                            style: {
+                                                maxHeight: 300,
+                                                width: 300,
+                                                zIndex: 1500
+                                            },
+                                        },
+                                    }}
                                 >
                                     <MenuItem value="">Tümü</MenuItem>
-                                    {publishers.map((pub) => (
-                                        <MenuItem key={pub.publisher} value={pub.publisher}>
-                                            {pub.publisher} ({pub.count})
+                                    {publishers.map((publisher) => (
+                                        <MenuItem key={publisher.id} value={publisher.name}>
+                                            {publisher.name}
                                         </MenuItem>
                                     ))}
                                 </Select>
@@ -499,7 +515,6 @@ const QuestionList = () => {
                     </Grid>
                 </Paper>
 
-                {/* Debug bilgileri - Geliştirme aşamasında görebilmek için */}
                 {/* Debug bilgileri - Geliştirme aşamasında görebilmek için */}
                 {hasEducationFilter && (
                     <Paper sx={{ p: 2, borderRadius: 2, bgcolor: '#f5f5f5' }}>

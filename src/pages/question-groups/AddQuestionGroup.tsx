@@ -17,7 +17,8 @@ import * as gameService from '../../services/game.service';
 import * as userService from '../../services/user.service';
 import { useCategories } from '../../hooks/useCategories';
 import * as categoryService from '../../services/category.service';
-import {useEducationStructure} from "../../hooks/useEducationStructure.ts";
+import { useEducationStructure } from "../../hooks/useEducationStructure.ts";
+import { usePublishers } from '../../hooks/usePublishers';
 
 const steps = ['Etkinlik Bilgileri', 'Soru Seçimi', 'Önizleme'];
 
@@ -53,7 +54,7 @@ const AddQuestionGroup = () => {
     const [categoryExists, setCategoryExists] = useState<boolean>(false);
     const [creatingCategory, setCreatingCategory] = useState<boolean>(false);
     const [selectedQuestions, setSelectedQuestions] = useState<number[]>([]);
-    const [publisherId, setPublisherId] = useState<string>(''); // YENİ: Publisher alanı
+    const [publisherName, setPublisherName] = useState<string>('');
 
     // Filtrelenmiş listeler
     const [filteredUnits, setFilteredUnits] = useState<any[]>([]);
@@ -65,7 +66,7 @@ const AddQuestionGroup = () => {
     const [unitId, setUnitId] = useState<number | ''>('');
     const [topicId, setTopicId] = useState<number | ''>('');
 
-    // Görsel yükleme için yeni state değişkenleri
+    // Görsel yükleme için state değişkenleri
     const [imageFile, setImageFile] = useState<File | null>(null);
     const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [dragActive, setDragActive] = useState(false);
@@ -85,14 +86,15 @@ const AddQuestionGroup = () => {
 
     const { grades, subjects, units, topics } = useEducationStructure();
     const { categories, refreshCategories } = useCategories();
+    const { publishers } = usePublishers();
 
-    // YENİ: Current user'ı yükle ve default publisher'ı set et
+    // Current user'dan default publisher yükleme
     useEffect(() => {
         const fetchCurrentUser = async () => {
             try {
                 const user = await userService.getCurrentUser();
                 if (user.publisher) {
-                    setPublisherId(user.publisher);
+                    setPublisherName(user.publisher);
                 }
             } catch (error) {
                 console.error('Current user yüklenirken hata:', error);
@@ -128,7 +130,6 @@ const AddQuestionGroup = () => {
             );
             setFilteredUnits(filtered);
 
-            // Eğer seçili ünite bu filtrelere uygun değilse, seçimi sıfırla
             if (unitId && !filtered.some(unit => unit.id === unitId)) {
                 setUnitId('');
                 setTopicId('');
@@ -146,7 +147,6 @@ const AddQuestionGroup = () => {
             const filtered = topics.filter(topic => topic.unit_id === unitId);
             setFilteredTopics(filtered);
 
-            // Eğer seçili konu bu filtreye uygun değilse, seçimi sıfırla
             if (topicId && !filtered.some(topic => topic.id === topicId)) {
                 setTopicId('');
             }
@@ -158,7 +158,6 @@ const AddQuestionGroup = () => {
 
     // Seçilen kombinasyona göre kategori durumunu kontrol et
     useEffect(() => {
-        // Kategori kontrolü için tüm 4 alan gerekli: gradeId, subjectId, unitId, topicId
         if (gradeId && subjectId && unitId && topicId) {
             const matchingCategory = categories.find(category =>
                 category.grade_id === gradeId &&
@@ -219,17 +218,16 @@ const AddQuestionGroup = () => {
     // Form alanları değişimleri
     const handleQuestionTypeChange = (event: SelectChangeEvent) => {
         setQuestionType(event.target.value as 'multiple_choice' | 'true_false' | 'qa');
-        setSelectedQuestions([]); // Tip değiştiğinde seçili soruları sıfırla
+        setSelectedQuestions([]);
     };
 
     const handleGameChange = (event: SelectChangeEvent) => {
         setGameId(event.target.value);
-        setSelectedQuestions([]); // Oyun değiştiğinde seçili soruları sıfırla
+        setSelectedQuestions([]);
     };
 
-    // YENİ: Publisher değiştir
-    const handlePublisherChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        setPublisherId(event.target.value);
+    const handlePublisherChange = (event: SelectChangeEvent) => {
+        setPublisherName(event.target.value);
     };
 
     // Kategori adını oluştur
@@ -266,14 +264,9 @@ const AddQuestionGroup = () => {
             };
 
             const newCategory = await categoryService.createCategory(categoryData);
-
-            // Kategorileri yenile
             await refreshCategories();
-
-            // Yeni kategoriyi seç
             setCategoryId(newCategory.id.toString());
             setCategoryExists(true);
-
             setError(null);
         } catch (err) {
             console.error('Error creating category:', err);
@@ -306,7 +299,6 @@ const AddQuestionGroup = () => {
         const newSelectedQuestions = [...selectedQuestions];
 
         if (currentIndex === -1) {
-            // Seçilecek soru sayısı limitini kontrol et
             if (newSelectedQuestions.length >= 48) {
                 setError('En fazla 48 soru seçebilirsiniz.');
                 return;
@@ -323,12 +315,10 @@ const AddQuestionGroup = () => {
     // Sayfadaki tüm soruları seç/kaldır
     const handleSelectAllToggle = () => {
         if (selectAllChecked) {
-            // Tüm seçimleri kaldır
             setSelectedQuestions(prev =>
                 prev.filter(id => !eligibleQuestions.some(q => q.id === id))
             );
         } else {
-            // Bu sayfadaki tüm soruları ekle (48 soru limitini aşmamak kaydıyla)
             const newSelections = [...selectedQuestions];
 
             eligibleQuestions.forEach(question => {
@@ -371,13 +361,11 @@ const AddQuestionGroup = () => {
     };
 
     const handleFileChange = (file: File) => {
-        // Dosya tipini kontrol et
         if (!file.type.match('image.*')) {
             setUploadError('Lütfen geçerli bir görsel dosyası yükleyin (JPEG, PNG, GIF, vs.)');
             return;
         }
 
-        // Dosya boyutunu kontrol et (5MB)
         if (file.size > 5 * 1024 * 1024) {
             setUploadError('Görsel dosyası 5MB\'tan küçük olmalıdır');
             return;
@@ -386,7 +374,6 @@ const AddQuestionGroup = () => {
         setUploadError(null);
         setImageFile(file);
 
-        // Önizleme URL'i oluştur
         const reader = new FileReader();
         reader.onloadend = () => {
             setImagePreview(reader.result as string);
@@ -400,7 +387,7 @@ const AddQuestionGroup = () => {
         setUploadError(null);
     };
 
-    // Form gönderme - YENİ: Publisher dahil
+    // Form gönderme
     const handleSubmit = async () => {
         try {
             setLoading(true);
@@ -423,7 +410,7 @@ const AddQuestionGroup = () => {
             formData.append('question_type', questionType);
             formData.append('game_id', gameId);
             formData.append('category_id', categoryId);
-            formData.append('publisher', publisherId); // YENİ: Publisher eklendi
+            formData.append('publisher', publisherName);
 
             selectedQuestions.forEach((id, index) => {
                 formData.append(`question_ids[${index}]`, id.toString());
@@ -458,9 +445,9 @@ const AddQuestionGroup = () => {
         }
     };
 
-    // Adım geçerlilik kontrolleri - YENİ: Publisher kontrolü eklendi
+    // Adım geçerlilik kontrolleri
     const isFirstStepValid = () => {
-        return name.trim() !== '' && gameId !== '' && publisherId.trim() !== '';
+        return name.trim() !== '' && gameId !== '' && publisherName.trim() !== '';
     };
 
     const isSecondStepValid = () => {
@@ -472,11 +459,7 @@ const AddQuestionGroup = () => {
         switch (step) {
             case 0:
                 return (
-                    <Box sx={{
-                        width: '100%',
-                        px: 2,
-                        boxSizing: 'border-box'
-                    }}>
+                    <Box sx={{ width: '100%', px: 2, boxSizing: 'border-box' }}>
                         <Typography variant="h6" sx={{ mb: 3 }}>
                             Etkinlik Bilgilerini Girin
                         </Typography>
@@ -492,111 +475,149 @@ const AddQuestionGroup = () => {
                                 />
                             </Grid>
 
-                            {/* YENİ: Publisher Alanı */}
+                            {/* Publisher Alanı - Tam genişlik */}
                             <Grid item xs={12} sm={6}>
-                                <TextField
-                                    label="Yayınevi"
-                                    fullWidth
-                                    value={publisherId}
-                                    onChange={handlePublisherChange}
-                                    required
-                                    helperText="Yayınevi adını girin veya düzenleyin"
-                                />
+                                <FormControl fullWidth required>
+                                    <InputLabel>Yayınevi</InputLabel>
+                                    <Select
+                                        value={publisherName}
+                                        label="Yayınevi"
+                                        onChange={handlePublisherChange}
+                                        error={!publisherName.trim() && activeStep === 0}
+                                        MenuProps={{
+                                            PaperProps: {
+                                                style: {
+                                                    maxHeight: 300,
+                                                    width: 'auto',
+                                                    minWidth: 200,
+                                                    zIndex: 1500
+                                                },
+                                            },
+                                        }}
+                                    >
+                                        <MenuItem value="">Yayınevi Seçin</MenuItem>
+                                        {publishers.map((publisher) => (
+                                            <MenuItem key={publisher.id} value={publisher.name}>
+                                                {publisher.name}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                    {!publisherName.trim() && activeStep === 0 && (
+                                        <Typography variant="caption" color="error" sx={{ mt: 0.5, ml: 1 }}>
+                                            Yayınevi seçimi zorunludur
+                                        </Typography>
+                                    )}
+                                </FormControl>
                             </Grid>
 
-                            <Grid item xs={12} sm={6}>
+                            {/* Kategori Seçimi - Ayrı satır, tam genişlik */}
+                            <Grid item xs={12}>
                                 <Typography variant="subtitle1" gutterBottom>
                                     Kategori Seçimi
                                 </Typography>
-                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'end' }}>
-                                    <FormControl fullWidth required sx={{ mb: 2, maxWidth: 200 }}>
-                                        <InputLabel>Sınıf</InputLabel>
-                                        <Select
-                                            value={gradeId}
-                                            label="Sınıf"
-                                            onChange={handleGradeChange}
-                                            required
-                                        >
-                                            <MenuItem value="" disabled>Sınıf Seçin</MenuItem>
-                                            {grades.map((grade) => (
-                                                <MenuItem key={grade.id} value={grade.id}>
-                                                    {grade.name}
-                                                </MenuItem>
-                                            ))}
-                                        </Select>
-                                    </FormControl>
 
-                                    <FormControl fullWidth required sx={{ mb: 2, maxWidth: 200 }}>
-                                        <InputLabel>Ders</InputLabel>
-                                        <Select
-                                            value={subjectId}
-                                            label="Ders"
-                                            onChange={handleSubjectChange}
-                                            required
-                                        >
-                                            <MenuItem value="" disabled>Ders Seçin</MenuItem>
-                                            {subjects.map((subject) => (
-                                                <MenuItem key={subject.id} value={subject.id}>
-                                                    {subject.name}
-                                                </MenuItem>
-                                            ))}
-                                        </Select>
-                                    </FormControl>
+                                {/* Kategori dropdown'ları için ayrı Grid container */}
+                                <Grid container spacing={2}>
+                                    <Grid item xs={12} sm={6} md={3}>
+                                        <FormControl fullWidth required>
+                                            <InputLabel>Sınıf</InputLabel>
+                                            <Select
+                                                value={gradeId}
+                                                label="Sınıf"
+                                                onChange={handleGradeChange}
+                                                required
+                                            >
+                                                <MenuItem value="" disabled>Sınıf Seçin</MenuItem>
+                                                {grades.map((grade) => (
+                                                    <MenuItem key={grade.id} value={grade.id}>
+                                                        {grade.name}
+                                                    </MenuItem>
+                                                ))}
+                                            </Select>
+                                        </FormControl>
+                                    </Grid>
 
-                                    <FormControl fullWidth required sx={{ mb: 2, maxWidth: 200 }}>
-                                        <InputLabel>Ünite</InputLabel>
-                                        <Select
-                                            value={unitId}
-                                            label="Ünite"
-                                            onChange={handleUnitChange}
-                                            disabled={!gradeId || !subjectId || filteredUnits.length === 0}
-                                        >
-                                            <MenuItem value="">Ünite Seçin </MenuItem>
-                                            {filteredUnits.map((unit) => (
-                                                <MenuItem key={unit.id} value={unit.id}>
-                                                    {unit.name}
-                                                </MenuItem>
-                                            ))}
-                                        </Select>
-                                    </FormControl>
+                                    <Grid item xs={12} sm={6} md={3}>
+                                        <FormControl fullWidth required>
+                                            <InputLabel>Ders</InputLabel>
+                                            <Select
+                                                value={subjectId}
+                                                label="Ders"
+                                                onChange={handleSubjectChange}
+                                                required
+                                            >
+                                                <MenuItem value="" disabled>Ders Seçin</MenuItem>
+                                                {subjects.map((subject) => (
+                                                    <MenuItem key={subject.id} value={subject.id}>
+                                                        {subject.name}
+                                                    </MenuItem>
+                                                ))}
+                                            </Select>
+                                        </FormControl>
+                                    </Grid>
 
-                                    <FormControl fullWidth required sx={{ mb: 2, maxWidth: 200 }}>
-                                        <InputLabel>Konu</InputLabel>
-                                        <Select
-                                            value={topicId}
-                                            label="Konu"
-                                            onChange={handleTopicChange}
-                                            disabled={!unitId || filteredTopics.length === 0}
-                                        >
-                                            <MenuItem value="">Konu Seçin </MenuItem>
-                                            {filteredTopics.map((topic) => (
-                                                <MenuItem key={topic.id} value={topic.id}>
-                                                    {topic.name}
-                                                </MenuItem>
-                                            ))}
-                                        </Select>
-                                    </FormControl>
+                                    <Grid item xs={12} sm={6} md={3}>
+                                        <FormControl fullWidth required>
+                                            <InputLabel>Ünite</InputLabel>
+                                            <Select
+                                                value={unitId}
+                                                label="Ünite"
+                                                onChange={handleUnitChange}
+                                                disabled={!gradeId || !subjectId || filteredUnits.length === 0}
+                                            >
+                                                <MenuItem value="">Ünite Seçin</MenuItem>
+                                                {filteredUnits.map((unit) => (
+                                                    <MenuItem key={unit.id} value={unit.id}>
+                                                        {unit.name}
+                                                    </MenuItem>
+                                                ))}
+                                            </Select>
+                                        </FormControl>
+                                    </Grid>
 
+                                    <Grid item xs={12} sm={6} md={3}>
+                                        <FormControl fullWidth required>
+                                            <InputLabel>Konu</InputLabel>
+                                            <Select
+                                                value={topicId}
+                                                label="Konu"
+                                                onChange={handleTopicChange}
+                                                disabled={!unitId || filteredTopics.length === 0}
+                                            >
+                                                <MenuItem value="">Konu Seçin</MenuItem>
+                                                {filteredTopics.map((topic) => (
+                                                    <MenuItem key={topic.id} value={topic.id}>
+                                                        {topic.name}
+                                                    </MenuItem>
+                                                ))}
+                                            </Select>
+                                        </FormControl>
+                                    </Grid>
+
+                                    {/* Kategori Ekle Butonu - Ayrı satır */}
                                     {gradeId && subjectId && unitId && topicId && !categoryExists && (
-                                        <Button
-                                            variant="contained"
-                                            color="secondary"
-                                            onClick={handleCreateCategory}
-                                            disabled={creatingCategory}
-                                            sx={{ mb: 2, height: 'fit-content' }}
-                                        >
-                                            {creatingCategory ? (
-                                                <>
-                                                    <CircularProgress size={20} sx={{ mr: 1 }} />
-                                                    Oluşturuluyor...
-                                                </>
-                                            ) : (
-                                                'Kategoriyi Ekle'
-                                            )}
-                                        </Button>
+                                        <Grid item xs={12}>
+                                            <Button
+                                                variant="contained"
+                                                color="secondary"
+                                                onClick={handleCreateCategory}
+                                                disabled={creatingCategory}
+                                                sx={{ mt: 1 }}
+                                            >
+                                                {creatingCategory ? (
+                                                    <>
+                                                        <CircularProgress size={20} sx={{ mr: 1 }} />
+                                                        Oluşturuluyor...
+                                                    </>
+                                                ) : (
+                                                    'Kategoriyi Ekle'
+                                                )}
+                                            </Button>
+                                        </Grid>
                                     )}
-                                </Box>
+                                </Grid>
 
+                                {/* Alert mesajı */}
                                 {gradeId && subjectId && unitId && topicId && (
                                     <Alert
                                         severity={categoryExists ? "success" : "info"}
@@ -608,9 +629,9 @@ const AddQuestionGroup = () => {
                                         }
                                     </Alert>
                                 )}
-
                             </Grid>
 
+                            {/* Soru Tipi */}
                             <Grid item xs={12} sm={6}>
                                 <FormControl fullWidth>
                                     <InputLabel>Soru Tipi</InputLabel>
@@ -626,6 +647,7 @@ const AddQuestionGroup = () => {
                                 </FormControl>
                             </Grid>
 
+                            {/* Oyun */}
                             <Grid item xs={12} sm={6}>
                                 <FormControl fullWidth>
                                     <InputLabel>Oyun</InputLabel>
@@ -878,12 +900,11 @@ const AddQuestionGroup = () => {
                                 <Typography>{name}</Typography>
                             </Grid>
 
-                            {/* YENİ: Publisher Önizleme */}
                             <Grid item xs={12} sm={6}>
                                 <Typography variant="subtitle1" fontWeight="bold">
                                     Yayınevi:
                                 </Typography>
-                                <Typography>{publisherId || '-'}</Typography>
+                                <Typography>{publisherName || '-'}</Typography>
                             </Grid>
 
                             <Grid item xs={12} sm={6}>
@@ -962,7 +983,7 @@ const AddQuestionGroup = () => {
         const isStepValid = [
             isFirstStepValid(),
             isSecondStepValid(),
-            true // Son adım her zaman geçerli
+            true
         ][activeStep];
 
         return (

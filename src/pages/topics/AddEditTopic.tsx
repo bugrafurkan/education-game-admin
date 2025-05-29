@@ -5,6 +5,11 @@ import {
     Paper,
     TextField,
     Typography,
+    FormControl,
+    InputLabel,
+    Select,
+    SelectChangeEvent,
+    Grid
 } from '@mui/material';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -28,12 +33,20 @@ const AddEditTopic = () => {
         unit_id: '',
     });
 
+    // Tüm veriler
     const [units, setUnits] = useState<Unit[]>([]);
     const [grades, setGrades] = useState<Grade[]>([]);
     const [subjects, setSubjects] = useState<Subject[]>([]);
-    const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null);
+
+    // Hiyerarşik seçimler
+    const [gradeId, setGradeId] = useState<number | ''>('');
+    const [subjectId, setSubjectId] = useState<number | ''>('');
+
+    // Filtrelenmiş ünite listesi
+    const [filteredUnits, setFilteredUnits] = useState<Unit[]>([]);
 
     useEffect(() => {
+        // Tüm verileri yükle
         getUnits().then((res) => setUnits(res.data));
         getGrades().then((res) => setGrades(res.data));
         getSubjects().then((res) => setSubjects(res.data));
@@ -47,25 +60,51 @@ const AddEditTopic = () => {
                         unit_id: topic.unit_id.toString(),
                     });
 
+                    // Düzenleme modunda mevcut topic'in unit bilgilerini yükle
                     getUnits().then((unitRes) => {
                         const unit = unitRes.data.find((u) => u.id === topic.unit_id);
-                        if (unit) setSelectedUnit(unit);
+                        if (unit) {
+                            setGradeId(unit.grade_id);
+                            setSubjectId(unit.subject_id);
+                        }
                     });
-
                 }
             });
         }
-    }, [id]);
+    }, [id, isEdit]);
 
+    // Grade ve Subject değiştiğinde ilgili üniteleri filtrele
     useEffect(() => {
-        const unit = units.find((u) => u.id === Number(form.unit_id));
-        if (unit) {
-            setSelectedUnit(unit);
+        if (gradeId && subjectId) {
+            const filtered = units.filter(
+                unit => unit.grade_id === gradeId && unit.subject_id === subjectId
+            );
+            setFilteredUnits(filtered);
+
+            // Eğer seçili ünite bu filtrelere uygun değilse, seçimi sıfırla
+            if (form.unit_id && !filtered.some(unit => unit.id === Number(form.unit_id))) {
+                setForm(prev => ({ ...prev, unit_id: '' }));
+            }
+        } else {
+            setFilteredUnits([]);
+            setForm(prev => ({ ...prev, unit_id: '' }));
         }
-    }, [form.unit_id, units]);
+    }, [gradeId, subjectId, units, form.unit_id]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setForm({ ...form, [e.target.name]: e.target.value });
+    };
+
+    const handleGradeChange = (event: SelectChangeEvent<number | ''>) => {
+        setGradeId(event.target.value as number | '');
+    };
+
+    const handleSubjectChange = (event: SelectChangeEvent<number | ''>) => {
+        setSubjectId(event.target.value as number | '');
+    };
+
+    const handleUnitChange = (event: SelectChangeEvent) => {
+        setForm(prev => ({ ...prev, unit_id: event.target.value }));
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -88,70 +127,98 @@ const AddEditTopic = () => {
         }
     };
 
-    const selectedGrade = grades.find((g) => g.id === selectedUnit?.grade_id);
-    const selectedSubject = subjects.find((s) => s.id === selectedUnit?.subject_id);
-
     return (
         <Box sx={{
             width: '100%',
-            px: 3,            // Responsive boşluk (varsayılan container gibi)
+            px: 3,
             boxSizing: 'border-box'
         }}>
             <Typography variant="h5" fontWeight="bold" mb={2}>
                 {isEdit ? 'Konu Düzenle' : 'Yeni Konu Ekle'}
             </Typography>
 
-            <Paper sx={{ p: 3, maxWidth: 500 }}>
+            <Paper sx={{ p: 3, maxWidth: 800 }}>
                 <form onSubmit={handleSubmit}>
-                    <TextField
-                        label="Konu Adı"
-                        name="name"
-                        value={form.name}
-                        onChange={handleChange}
-                        fullWidth
-                        required
-                        margin="normal"
-                    />
+                    <Grid container spacing={3}>
+                        {/* Konu Adı */}
+                        <Grid item xs={12}>
+                            <TextField
+                                label="Konu Adı"
+                                name="name"
+                                value={form.name}
+                                onChange={handleChange}
+                                fullWidth
+                                required
+                            />
+                        </Grid>
 
-                    <TextField
-                        select
-                        label="Ünite Seç"
-                        name="unit_id"
-                        value={form.unit_id}
-                        onChange={handleChange}
-                        fullWidth
-                        required
-                        margin="normal"
-                    >
-                        {units.map((unit) => (
-                            <MenuItem key={unit.id} value={unit.id}>
-                                {unit.name}
-                            </MenuItem>
-                        ))}
-                    </TextField>
+                        {/* Hiyerarşik Seçim Alanları */}
+                        <Grid item xs={12}>
+                            <Typography variant="subtitle1" gutterBottom>
+                                Kategori Seçimi
+                            </Typography>
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'end' }}>
+                                <FormControl fullWidth required sx={{ mb: 2, maxWidth: 200 }}>
+                                    <InputLabel>Sınıf</InputLabel>
+                                    <Select
+                                        value={gradeId}
+                                        label="Sınıf"
+                                        onChange={handleGradeChange}
+                                        required
+                                    >
+                                        <MenuItem value="" disabled>Sınıf Seçin</MenuItem>
+                                        {grades.map((grade) => (
+                                            <MenuItem key={grade.id} value={grade.id}>
+                                                {grade.name}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
 
-                    <TextField
-                        label="Sınıf"
-                        value={selectedGrade?.name || ''}
-                        fullWidth
-                        margin="normal"
-                        InputProps={{
-                            readOnly: true,
-                        }}
-                    />
+                                <FormControl fullWidth required sx={{ mb: 2, maxWidth: 200 }}>
+                                    <InputLabel>Ders</InputLabel>
+                                    <Select
+                                        value={subjectId}
+                                        label="Ders"
+                                        onChange={handleSubjectChange}
+                                        required
+                                    >
+                                        <MenuItem value="" disabled>Ders Seçin</MenuItem>
+                                        {subjects.map((subject) => (
+                                            <MenuItem key={subject.id} value={subject.id}>
+                                                {subject.name}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
 
-                    <TextField
-                        label="Ders"
-                        value={selectedSubject?.name || ''}
-                        fullWidth
-                        margin="normal"
-                        InputProps={{
-                            readOnly: true,
-                        }}
-                    />
+                                <FormControl fullWidth required sx={{ mb: 2, maxWidth: 200 }}>
+                                    <InputLabel>Ünite</InputLabel>
+                                    <Select
+                                        value={form.unit_id}
+                                        label="Ünite"
+                                        onChange={handleUnitChange}
+                                        disabled={!gradeId || !subjectId || filteredUnits.length === 0}
+                                        required
+                                    >
+                                        <MenuItem value="" disabled>Ünite Seçin</MenuItem>
+                                        {filteredUnits.map((unit) => (
+                                            <MenuItem key={unit.id} value={unit.id}>
+                                                {unit.name}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </Box>
+                        </Grid>
+                    </Grid>
 
-                    <Box mt={2}>
-                        <Button type="submit" variant="contained">
+                    <Box mt={3}>
+                        <Button
+                            type="submit"
+                            variant="contained"
+                            disabled={!form.name || !form.unit_id}
+                        >
                             Kaydet
                         </Button>
                         <Button

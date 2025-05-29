@@ -5,7 +5,7 @@ import {
     TableCell, TableContainer, TableHead, TablePagination, TableRow, Grid,
     CircularProgress, Alert, Select, MenuItem, IconButton, FormControl, InputLabel,
     Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle,
-    SelectChangeEvent, Autocomplete
+    SelectChangeEvent
 } from '@mui/material';
 import {
     Add as AddIcon, Search as SearchIcon, Edit as EditIcon, Delete as DeleteIcon,
@@ -16,6 +16,7 @@ import * as questionGroupService from '../../services/question-group.service';
 import { useGames } from '../../hooks/useGames';
 import { useCategories } from '../../hooks/useCategories';
 import { useEducationStructure } from '../../hooks/useEducationStructure';
+import { usePublishers } from '../../hooks/usePublishers'; // DEĞIŞIKLIK: usePublishers hook'u eklendi
 
 const QuestionGroupList = () => {
     const [loading, setLoading] = useState(true);
@@ -31,10 +32,8 @@ const QuestionGroupList = () => {
     const [sortField, setSortField] = useState('created_at');
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
-    // YENİ: Publisher filtresi
+    // DEĞIŞIKLIK: Publisher filtresi - Question sayfası gibi
     const [publisherFilter, setPublisherFilter] = useState<string>('');
-    const [publishers, setPublishers] = useState<{ publisher: string; count: number }[]>([]);
-    const [publishersLoading, setPublishersLoading] = useState(false);
 
     // Eğitim yapısı filtreleri
     const [gradeIdFilter, setGradeIdFilter] = useState<number | ''>('');
@@ -50,27 +49,11 @@ const QuestionGroupList = () => {
     const { games } = useGames();
     const { categories } = useCategories();
     const { grades, subjects, units, topics } = useEducationStructure();
+    const { publishers } = usePublishers(); // DEĞIŞIKLIK: usePublishers hook'u kullanılıyor
 
     // Filtrelenmiş listeler
     const [filteredUnits, setFilteredUnits] = useState<any[]>([]);
     const [filteredTopics, setFilteredTopics] = useState<any[]>([]);
-
-    // YENİ: Publisher'ları yükle
-    useEffect(() => {
-        const fetchPublishers = async () => {
-            try {
-                setPublishersLoading(true);
-                const response = await questionGroupService.getPublishers();
-                setPublishers(response);
-            } catch (err) {
-                console.error('Error fetching publishers:', err);
-            } finally {
-                setPublishersLoading(false);
-            }
-        };
-
-        fetchPublishers();
-    }, []);
 
     // Grade ve Subject değiştiğinde ilgili üniteleri filtrele
     useEffect(() => {
@@ -80,7 +63,6 @@ const QuestionGroupList = () => {
             );
             setFilteredUnits(filtered);
 
-            // Eğer seçili ünite bu filtrelere uygun değilse, seçimi sıfırla
             if (unitIdFilter && !filtered.some(unit => unit.id === unitIdFilter)) {
                 setUnitIdFilter('');
                 setTopicIdFilter('');
@@ -98,7 +80,6 @@ const QuestionGroupList = () => {
             const filtered = topics.filter(topic => topic.unit_id === unitIdFilter);
             setFilteredTopics(filtered);
 
-            // Eğer seçili konu bu filtreye uygun değilse, seçimi sıfırla
             if (topicIdFilter && !filtered.some(topic => topic.id === topicIdFilter)) {
                 setTopicIdFilter('');
             }
@@ -111,11 +92,10 @@ const QuestionGroupList = () => {
     // Seçilen filtrelere göre kategori ID'lerini bul
     const getMatchingCategoryIds = (): number[] | null => {
         if (!gradeIdFilter && !subjectIdFilter && !unitIdFilter && !topicIdFilter) {
-            return null; // Hiçbir filtre seçilmediyse null döndür (tüm etkinlikler)
+            return null;
         }
 
         const matchingCategories = categories.filter(category => {
-            // Her filtre için kontrol yap
             const gradeMatch = !gradeIdFilter || category.grade_id === gradeIdFilter;
             const subjectMatch = !subjectIdFilter || category.subject_id === subjectIdFilter;
             const unitMatch = !unitIdFilter || category.unit_id === unitIdFilter;
@@ -125,11 +105,9 @@ const QuestionGroupList = () => {
         });
 
         const categoryIds = matchingCategories.map(category => category.id);
-
-        return categoryIds; // Boş array da olabilir
+        return categoryIds;
     };
 
-    // Soru tiplerini kullanıcı dostu formata dönüştüren yardımcı fonksiyon
     const getQuestionTypeLabel = (type: string): string => {
         switch (type) {
             case 'multiple_choice':
@@ -150,16 +128,14 @@ const QuestionGroupList = () => {
     const fetchGroups = async () => {
         setLoading(true);
         try {
-            // Çoklu kategori filtreleme - Boş kategori sorunu çözümü
             const matchingCategoryIds = getMatchingCategoryIds();
             const filters: questionGroupService.QuestionGroupFilters = {
                 search,
                 question_type: questionType || undefined,
                 game_id: gameId,
-                publisher: publisherFilter || undefined, // YENİ: Publisher filtresi
+                publisher: publisherFilter || undefined, // DEĞIŞIKLIK: publisher string olarak
                 sort_field: sortField,
                 sort_direction: sortDirection,
-                // Eğer eşleşen kategori varsa category_ids gönder, yoksa [-1] gönder
                 ...(matchingCategoryIds !== null ? {
                     category_ids: matchingCategoryIds.length > 0 ? matchingCategoryIds : [-1]
                 } : {})
@@ -175,11 +151,9 @@ const QuestionGroupList = () => {
         setLoading(false);
     };
 
-    // Debug bilgileri güncellemesi
     const matchingCategoryIds = getMatchingCategoryIds();
     const hasEducationFilter = gradeIdFilter || subjectIdFilter || unitIdFilter || topicIdFilter;
 
-    // Kategori filtre değişiklik fonksiyonları
     const handleGradeChange = (event: SelectChangeEvent<number | ''>) => {
         setGradeIdFilter(event.target.value as number | '');
         setPage(1);
@@ -200,18 +174,17 @@ const QuestionGroupList = () => {
         setPage(1);
     };
 
-    // YENİ: Publisher değişiklik fonksiyonu
-    const handlePublisherChange = (_event: any, newValue: string | null) => {
-        setPublisherFilter(newValue || '');
+    // DEĞIŞIKLIK: Publisher değişiklik fonksiyonu - Question sayfası gibi
+    const handlePublisherChange = (event: SelectChangeEvent) => {
+        setPublisherFilter(event.target.value);
         setPage(1);
     };
 
-    // Tüm filtreleri temizle
     const handleResetFilters = () => {
         setSearch('');
         setQuestionType('');
         setGameId('');
-        setPublisherFilter(''); // YENİ: Publisher filtresi temizle
+        setPublisherFilter(''); // DEĞIŞIKLIK: Publisher filtresi temizle
         setGradeIdFilter('');
         setSubjectIdFilter('');
         setUnitIdFilter('');
@@ -219,33 +192,29 @@ const QuestionGroupList = () => {
         setPage(1);
     };
 
-    // Herhangi bir filtre aktif mi kontrol et
     const isAnyFilterActive = () => {
         return search ||
             questionType ||
             gameId ||
-            publisherFilter || // YENİ: Publisher filtresi kontrolü
+            publisherFilter || // DEĞIŞIKLIK: Publisher filtresi kontrolü
             gradeIdFilter ||
             subjectIdFilter ||
             unitIdFilter ||
             topicIdFilter;
     };
 
-    // Silme dialogunu açan fonksiyon
     const handleDeleteClick = (groupId: number, event: React.MouseEvent) => {
-        event.stopPropagation(); // Event'in parent elementlere geçişini engelle
+        event.stopPropagation();
         setGroupToDelete(groupId);
         setDeleteDialogOpen(true);
     };
 
-    // Silme işlemini gerçekleştiren fonksiyon
     const handleDeleteConfirm = async () => {
         if (!groupToDelete) return;
 
         setDeleteLoading(true);
         try {
             await questionGroupService.deleteQuestionGroup(groupToDelete);
-            // Silme başarılı olduğunda listeyi güncelle
             fetchGroups();
             setError(null);
         } catch (e) {
@@ -328,30 +297,32 @@ const QuestionGroupList = () => {
                         </FormControl>
                     </Grid>
 
-                    {/* YENİ: Publisher Filtresi */}
+                    {/* DEĞIŞIKLIK: Publisher Filtresi - Question sayfası gibi Select dropdown */}
                     <Grid item xs={12} md={3}>
-                        <Autocomplete
-                            fullWidth
-                            options={publishers.map(p => p.publisher)}
-                            value={publisherFilter}
-                            onChange={handlePublisherChange}
-                            loading={publishersLoading}
-                            renderInput={(params) => (
-                                <TextField
-                                    {...params}
-                                    label="Yayınevi"
-                                    InputProps={{
-                                        ...params.InputProps,
-                                        endAdornment: (
-                                            <>
-                                                {publishersLoading ? <CircularProgress color="inherit" size={20} /> : null}
-                                                {params.InputProps.endAdornment}
-                                            </>
-                                        ),
-                                    }}
-                                />
-                            )}
-                        />
+                        <FormControl fullWidth>
+                            <InputLabel>Yayınevi</InputLabel>
+                            <Select
+                                value={publisherFilter}
+                                label="Yayınevi"
+                                onChange={handlePublisherChange}
+                                MenuProps={{
+                                    PaperProps: {
+                                        style: {
+                                            maxHeight: 300,
+                                            width: 300,
+                                            zIndex: 1500
+                                        },
+                                    },
+                                }}
+                            >
+                                <MenuItem value="">Tümü</MenuItem>
+                                {publishers.map((publisher) => (
+                                    <MenuItem key={publisher.id} value={publisher.name}>
+                                        {publisher.name}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
                     </Grid>
 
                     {/* Sınıf */}
@@ -428,7 +399,6 @@ const QuestionGroupList = () => {
                     <Grid item xs={12} md={12}>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <Box>
-                                {/* Filtre Temizle Butonu */}
                                 {isAnyFilterActive() && (
                                     <Button
                                         variant="outlined"
@@ -483,7 +453,7 @@ const QuestionGroupList = () => {
                                 <TableCell onClick={() => handleSort('game_id')} sx={{ cursor: 'pointer' }}>Oyun {getSortIcon('game_id')}</TableCell>
                                 <TableCell>Soru Sayısı</TableCell>
                                 <TableCell>Kategori</TableCell>
-                                <TableCell>Yayınevi</TableCell> {/* YENİ: Publisher kolonu */}
+                                <TableCell>Yayınevi</TableCell>
                                 <TableCell>İşlemler</TableCell>
                             </TableRow>
                         </TableHead>
@@ -500,7 +470,7 @@ const QuestionGroupList = () => {
                                         <TableCell>{group.game?.name || '-'}</TableCell>
                                         <TableCell>{group.questions_count}</TableCell>
                                         <TableCell>{group.category?.name || '-'}</TableCell>
-                                        <TableCell>{group.publisher || '-'}</TableCell> {/* YENİ: Publisher gösterimi */}
+                                        <TableCell>{group.publisher || '-'}</TableCell>
                                         <TableCell>
                                             <IconButton component={Link} to={`/question-groups/${group.id}`}><ViewIcon /></IconButton>
                                             <IconButton component={Link} to={`/question-groups/${group.id}/edit`}><EditIcon /></IconButton>

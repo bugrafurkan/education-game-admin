@@ -361,7 +361,15 @@ const QuestionGroupDetail = () => {
                             {questionGroup.creator?.name || '-'}
                         </Typography>
                     </Grid>
-
+                    {/* YENİ: Publisher Grid Item */}
+                    <Grid item xs={12} sm={6} md={4}>
+                        <Typography variant="subtitle2" color="text.secondary">
+                            Yayınevi
+                        </Typography>
+                        <Typography variant="body1" fontWeight="medium">
+                            {questionGroup.publisher || '-'}
+                        </Typography>
+                    </Grid>
                     <Grid item xs={12} sm={6} md={4}>
                         <Typography variant="subtitle2" color="text.secondary">
                             Soru Sayısı

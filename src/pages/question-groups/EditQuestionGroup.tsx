@@ -5,7 +5,8 @@ import {
     Box, Typography, Paper, Button, TextField,
     Grid, List, ListItem, ListItemText, Checkbox,
     ListItemIcon, Alert, CircularProgress, Chip,
-    Pagination, FormHelperText, IconButton
+    Pagination, FormHelperText, IconButton, FormControl,
+    InputLabel, Select, MenuItem, SelectChangeEvent
 } from '@mui/material';
 import {
     ArrowBack as ArrowBackIcon,
@@ -14,6 +15,7 @@ import {
     DeleteOutline as DeleteIcon
 } from '@mui/icons-material';
 import * as questionGroupService from '../../services/question-group.service';
+import { usePublishers } from '../../hooks/usePublishers'; // DEĞIŞIKLIK: usePublishers hook'u eklendi
 
 // Drag & Drop dosya yükleme için stiller
 const dropzoneStyles = {
@@ -43,7 +45,9 @@ const EditQuestionGroup = () => {
     const [questionType, setQuestionType] = useState<string>('');
     const [gameId, setGameId] = useState<number>(0);
     const [selectedQuestions, setSelectedQuestions] = useState<number[]>([]);
-    const [publisherId, setPublisherId] = useState<string>(''); // YENİ: Publisher alanı
+
+    // DEĞIŞIKLIK: Publisher state'i - Question sayfası gibi string olarak
+    const [publisherName, setPublisherName] = useState<string>('');
 
     // Görsel yükleme için yeni state değişkenleri
     const [imageFile, setImageFile] = useState<File | null>(null);
@@ -65,6 +69,8 @@ const EditQuestionGroup = () => {
     const [questionsPage, setQuestionsPage] = useState(1);
     const [totalQuestionsPages, setTotalQuestionsPages] = useState(1);
 
+    const { publishers } = usePublishers(); // DEĞIŞIKLIK: usePublishers hook'u kullanılıyor
+
     // Grup verilerini yükle
     useEffect(() => {
         if (!id) return;
@@ -83,9 +89,9 @@ const EditQuestionGroup = () => {
             setAllGroupQuestions(response.questions || []);
             setSelectedQuestions(response.questions?.map(q => q.id) || []);
 
-            // YENİ: Publisher bilgisini yükle
+            // DEĞIŞIKLIK: Publisher bilgisini yükle - Question sayfası gibi
             if (response.publisher) {
-                setPublisherId(response.publisher);
+                setPublisherName(response.publisher);
             }
 
             // Mevcut görseli ayarla
@@ -149,9 +155,9 @@ const EditQuestionGroup = () => {
         setError(null);
     };
 
-    // YENİ: Publisher değiştir
-    const handlePublisherChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        setPublisherId(event.target.value);
+    // DEĞIŞIKLIK: Publisher değiştir - Question sayfası gibi Select ile
+    const handlePublisherChange = (event: SelectChangeEvent) => {
+        setPublisherName(event.target.value);
     };
 
     // Görsel yükleme işlemleri
@@ -219,7 +225,7 @@ const EditQuestionGroup = () => {
         setUploadError(null);
     };
 
-    // Form gönderme - YENİ: Publisher dahil
+    // Form gönderme - DEĞIŞIKLIK: Publisher string olarak dahil
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
@@ -243,7 +249,7 @@ const EditQuestionGroup = () => {
             // FormData oluştur
             const formData = new FormData();
             formData.append('name', name);
-            formData.append('publisher', publisherId); // YENİ: Publisher eklendi
+            formData.append('publisher', publisherName); // DEĞIŞIKLIK: Publisher string olarak eklendi
             formData.append('_method', 'PUT'); // Laravel'de PUT/PATCH için gerekli
 
             // Seçili soruları ekle
@@ -344,15 +350,33 @@ const EditQuestionGroup = () => {
                             />
                         </Grid>
 
-                        {/* YENİ: Publisher Alanı */}
+                        {/* DEĞIŞIKLIK: Publisher Alanı - Question sayfası gibi Select dropdown */}
                         <Grid item xs={12} sm={6}>
-                            <TextField
-                                label="Yayınevi"
-                                fullWidth
-                                value={publisherId}
-                                onChange={handlePublisherChange}
-                                helperText="Yayınevi adını girin veya düzenleyin"
-                            />
+                            <FormControl fullWidth>
+                                <InputLabel>Yayınevi</InputLabel>
+                                <Select
+                                    value={publisherName}
+                                    label="Yayınevi"
+                                    onChange={handlePublisherChange}
+                                    MenuProps={{
+                                        PaperProps: {
+                                            style: {
+                                                maxHeight: 300,
+                                                width: 'auto',
+                                                minWidth: 200,
+                                                zIndex: 1500
+                                            },
+                                        },
+                                    }}
+                                >
+                                    <MenuItem value="">Yayınevi Seçin</MenuItem>
+                                    {publishers.map((publisher) => (
+                                        <MenuItem key={publisher.id} value={publisher.name}>
+                                            {publisher.name}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
                         </Grid>
 
                         <Grid item xs={12} sm={6}>

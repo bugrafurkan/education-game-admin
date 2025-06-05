@@ -498,7 +498,7 @@ const QuestionGroupList = () => {
                         setRowsPerPage(parseInt(e.target.value, 10));
                         setPage(1);
                     }}
-                    rowsPerPageOptions={[5, 10, 25]}
+                    rowsPerPageOptions={[10]}
                 />
             </Paper>
 

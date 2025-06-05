@@ -45,7 +45,7 @@ export const useQuestionGroups = (initialPage = 1) => {
             return true;
         } catch (err) {
             console.error('Error deleting question group:', err);
-            setError('Soru grubu silinirken bir hata oluştu.');
+            setError('Etkinlik silinirken bir hata oluştu.');
             return false;
         }
     };

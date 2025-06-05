@@ -105,7 +105,7 @@ const EditQuestionGroup = () => {
 
         } catch (err) {
             console.error('Error fetching question group:', err);
-            setError('Soru grubu yüklenirken bir hata oluştu.');
+            setError('Etkinlik yüklenirken bir hata oluştu.');
             setLoading(false);
         }
     };
@@ -271,13 +271,13 @@ const EditQuestionGroup = () => {
             await questionGroupService.updateQuestionGroupWithImage(parseInt(id!), formData);
 
             // Başarılı mesajı göster
-            alert('Soru grubu başarıyla güncellendi.');
+            alert('Etkinlik başarıyla güncellendi.');
 
             // Grup detay sayfasına yönlendir
             navigate(`/question-groups/${id}`);
         } catch (err) {
             console.error('Error updating question group:', err);
-            setError('Soru grubu güncellenirken bir hata oluştu.');
+            setError('Etkinlik güncellenirken bir hata oluştu.');
         } finally {
             setSaving(false);
         }
@@ -322,7 +322,7 @@ const EditQuestionGroup = () => {
                         <ArrowBackIcon />
                     </IconButton>
                     <Typography variant="h4" fontWeight="bold">
-                        Soru Grubunu Düzenle
+                        Etkinliği Düzenle
                     </Typography>
                 </Box>
             </Box>

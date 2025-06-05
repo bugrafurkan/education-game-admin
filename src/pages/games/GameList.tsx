@@ -228,7 +228,7 @@ const GameList = () => {
                                 page={pagination.current_page - 1} // API'den 1-tabanlı, MUI'de 0-tabanlı
                                 onPageChange={handleChangePage}
                                 onRowsPerPageChange={handleChangeRowsPerPage}
-                                rowsPerPageOptions={[6, 12, 24]}
+                                rowsPerPageOptions={[12]}
                                 labelRowsPerPage="Sayfa başına oyun:"
                                 labelDisplayedRows={({ from, to, count }) => `${from}-${to} / ${count}`}
                             />

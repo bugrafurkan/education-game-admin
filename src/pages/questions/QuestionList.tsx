@@ -654,7 +654,7 @@ const QuestionList = () => {
 
                     {!loading && pagination && (
                         <TablePagination
-                            rowsPerPageOptions={[5, 10, 25]}
+                            rowsPerPageOptions={[ 10 ]}
                             component="div"
                             count={pagination.total}
                             rowsPerPage={rowsPerPage}

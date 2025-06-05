@@ -246,7 +246,7 @@ const ExportList = () => {
                 </TableContainer>
 
                 <TablePagination
-                    rowsPerPageOptions={[5, 10, 25]}
+                    rowsPerPageOptions={[ 10]}
                     component="div"
                     count={filteredExports.length}
                     rowsPerPage={rowsPerPage}

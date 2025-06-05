@@ -30,6 +30,7 @@ import TopicList from "../pages/topics/TopicList.tsx";
 import AddEditTopic from "../pages/topics/AddEditTopic.tsx";
 import TopluSoruEkleme from "../pages/questions/TopluSoruEkleme.tsx";
 import ExcelSoruImport from "../pages/questions/ExcelSoruImport.tsx";
+import PublisherList from '../pages/publishers/PublisherList.tsx';
 
 // AuthGuard: Kimlik doğrulama gerektiren rotalar için koruma
 interface AuthGuardProps {
@@ -117,7 +118,7 @@ const AppRoutes = () => {
                 <Route path="/topics" element={<TopicList />} />
                 <Route path="/topics/add" element={<AddEditTopic />} />
                 <Route path="/topics/edit/:id" element={<AddEditTopic />} />
-
+                <Route path="/publishers" element={<PublisherList />} />
                 {/* Other protected routes will go here */}
             </Route>
 

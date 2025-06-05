@@ -124,25 +124,25 @@ export const getQuestionGroups = async (
     return response.data;
 };
 
-// Belirli bir soru grubunu getir
+// Belirli bir Etkinliknu getir
 export const getQuestionGroup = async (id: number): Promise<QuestionGroup> => {
     const response = await api.get<QuestionGroup>(`/question-groups/${id}`);
     return response.data;
 };
 
-// Kod ile soru grubunu getir
+// Kod ile Etkinliknu getir
 export const getQuestionGroupByCode = async (code: string): Promise<QuestionGroup> => {
     const response = await api.get<QuestionGroup>(`/question-groups/code/${code}`);
     return response.data;
 };
 
-// Yeni soru grubu oluştur
+// Yeni Etkinlik oluştur
 export const createQuestionGroup = async (groupData: QuestionGroupCreate): Promise<QuestionGroup> => {
     const response = await api.post<QuestionGroup>('/question-groups', groupData);
     return response.data;
 };
 
-// Görsel ile yeni soru grubu oluştur (FormData kullanır)
+// Görsel ile yeni Etkinlik oluştur (FormData kullanır)
 export const createQuestionGroupWithImage = async (formData: FormData): Promise<QuestionGroup> => {
     const response = await api.post<QuestionGroup>('/question-groups', formData, {
         headers: {
@@ -152,13 +152,13 @@ export const createQuestionGroupWithImage = async (formData: FormData): Promise<
     return response.data;
 };
 
-// Soru grubunu güncelle
+// Etkinliknu güncelle
 export const updateQuestionGroup = async (id: number, groupData: QuestionGroupUpdate): Promise<QuestionGroup> => {
     const response = await api.put<QuestionGroup>(`/question-groups/${id}`, groupData);
     return response.data;
 };
 
-// Görsel ile soru grubunu güncelle (FormData kullanır)
+// Görsel ile Etkinliknu güncelle (FormData kullanır)
 export const updateQuestionGroupWithImage = async (id: number, formData: FormData): Promise<QuestionGroup> => {
     const response = await api.post<QuestionGroup>(`/question-groups/${id}`, formData, {
         headers: {
@@ -168,7 +168,7 @@ export const updateQuestionGroupWithImage = async (id: number, formData: FormDat
     return response.data;
 };
 
-// Soru grubunu sil
+// Etkinliknu sil
 export const deleteQuestionGroup = async (id: number): Promise<void> => {
     await api.delete(`/question-groups/${id}`);
 };

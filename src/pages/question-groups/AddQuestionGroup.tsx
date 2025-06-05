@@ -421,11 +421,11 @@ const AddQuestionGroup = () => {
             }
 
             await questionGroupService.createQuestionGroupWithImage(formData);
-            alert('Soru grubu başarıyla oluşturuldu.');
+            alert('Etkinlik başarıyla oluşturuldu.');
             navigate('/question-groups');
         } catch (err) {
             console.error('Error creating question group:', err);
-            setError('Soru grubu oluşturulurken bir hata oluştu.');
+            setError('Etkinlik oluşturulurken bir hata oluştu.');
         } finally {
             setLoading(false);
         }
@@ -1009,7 +1009,7 @@ const AddQuestionGroup = () => {
                             }}
                             startIcon={loading ? <CircularProgress size={20} /> : null}
                         >
-                            {loading ? 'İşleniyor...' : 'Grubu Oluştur'}
+                            {loading ? 'İşleniyor...' : 'Etkinliği Oluştur'}
                         </Button>
                     ) : (
                         <Button

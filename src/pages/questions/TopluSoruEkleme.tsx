@@ -22,6 +22,7 @@ import { usePublishers } from '../../hooks/usePublishers';
 import * as questionService from '../../services/question.service';
 import * as gameService from '../../services/game.service';
 import * as categoryService from '../../services/category.service';
+import ImageUploader from '../../components/ImageUploader';
 import axios, { AxiosError } from 'axios';
 
 // Soru tipi seçenekleri
@@ -55,8 +56,8 @@ const emptyChoiceTemplate = [
 interface QuestionTemplate {
     id: number;
     questionText: string;
-    imageFile: File | null;
     imagePath: string | null;
+    imageError: string | null;
     difficulty: string;
     publisherName: string;
     correctAnswer: string;
@@ -253,8 +254,8 @@ const TopluSoruEkleme = () => {
         const newQuestion: QuestionTemplate = {
             id: questionCounter,
             questionText: '',
-            imageFile: null,
             imagePath: null,
+            imageError: null,
             difficulty: 'medium',
             publisherName: globalPublisherName,
             correctAnswer: '',
@@ -343,40 +344,16 @@ const TopluSoruEkleme = () => {
     };
 
     // Resim seçimi
-    const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>, questionIndex: number) => {
-        const file = event.target.files?.[0];
-        if (!file) return;
-
-        // Dosya boyutu kontrolü (2MB)
-        if (file.size > 2 * 1024 * 1024) {
-            const updatedQuestions = [...questions];
-            updatedQuestions[questionIndex].error = "Dosya boyutu 2MB'dan küçük olmalıdır.";
-            setQuestions(updatedQuestions);
-            return;
-        }
-
-        // Dosya tipi kontrolü
-        if (!file.type.startsWith('image/')) {
-            const updatedQuestions = [...questions];
-            updatedQuestions[questionIndex].error = "Sadece resim dosyaları yüklenebilir.";
-            setQuestions(updatedQuestions);
-            return;
-        }
-
-        const objectUrl = URL.createObjectURL(file);
-
+    const handleImagePathChange = (path: string | null, questionIndex: number) => {
         const updatedQuestions = [...questions];
-        updatedQuestions[questionIndex].imageFile = file;
-        updatedQuestions[questionIndex].imagePath = objectUrl;
-        updatedQuestions[questionIndex].error = null;
+        updatedQuestions[questionIndex].imagePath = path;
+        updatedQuestions[questionIndex].imageError = null;
         setQuestions(updatedQuestions);
     };
 
-    // Resmi kaldır
-    const handleRemoveImage = (questionIndex: number) => {
+    const handleImageError = (error: string | null, questionIndex: number) => {
         const updatedQuestions = [...questions];
-        updatedQuestions[questionIndex].imageFile = null;
-        updatedQuestions[questionIndex].imagePath = null;
+        updatedQuestions[questionIndex].imageError = error;
         setQuestions(updatedQuestions);
     };
 
@@ -471,14 +448,8 @@ const TopluSoruEkleme = () => {
                 };
 
                 // Resim varsa yükle
-                if (question.imageFile) {
-                    try {
-                        const uploadResponse = await questionService.uploadImage(question.imageFile);
-                        questionData.image_path = uploadResponse.url;
-                    } catch (error) {
-                        console.error('Resim yükleme hatası:', error);
-                        throw new Error(`${question.id} numaralı sorunun resmi yüklenemedi`);
-                    }
+                if (question.imagePath) {
+                    questionData.image_path = question.imagePath;
                 }
 
                 // Soruyu kaydet
@@ -524,7 +495,7 @@ const TopluSoruEkleme = () => {
                     setQuestions([]);
                     setSuccess(false);
                 }
-            }, 2000);
+            }, 1000);
 
         } catch (error) {
             if (axios.isAxiosError(error)) {
@@ -855,54 +826,17 @@ const TopluSoruEkleme = () => {
                                             </Box>
 
                                             <Box sx={{ mb: 3 }}>
-                                                <Typography variant="subtitle1" sx={{ mb: 1 }}>
-                                                    Soru Resmi (Opsiyonel)
-                                                </Typography>
+                                                <ImageUploader
+                                                    imagePath={question.imagePath}
+                                                    onImagePathChange={(path) => handleImagePathChange(path, index)}
+                                                    onError={(error) => handleImageError(error, index)}
+                                                />
 
-                                                {question.imagePath && (
-                                                    <Box sx={{ mb: 2, position: 'relative', width: 'fit-content' }}>
-                                                        <img
-                                                            src={question.imagePath}
-                                                            alt={`Soru ${index + 1} resmi`}
-                                                            style={{
-                                                                maxWidth: '100%',
-                                                                maxHeight: '200px',
-                                                                border: '1px solid #ddd',
-                                                                borderRadius: '4px'
-                                                            }}
-                                                        />
-                                                        <Button
-                                                            variant="contained"
-                                                            color="error"
-                                                            size="small"
-                                                            onClick={() => handleRemoveImage(index)}
-                                                            sx={{
-                                                                position: 'absolute',
-                                                                top: 5,
-                                                                right: 5,
-                                                                minWidth: '30px',
-                                                                width: '30px',
-                                                                height: '30px',
-                                                                p: 0
-                                                            }}
-                                                        >
-                                                            X
-                                                        </Button>
-                                                    </Box>
+                                                {question.imageError && (
+                                                    <Alert severity="error" sx={{ mt: 1 }}>
+                                                        {question.imageError}
+                                                    </Alert>
                                                 )}
-
-                                                <Button
-                                                    variant="outlined"
-                                                    component="label"
-                                                >
-                                                    Resim Seç
-                                                    <input
-                                                        type="file"
-                                                        accept="image/*"
-                                                        hidden
-                                                        onChange={(e) => handleImageUpload(e, index)}
-                                                    />
-                                                </Button>
                                             </Box>
 
                                             <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>

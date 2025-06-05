@@ -60,7 +60,7 @@ const QuestionGroupDetail = () => {
             setLoading(false);
         } catch (err) {
             console.error('Error fetching question group:', err);
-            setError('Soru grubu yüklenirken bir hata oluştu.');
+            setError('Etkinlik yüklenirken bir hata oluştu.');
             setLoading(false);
         }
     };
@@ -78,7 +78,7 @@ const QuestionGroupDetail = () => {
             navigate('/question-groups');
         } catch (err) {
             console.error('Error deleting question group:', err);
-            setError('Soru grubu silinirken bir hata oluştu.');
+            setError('Etkinlik silinirken bir hata oluştu.');
         } finally {
             setDeleteDialogOpen(false);
         }
@@ -137,7 +137,7 @@ const QuestionGroupDetail = () => {
                     setStatusCheckInterval(null);
                 }
 
-                // Soru grubunu güncel bilgilerle yeniden yükle
+                // Etkinliknu güncel bilgilerle yeniden yükle
                 fetchQuestionGroup();
             } else if (status.status === 'failed') {
                 setIframeStatus('failed');
@@ -202,7 +202,7 @@ const QuestionGroupDetail = () => {
     if (!questionGroup) {
         return (
             <Alert severity="warning" sx={{ mt: 3, width: '100%' }}>
-                Soru grubu bulunamadı.
+                Etkinlik bulunamadı.
             </Alert>
         );
     }
@@ -634,10 +634,10 @@ const QuestionGroupDetail = () => {
                 open={deleteDialogOpen}
                 onClose={() => setDeleteDialogOpen(false)}
             >
-                <DialogTitle>Soru Grubunu Sil</DialogTitle>
+                <DialogTitle>Etkinlik Sil</DialogTitle>
                 <DialogContent>
                     <DialogContentText>
-                        "{questionGroup.name}" soru grubunu silmek istediğinize emin misiniz? Bu işlem geri alınamaz.
+                        "{questionGroup.name}" etkinliğini silmek istediğinize emin misiniz? Bu işlem geri alınamaz.
                     </DialogContentText>
                 </DialogContent>
                 <DialogActions>
@@ -721,7 +721,7 @@ const QuestionGroupDetail = () => {
                     {iframeStatus === 'completed' && iframeCode && (
                         <>
                             <DialogContentText sx={{ mb: 2 }}>
-                                Aşağıdaki iframe kodunu web sitenize ekleyerek bu soru grubunu görüntüleyebilirsiniz:
+                                Aşağıdaki iframe kodunu web sitenize ekleyerek bu etkinliği görüntüleyebilirsiniz:
                             </DialogContentText>
 
                             <TextField

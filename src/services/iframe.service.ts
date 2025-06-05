@@ -3,7 +3,7 @@ import api from './api';
 
 /**
  * İframe oluşturma işlemini başlatır
- * @param groupId Soru grubu ID'si
+ * @param groupId Etkinlik ID'si
  */
 interface CreateIframeResponse {
     success: boolean;
@@ -22,7 +22,7 @@ export const createIframe = async (groupId: number, gameId: number): Promise<Cre
 };
 /**
  * İframe durumunu kontrol eder
- * @param groupId Soru grubu ID'si
+ * @param groupId Etkinlik ID'si
  */
 export interface IframeStatus {
     status: 'pending' | 'processing' | 'completed' | 'failed';

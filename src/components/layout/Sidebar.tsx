@@ -20,6 +20,7 @@ import {
     LibraryBooks as LibraryBooksIcon,
     Category as CategoryIcon,
     People as PeopleIcon,
+    Business as BusinessIcon, // Publisher iconu için eklendi
     ExpandLess,
     ExpandMore,
     School as GradeIcon,
@@ -94,21 +95,25 @@ const Sidebar = ({ open, onClose, variant }: SidebarProps) => {
         setUserRole(role);
     }, [isAuthenticated]);
 
-    // Menü sıralaması değiştirildi, Ayarlar sekmesi sona değil ortaya alındı
-    const allMenuItems = [
+    // Editor için menü öğeleri
+    const editorMenuItems = [
+        //{ text: 'Ana Sayfa', icon: <HomeIcon />, path: '/' },
+        { text: 'Kullanıcı Yönetimi', icon: <PeopleIcon />, path: '/user-management' },
+        { text: 'Yayınevi Yönetimi', icon: <BusinessIcon />, path: '/publishers' }, // Editor için Publisher
+    ];
+
+    // Normal kullanıcılar için menü öğeleri
+    const normalUserMenuItems = [
         { text: 'Ana Sayfa', icon: <HomeIcon />, path: '/' },
         { text: 'Soru Yönetimi', icon: <QuestionIcon />, path: '/questions' },
         { text: 'Oyun Yönetimi', icon: <GameIcon />, path: '/games' },
         { text: 'Etkinlik Yönetimi', icon: <LibraryBooksIcon />, path: '/question-groups' },
+        { text: 'Yayınevi Yönetimi', icon: <BusinessIcon />, path: '/publishers' }, // Normal kullanıcılar için Publisher
         { text: 'Reklam Yönetimi', icon: <CampaignIcon />, path: '/advertisements' },
         { text: 'Ayarlar', icon: <SettingsIcon />, path: '/settings' },
     ];
 
-    const editorOnlyItems = [
-        { text: 'Kullanıcı Yönetimi', icon: <PeopleIcon />, path: '/user-management' },
-    ];
-
-    const menuItemsToRender = userRole === 'editor' ? editorOnlyItems : allMenuItems;
+    const menuItemsToRender = userRole === 'editor' ? editorMenuItems : normalUserMenuItems;
 
     return (
         <Drawer
@@ -162,7 +167,7 @@ const Sidebar = ({ open, onClose, variant }: SidebarProps) => {
                     </ListItem>
                 ))}
 
-                {/* Kategoriler Menüsü - Normal kullanıcılar için ve Ayarlardan sonra göster */}
+                {/* Kategoriler Menüsü - Sadece normal kullanıcılar için */}
                 {userRole !== 'editor' && (
                     <>
                         <ListItem disablePadding>

@@ -53,3 +53,17 @@ export const getCurrentUser = async (): Promise<User> => {
 export const isAuthenticated = (): boolean => {
     return !!localStorage.getItem('auth_token');
 };
+
+export const getCurrentUserRole = async (): Promise<string | null> => {
+    try {
+        if (!isAuthenticated()) {
+            return null;
+        }
+
+        const user = await getCurrentUser();
+        return user.role;
+    } catch (error) {
+        console.error('Kullanıcı rolü alınırken hata:', error);
+        return null;
+    }
+};

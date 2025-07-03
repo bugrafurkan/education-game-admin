@@ -32,6 +32,12 @@ interface ExcelQuestion {
     question_text: string;
     is_correct?: boolean;
     answer_text?: string;
+    // Çoktan seçmeli için seçenekler
+    option_a?: string;
+    option_b?: string;
+    option_c?: string;
+    option_d?: string;
+    correct_option?: string;
     valid: boolean;
     error?: string;
 }
@@ -63,7 +69,7 @@ const ExcelSoruImport = () => {
     const [filteredTopics, setFilteredTopics] = useState<any[]>([]);
 
     // Soru tipi ve yayınevi seçimi
-    const [questionType, setQuestionType] = useState<'true_false' | 'text'>('true_false');
+    const [questionType, setQuestionType] = useState<'true_false' | 'text' | 'multiple_choice'>('true_false');
     const [publisherName, setPublisherName] = useState<string>('');
 
     // Dosya ve içerik
@@ -205,33 +211,88 @@ const ExcelSoruImport = () => {
                     h?.toString().toLowerCase().includes('soru') ||
                     h?.toString().toLowerCase().includes('question'));
 
-                // Soru tipi Doğru/Yanlış ise doğru/yanlış sütununu, Klasik ise cevap sütununu ara
-                let answerColIndex = -1;
+                let requiredColumns: string[] = [];
+                let columnIndices: { [key: string]: number } = {};
 
                 if (questionType === 'true_false') {
-                    answerColIndex = headers.findIndex((h: string) =>
+                    // Doğru/Yanlış tipi için gerekli sütunlar
+                    const answerColIndex = headers.findIndex((h: string) =>
                         h?.toString().toLowerCase().includes('doğru') ||
                         h?.toString().toLowerCase().includes('yanlış') ||
                         h?.toString().toLowerCase().includes('dogru') ||
                         h?.toString().toLowerCase().includes('yanlis') ||
                         h?.toString().toLowerCase().includes('true') ||
                         h?.toString().toLowerCase().includes('false'));
-                } else {
-                    answerColIndex = headers.findIndex((h: string) =>
+
+                    columnIndices = { question: questionColIndex, answer: answerColIndex };
+                    requiredColumns = ['Soru Metni', 'Doğru/Yanlış'];
+
+                } else if (questionType === 'text') {
+                    // Klasik tipi için gerekli sütunlar
+                    const answerColIndex = headers.findIndex((h: string) =>
                         h?.toString().toLowerCase().includes('cevap') ||
                         h?.toString().toLowerCase().includes('answer'));
+
+                    columnIndices = { question: questionColIndex, answer: answerColIndex };
+                    requiredColumns = ['Soru Metni', 'Cevap'];
+
+                } else if (questionType === 'multiple_choice') {
+                    // Çoktan seçmeli tipi için gerekli sütunlar
+                    const optionAIndex = headers.findIndex((h: string) =>
+                        h?.toString().toLowerCase().includes('seçenek a') ||
+                        h?.toString().toLowerCase().includes('secenek a') ||
+                        h?.toString().toLowerCase().includes('option a') ||
+                        h?.toString().toLowerCase().includes('a)') ||
+                        h?.toString().toLowerCase().includes('a şıkkı') ||
+                        h?.toString().toLowerCase().includes('a sikki'));
+
+                    const optionBIndex = headers.findIndex((h: string) =>
+                        h?.toString().toLowerCase().includes('seçenek b') ||
+                        h?.toString().toLowerCase().includes('secenek b') ||
+                        h?.toString().toLowerCase().includes('option b') ||
+                        h?.toString().toLowerCase().includes('b)') ||
+                        h?.toString().toLowerCase().includes('b şıkkı') ||
+                        h?.toString().toLowerCase().includes('b sikki'));
+
+                    const optionCIndex = headers.findIndex((h: string) =>
+                        h?.toString().toLowerCase().includes('seçenek c') ||
+                        h?.toString().toLowerCase().includes('secenek c') ||
+                        h?.toString().toLowerCase().includes('option c') ||
+                        h?.toString().toLowerCase().includes('c)') ||
+                        h?.toString().toLowerCase().includes('c şıkkı') ||
+                        h?.toString().toLowerCase().includes('c sikki'));
+
+                    const optionDIndex = headers.findIndex((h: string) =>
+                        h?.toString().toLowerCase().includes('seçenek d') ||
+                        h?.toString().toLowerCase().includes('secenek d') ||
+                        h?.toString().toLowerCase().includes('option d') ||
+                        h?.toString().toLowerCase().includes('d)') ||
+                        h?.toString().toLowerCase().includes('d şıkkı') ||
+                        h?.toString().toLowerCase().includes('d sikki'));
+
+                    const correctOptionIndex = headers.findIndex((h: string) =>
+                        h?.toString().toLowerCase().includes('doğru seçenek') ||
+                        h?.toString().toLowerCase().includes('dogru secenek') ||
+                        h?.toString().toLowerCase().includes('correct option') ||
+                        h?.toString().toLowerCase().includes('doğru şık') ||
+                        h?.toString().toLowerCase().includes('dogru sik') ||
+                        h?.toString().toLowerCase().includes('cevap'));
+
+                    columnIndices = {
+                        question: questionColIndex,
+                        optionA: optionAIndex,
+                        optionB: optionBIndex,
+                        optionC: optionCIndex,
+                        optionD: optionDIndex,
+                        correctOption: correctOptionIndex
+                    };
+                    requiredColumns = ['Soru Metni', 'Seçenek A', 'Seçenek B', 'Seçenek C', 'Seçenek D', 'Doğru Seçenek'];
                 }
 
-                if (questionColIndex === -1 || answerColIndex === -1) {
-                    let errorMessage = 'Excel dosyasında gerekli sütunlar bulunamadı. ';
-
-                    if (questionType === 'true_false') {
-                        errorMessage += 'Lütfen "Soru Metni" ve "Doğru/Yanlış" sütunlarının bulunduğundan emin olun.';
-                    } else {
-                        errorMessage += 'Lütfen "Soru Metni" ve "Cevap" sütunlarının bulunduğundan emin olun.';
-                    }
-
-                    setParseError(errorMessage);
+                // Eksik sütunları kontrol et
+                const missingColumns = Object.values(columnIndices).filter(index => index === -1);
+                if (missingColumns.length > 0) {
+                    setParseError(`Excel dosyasında gerekli sütunlar bulunamadı. Lütfen şu sütunların bulunduğundan emin olun: ${requiredColumns.join(', ')}`);
                     setLoading(false);
                     return;
                 }
@@ -244,19 +305,24 @@ const ExcelSoruImport = () => {
                     const row = jsonData[i];
 
                     // Boş satırları atla
-                    if (!row || row.length === 0 || !row[questionColIndex]) continue;
+                    if (!row || row.length === 0 || !row[columnIndices.question]) continue;
 
-                    const questionText = row[questionColIndex]?.toString().trim();
+                    const questionText = row[columnIndices.question]?.toString().trim();
                     let valid = true;
                     let error = undefined;
                     let isCorrect: boolean | undefined = undefined;
                     let answerText: string | undefined = undefined;
+                    let optionA: string | undefined = undefined;
+                    let optionB: string | undefined = undefined;
+                    let optionC: string | undefined = undefined;
+                    let optionD: string | undefined = undefined;
+                    let correctOption: string | undefined = undefined;
 
                     // Soru tipine göre farklı işlem yap
                     if (questionType === 'true_false') {
                         // Doğru/Yanlış değerini işle
-                        if (row[answerColIndex]) {
-                            const answerValue = row[answerColIndex]?.toString().toLowerCase().trim();
+                        if (row[columnIndices.answer]) {
+                            const answerValue = row[columnIndices.answer]?.toString().toLowerCase().trim();
 
                             if (['doğru', 'dogru', 'true', 'd', 't', 'evet', 'yes', '1'].includes(answerValue)) {
                                 isCorrect = true;
@@ -270,12 +336,32 @@ const ExcelSoruImport = () => {
                             valid = false;
                             error = 'Doğru/Yanlış değeri eksik';
                         }
-                    } else {
+
+                    } else if (questionType === 'text') {
                         // Klasik soru için cevap metnini kontrol et
-                        answerText = row[answerColIndex]?.toString().trim();
+                        answerText = row[columnIndices.answer]?.toString().trim();
                         if (!answerText || answerText.length < 1) {
                             valid = false;
                             error = 'Cevap metni eksik';
+                        }
+
+                    } else if (questionType === 'multiple_choice') {
+                        // Çoktan seçmeli için seçenekleri ve doğru cevabı kontrol et
+                        optionA = row[columnIndices.optionA]?.toString().trim();
+                        optionB = row[columnIndices.optionB]?.toString().trim();
+                        optionC = row[columnIndices.optionC]?.toString().trim();
+                        optionD = row[columnIndices.optionD]?.toString().trim();
+                        correctOption = row[columnIndices.correctOption]?.toString().toLowerCase().trim();
+
+                        // Seçeneklerin dolu olup olmadığını kontrol et
+                        if (!optionA || !optionB || !optionC || !optionD) {
+                            valid = false;
+                            error = 'Tüm seçenekler (A, B, C, D) doldurulmalıdır';
+                        }
+                        // Doğru seçeneği kontrol et
+                        else if (!correctOption || !['a', 'b', 'c', 'd'].includes(correctOption)) {
+                            valid = false;
+                            error = 'Doğru seçenek A, B, C veya D olmalıdır';
                         }
                     }
 
@@ -290,6 +376,11 @@ const ExcelSoruImport = () => {
                         question_text: questionText || '',
                         is_correct: isCorrect,
                         answer_text: answerText,
+                        option_a: optionA,
+                        option_b: optionB,
+                        option_c: optionC,
+                        option_d: optionD,
+                        correct_option: correctOption,
                         valid,
                         error
                     });
@@ -383,7 +474,7 @@ const ExcelSoruImport = () => {
                             { answer_text: 'Yanlış', is_correct: question.is_correct === false }
                         ]
                     };
-                } else {
+                } else if (questionType === 'text') {
                     // Klasik tipi soru
                     questionData = {
                         category_id: categoryId as number,
@@ -395,6 +486,23 @@ const ExcelSoruImport = () => {
                             { answer_text: question.answer_text || '', is_correct: true }
                         ]
                     };
+                } else if (questionType === 'multiple_choice') {
+                    // Çoktan seçmeli tipi soru
+                    questionData = {
+                        category_id: categoryId as number,
+                        question_text: question.question_text,
+                        question_type: 'multiple_choice',
+                        difficulty: 'medium',
+                        publisher: publisherName.trim(),
+                        answers: [
+                            { answer_text: question.option_a || '', is_correct: question.correct_option === 'a' },
+                            { answer_text: question.option_b || '', is_correct: question.correct_option === 'b' },
+                            { answer_text: question.option_c || '', is_correct: question.correct_option === 'c' },
+                            { answer_text: question.option_d || '', is_correct: question.correct_option === 'd' }
+                        ]
+                    };
+                } else {
+                    throw new Error('Geçersiz soru tipi');
                 }
 
                 // Soruyu kaydet
@@ -473,13 +581,21 @@ const ExcelSoruImport = () => {
                 ['Su 100 derecede kaynar.', 'Doğru'],
                 ['İnsan kalbi sağ taraftadır.', 'Yanlış']
             ];
-        } else {
+        } else if (questionType === 'text') {
             data = [
                 ['Soru Metni', 'Cevap'],
                 ['Türkiye\'nin başkenti neresidir?', 'Ankara'],
                 ['2+2 kaçtır?', '4'],
                 ['Dünyanın en büyük okyanusu hangisidir?', 'Pasifik Okyanusu'],
                 ['Cumhuriyet hangi yılda ilan edilmiştir?', '1923']
+            ];
+        } else if (questionType === 'multiple_choice') {
+            data = [
+                ['Soru Metni', 'Seçenek A', 'Seçenek B', 'Seçenek C', 'Seçenek D', 'Doğru Seçenek'],
+                ['Türkiye\'nin başkenti neresidir?', 'İstanbul', 'Ankara', 'İzmir', 'Bursa', 'B'],
+                ['2+2 kaçtır?', '3', '4', '5', '6', 'B'],
+                ['Dünyanın en büyük okyanusu hangisidir?', 'Atlas Okyanusu', 'Hint Okyanusu', 'Pasifik Okyanusu', 'Arktik Okyanusu', 'C'],
+                ['Cumhuriyet hangi yılda ilan edilmiştir?', '1922', '1923', '1924', '1925', 'B']
             ];
         }
 
@@ -488,11 +604,21 @@ const ExcelSoruImport = () => {
         const ws = XLSX.utils.aoa_to_sheet(data);
 
         // Çalışma sayfasını çalışma kitabına ekle
-        const fileName = questionType === 'true_false'
-            ? 'dogru-yanlis-sorular-sablonu.xlsx'
-            : 'klasik-sorular-sablonu.xlsx';
+        let fileName = '';
+        let sheetName = '';
 
-        XLSX.utils.book_append_sheet(wb, ws, questionType === 'true_false' ? 'Doğru-Yanlış Sorular' : 'Klasik Sorular');
+        if (questionType === 'true_false') {
+            fileName = 'dogru-yanlis-sorular-sablonu.xlsx';
+            sheetName = 'Doğru-Yanlış Sorular';
+        } else if (questionType === 'text') {
+            fileName = 'klasik-sorular-sablonu.xlsx';
+            sheetName = 'Klasik Sorular';
+        } else if (questionType === 'multiple_choice') {
+            fileName = 'coktan-secmeli-sorular-sablonu.xlsx';
+            sheetName = 'Çoktan Seçmeli Sorular';
+        }
+
+        XLSX.utils.book_append_sheet(wb, ws, sheetName);
 
         // Dosyayı indir
         XLSX.writeFile(wb, fileName);
@@ -596,7 +722,30 @@ const ExcelSoruImport = () => {
     };
 
     const handleQuestionTypeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        setQuestionType(event.target.value as 'true_false' | 'text');
+        setQuestionType(event.target.value as 'true_false' | 'text' | 'multiple_choice');
+    };
+
+    // Çoktan seçmeli soruları görüntülemek için yardımcı fonksiyon
+    const renderMultipleChoiceOptions = (question: ExcelQuestion) => {
+        return (
+            <Box>
+                <Typography variant="body2" sx={{ fontSize: '0.8rem', mb: 0.5 }}>
+                    A) {question.option_a}
+                </Typography>
+                <Typography variant="body2" sx={{ fontSize: '0.8rem', mb: 0.5 }}>
+                    B) {question.option_b}
+                </Typography>
+                <Typography variant="body2" sx={{ fontSize: '0.8rem', mb: 0.5 }}>
+                    C) {question.option_c}
+                </Typography>
+                <Typography variant="body2" sx={{ fontSize: '0.8rem', mb: 0.5 }}>
+                    D) {question.option_d}
+                </Typography>
+                <Typography variant="body2" sx={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'primary.main' }}>
+                    Doğru: {question.correct_option?.toUpperCase()}
+                </Typography>
+            </Box>
+        );
     };
 
     return (
@@ -777,20 +926,33 @@ const ExcelSoruImport = () => {
                             control={<Radio />}
                             label="Klasik"
                         />
+                        <FormControlLabel
+                            value="multiple_choice"
+                            control={<Radio />}
+                            label="Çoktan Seçmeli"
+                        />
                     </RadioGroup>
                 </FormControl>
 
                 <Box sx={{ mb: 3 }}>
                     <Chip
-                        label={questionType === 'true_false' ? 'Doğru-Yanlış Soruları' : 'Klasik Sorular'}
+                        label={
+                            questionType === 'true_false'
+                                ? 'Doğru-Yanlış Soruları'
+                                : questionType === 'text'
+                                    ? 'Klasik Sorular'
+                                    : 'Çoktan Seçmeli Sorular'
+                        }
                         color="primary"
                         sx={{ fontWeight: 'bold' }}
                     />
                     <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
                         {questionType === 'true_false' ? (
                             'Excel dosyasında her soru için doğru cevap "Doğru" veya "Yanlış" olarak belirtilmelidir.'
-                        ) : (
+                        ) : questionType === 'text' ? (
                             'Excel dosyasında her soru için cevap metni "Cevap" sütununda belirtilmelidir.'
+                        ) : (
+                            'Excel dosyasında her soru için 4 seçenek (A, B, C, D) ve doğru seçenek (A, B, C veya D) belirtilmelidir.'
                         )}
                     </Typography>
                 </Box>
@@ -900,9 +1062,14 @@ const ExcelSoruImport = () => {
                                 <TableHead>
                                     <TableRow>
                                         <TableCell width="5%">#</TableCell>
-                                        <TableCell width="55%">Soru Metni</TableCell>
-                                        <TableCell width="30%">
-                                            {questionType === 'true_false' ? 'Doğru Cevap' : 'Cevap'}
+                                        <TableCell width="45%">Soru Metni</TableCell>
+                                        <TableCell width="40%">
+                                            {questionType === 'true_false'
+                                                ? 'Doğru Cevap'
+                                                : questionType === 'text'
+                                                    ? 'Cevap'
+                                                    : 'Seçenekler'
+                                            }
                                         </TableCell>
                                         <TableCell width="10%">Durum</TableCell>
                                     </TableRow>
@@ -935,8 +1102,10 @@ const ExcelSoruImport = () => {
                                             <TableCell>
                                                 {questionType === 'true_false' ? (
                                                     question.is_correct === true ? 'Doğru' : 'Yanlış'
-                                                ) : (
+                                                ) : questionType === 'text' ? (
                                                     question.answer_text
+                                                ) : (
+                                                    renderMultipleChoiceOptions(question)
                                                 )}
                                             </TableCell>
                                             <TableCell>
@@ -1025,8 +1194,10 @@ const ExcelSoruImport = () => {
                                 <Typography>
                                     {questionType === 'true_false' ? (
                                         <span><strong>"Doğru/Yanlış"</strong> adında bir sütun içermelidir.</span>
-                                    ) : (
+                                    ) : questionType === 'text' ? (
                                         <span><strong>"Cevap"</strong> adında bir sütun içermelidir.</span>
+                                    ) : (
+                                        <span><strong>"Seçenek A", "Seçenek B", "Seçenek C", "Seçenek D"</strong> ve <strong>"Doğru Seçenek"</strong> sütunları içermelidir.</span>
                                     )}
                                 </Typography>
                             </li>
@@ -1069,6 +1240,30 @@ const ExcelSoruImport = () => {
 
                                 <Typography paragraph>
                                     "Cevap" sütununda sorunun doğru cevabını belirtmelisiniz. Bu metin öğrencilere gösterilecek doğru cevaptır.
+                                </Typography>
+                            </>
+                        )}
+
+                        {questionType === 'multiple_choice' && (
+                            <>
+                                <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
+                                    Çoktan Seçmeli Sorularda Sütun Formatı
+                                </Typography>
+
+                                <Typography paragraph>
+                                    Çoktan seçmeli sorular için aşağıdaki sütunlar gereklidir:
+                                </Typography>
+
+                                <ul>
+                                    <li><Typography><strong>Seçenek A:</strong> İlk seçenek metni</Typography></li>
+                                    <li><Typography><strong>Seçenek B:</strong> İkinci seçenek metni</Typography></li>
+                                    <li><Typography><strong>Seçenek C:</strong> Üçüncü seçenek metni</Typography></li>
+                                    <li><Typography><strong>Seçenek D:</strong> Dördüncü seçenek metni</Typography></li>
+                                    <li><Typography><strong>Doğru Seçenek:</strong> A, B, C veya D harflerinden biri</Typography></li>
+                                </ul>
+
+                                <Typography paragraph sx={{ mt: 2 }}>
+                                    <strong>Örnek:</strong> Eğer doğru cevap "Seçenek B" ise, "Doğru Seçenek" sütununa sadece "B" yazın.
                                 </Typography>
                             </>
                         )}

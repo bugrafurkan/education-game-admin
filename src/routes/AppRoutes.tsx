@@ -31,6 +31,7 @@ import AddEditTopic from "../pages/topics/AddEditTopic.tsx";
 import TopluSoruEkleme from "../pages/questions/TopluSoruEkleme.tsx";
 import ExcelSoruImport from "../pages/questions/ExcelSoruImport.tsx";
 import PublisherList from '../pages/publishers/PublisherList.tsx';
+import RoleGuard from '../components/auth/RoleGuard'; // Yeni eklenen
 
 // AuthGuard: Kimlik doğrulama gerektiren rotalar için koruma
 interface AuthGuardProps {
@@ -103,9 +104,33 @@ const AppRoutes = () => {
                 <Route path="categories" element={<CategoryList />} />
                 <Route path="categories/add" element={<AddEditCategory />} />
                 <Route path="categories/:id/edit" element={<AddEditCategory />} />
-                <Route path="/user-management" element={<UserManagement />} />
-                <Route path="/user-management/add" element={<UserAddEdit  />} />
-                <Route path="/user-management/edit/:id" element={<UserAddEdit  />} />
+
+                {/* USER MANAGEMENT - Sadece editor rolü erişebilir */}
+                <Route
+                    path="/user-management"
+                    element={
+                        <RoleGuard allowedRoles={['editor']}>
+                            <UserManagement />
+                        </RoleGuard>
+                    }
+                />
+                <Route
+                    path="/user-management/add"
+                    element={
+                        <RoleGuard allowedRoles={['editor']}>
+                            <UserAddEdit />
+                        </RoleGuard>
+                    }
+                />
+                <Route
+                    path="/user-management/edit/:id"
+                    element={
+                        <RoleGuard allowedRoles={['editor']}>
+                            <UserAddEdit />
+                        </RoleGuard>
+                    }
+                />
+
                 <Route path="/grades" element={<GradeList />} />
                 <Route path="/grades/add" element={<AddEditGrade />} />
                 <Route path="/grades/edit/:id" element={<AddEditGrade />} />

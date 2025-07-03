@@ -22,7 +22,7 @@ export const usePublishers = () => {
         }
     }, []);
 
-    // Yeni publisher oluştur
+    // Yeni publisher oluştur (mevcut)
     const createPublisher = useCallback(async (name: string): Promise<publisherService.Publisher> => {
         try {
             const newPublisher = await publisherService.createPublisher({ name });
@@ -34,7 +34,7 @@ export const usePublishers = () => {
         }
     }, []);
 
-    // Publisher güncelle
+    // Publisher güncelle (mevcut)
     const updatePublisher = useCallback(async (id: number, name: string): Promise<publisherService.Publisher> => {
         try {
             const updatedPublisher = await publisherService.updatePublisher(id, { name });
@@ -49,7 +49,7 @@ export const usePublishers = () => {
         }
     }, []);
 
-    // Publisher sil
+    // Publisher sil (mevcut)
     const deletePublisher = useCallback(async (id: number): Promise<void> => {
         try {
             await publisherService.deletePublisher(id);
@@ -60,7 +60,7 @@ export const usePublishers = () => {
         }
     }, []);
 
-    // İsme göre publisher bul veya oluştur
+    // İsme göre publisher bul veya oluştur (mevcut)
     const findOrCreatePublisher = useCallback(async (name: string): Promise<publisherService.Publisher> => {
         try {
             const publisher = await publisherService.findOrCreatePublisher(name);
@@ -81,10 +81,89 @@ export const usePublishers = () => {
         }
     }, []);
 
-    // Manuel yenileme
+    // Manuel yenileme (mevcut)
     const refreshPublishers = useCallback(async () => {
         await fetchPublishers();
     }, [fetchPublishers]);
+
+    // YENİ: Logo ile birlikte publisher oluştur
+    const createPublisherWithLogo = useCallback(async (formData: FormData): Promise<publisherService.Publisher> => {
+        try {
+            const newPublisher = await publisherService.createPublisherWithLogo(formData);
+            setPublishers(prev => [...prev, newPublisher].sort((a, b) => a.name.localeCompare(b.name)));
+            return newPublisher;
+        } catch (err) {
+            console.error('Logo ile publisher oluşturulurken hata:', err);
+            throw err;
+        }
+    }, []);
+
+    // YENİ: Logo ile birlikte publisher güncelle
+    const updatePublisherWithLogo = useCallback(async (id: number, formData: FormData): Promise<publisherService.Publisher> => {
+        try {
+            const updatedPublisher = await publisherService.updatePublisherWithLogo(id, formData);
+            setPublishers(prev =>
+                prev.map(p => p.id === id ? updatedPublisher : p)
+                    .sort((a, b) => a.name.localeCompare(b.name))
+            );
+            return updatedPublisher;
+        } catch (err) {
+            console.error('Logo ile publisher güncellenirken hata:', err);
+            throw err;
+        }
+    }, []);
+
+    // YENİ: Sadece logo yükle
+    const uploadLogo = useCallback(async (logoFile: File, publisherId?: number): Promise<{ logo_url: string; publisher?: publisherService.Publisher }> => {
+        try {
+            const result = await publisherService.uploadLogo(logoFile, publisherId);
+
+            // Eğer publisher güncellendiyse state'i güncelle
+            if (result.publisher) {
+                setPublishers(prev =>
+                    prev.map(p => p.id === result.publisher!.id ? result.publisher! : p)
+                );
+            }
+
+            return result;
+        } catch (err) {
+            console.error('Logo yüklenirken hata:', err);
+            throw err;
+        }
+    }, []);
+
+    // YENİ: Logo sil
+    const deleteLogo = useCallback(async (publisherId: number): Promise<void> => {
+        try {
+            await publisherService.deleteLogo(publisherId);
+
+            // State'de logo bilgilerini temizle
+            setPublishers(prev =>
+                prev.map(p => p.id === publisherId ? { ...p, logo_url: undefined, has_logo: false } : p)
+            );
+        } catch (err) {
+            console.error('Logo silinirken hata:', err);
+            throw err;
+        }
+    }, []);
+
+    // YENİ: Polymorphic create function - FormData veya string kabul eder
+    const createPublisherFlexible = useCallback(async (data: FormData | string): Promise<publisherService.Publisher> => {
+        if (data instanceof FormData) {
+            return createPublisherWithLogo(data);
+        } else {
+            return createPublisher(data);
+        }
+    }, [createPublisher, createPublisherWithLogo]);
+
+    // YENİ: Polymorphic update function - FormData veya string kabul eder
+    const updatePublisherFlexible = useCallback(async (id: number, data: FormData | string): Promise<publisherService.Publisher> => {
+        if (data instanceof FormData) {
+            return updatePublisherWithLogo(id, data);
+        } else {
+            return updatePublisher(id, data);
+        }
+    }, [updatePublisher, updatePublisherWithLogo]);
 
     // Component mount olduğunda publisher'ları yükle
     useEffect(() => {
@@ -92,6 +171,7 @@ export const usePublishers = () => {
     }, [fetchPublishers]);
 
     return {
+        // Mevcut fonksiyonlar (değiştirilmedi)
         publishers,
         loading,
         error,
@@ -100,6 +180,16 @@ export const usePublishers = () => {
         deletePublisher,
         findOrCreatePublisher,
         refreshPublishers,
-        fetchPublishers
+        fetchPublishers,
+
+        // Yeni logo fonksiyonları
+        createPublisherWithLogo,
+        updatePublisherWithLogo,
+        uploadLogo,
+        deleteLogo,
+
+        // Polymorphic fonksiyonlar (geriye uyumlu)
+        createPublisherFlexible,
+        updatePublisherFlexible
     };
 };

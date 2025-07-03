@@ -5,18 +5,19 @@ import {
     TableCell, TableContainer, TableHead, TablePagination, TableRow, Grid,
     CircularProgress, Alert, Select, MenuItem, IconButton, FormControl, InputLabel,
     Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle,
-    SelectChangeEvent
+    SelectChangeEvent, Tooltip
 } from '@mui/material';
 import {
     Add as AddIcon, Search as SearchIcon, Edit as EditIcon, Delete as DeleteIcon,
-    Visibility as ViewIcon, ArrowUpward, ArrowDownward
+    Visibility as ViewIcon, ArrowUpward, ArrowDownward, Launch as LaunchIcon,
+    Download as DownloadIcon
 } from '@mui/icons-material';
 import { Link } from 'react-router-dom';
 import * as questionGroupService from '../../services/question-group.service';
 import { useGames } from '../../hooks/useGames';
 import { useCategories } from '../../hooks/useCategories';
 import { useEducationStructure } from '../../hooks/useEducationStructure';
-import { usePublishers } from '../../hooks/usePublishers'; // DEĞIŞIKLIK: usePublishers hook'u eklendi
+import { usePublishers } from '../../hooks/usePublishers';
 
 const QuestionGroupList = () => {
     const [loading, setLoading] = useState(true);
@@ -32,7 +33,7 @@ const QuestionGroupList = () => {
     const [sortField, setSortField] = useState('created_at');
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
-    // DEĞIŞIKLIK: Publisher filtresi - Question sayfası gibi
+    // Publisher filtresi
     const [publisherFilter, setPublisherFilter] = useState<string>('');
 
     // Eğitim yapısı filtreleri
@@ -49,11 +50,30 @@ const QuestionGroupList = () => {
     const { games } = useGames();
     const { categories } = useCategories();
     const { grades, subjects, units, topics } = useEducationStructure();
-    const { publishers } = usePublishers(); // DEĞIŞIKLIK: usePublishers hook'u kullanılıyor
+    const { publishers } = usePublishers();
 
     // Filtrelenmiş listeler
     const [filteredUnits, setFilteredUnits] = useState<any[]>([]);
     const [filteredTopics, setFilteredTopics] = useState<any[]>([]);
+
+    // İframe URL'ini çıkaran yardımcı fonksiyon
+    const extractIframeUrl = (iframeCode: string): string | null => {
+        if (!iframeCode) return null;
+        const srcMatch = iframeCode.match(/src="([^"]+)"/);
+        return srcMatch ? srcMatch[1] : null;
+    };
+
+    // İframe URL'ini yeni sekmede aç
+    const handleOpenIframeUrl = (group: questionGroupService.QuestionGroup) => {
+        if (group.iframe_code) {
+            const url = extractIframeUrl(group.iframe_code);
+            if (url) {
+                window.open(url, '_blank', 'noopener,noreferrer');
+            }
+        }
+    };
+
+
 
     // Grade ve Subject değiştiğinde ilgili üniteleri filtrele
     useEffect(() => {
@@ -133,7 +153,7 @@ const QuestionGroupList = () => {
                 search,
                 question_type: questionType || undefined,
                 game_id: gameId,
-                publisher: publisherFilter || undefined, // DEĞIŞIKLIK: publisher string olarak
+                publisher: publisherFilter || undefined,
                 sort_field: sortField,
                 sort_direction: sortDirection,
                 ...(matchingCategoryIds !== null ? {
@@ -174,7 +194,6 @@ const QuestionGroupList = () => {
         setPage(1);
     };
 
-    // DEĞIŞIKLIK: Publisher değişiklik fonksiyonu - Question sayfası gibi
     const handlePublisherChange = (event: SelectChangeEvent) => {
         setPublisherFilter(event.target.value);
         setPage(1);
@@ -184,7 +203,7 @@ const QuestionGroupList = () => {
         setSearch('');
         setQuestionType('');
         setGameId('');
-        setPublisherFilter(''); // DEĞIŞIKLIK: Publisher filtresi temizle
+        setPublisherFilter('');
         setGradeIdFilter('');
         setSubjectIdFilter('');
         setUnitIdFilter('');
@@ -196,7 +215,7 @@ const QuestionGroupList = () => {
         return search ||
             questionType ||
             gameId ||
-            publisherFilter || // DEĞIŞIKLIK: Publisher filtresi kontrolü
+            publisherFilter ||
             gradeIdFilter ||
             subjectIdFilter ||
             unitIdFilter ||
@@ -297,7 +316,7 @@ const QuestionGroupList = () => {
                         </FormControl>
                     </Grid>
 
-                    {/* DEĞIŞIKLIK: Publisher Filtresi - Question sayfası gibi Select dropdown */}
+                    {/* Publisher Filtresi */}
                     <Grid item xs={12} md={3}>
                         <FormControl fullWidth>
                             <InputLabel>Yayınevi</InputLabel>
@@ -454,7 +473,7 @@ const QuestionGroupList = () => {
                                 <TableCell>Soru Sayısı</TableCell>
                                 <TableCell>Kategori</TableCell>
                                 <TableCell>Yayınevi</TableCell>
-                                <TableCell>İşlemler</TableCell>
+                                <TableCell sx={{ minWidth: '180px' }}>İşlemler</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
@@ -472,14 +491,71 @@ const QuestionGroupList = () => {
                                         <TableCell>{group.category?.name || '-'}</TableCell>
                                         <TableCell>{group.publisher || '-'}</TableCell>
                                         <TableCell>
-                                            <IconButton component={Link} to={`/question-groups/${group.id}`}><ViewIcon /></IconButton>
-                                            <IconButton component={Link} to={`/question-groups/${group.id}/edit`}><EditIcon /></IconButton>
-                                            <IconButton
-                                                color="error"
-                                                onClick={(e) => handleDeleteClick(group.id, e)}
-                                            >
-                                                <DeleteIcon />
-                                            </IconButton>
+                                            <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                                                {/* Görüntüle */}
+                                                <Tooltip title="Detayları Görüntüle">
+                                                    <IconButton
+                                                        component={Link}
+                                                        to={`/question-groups/${group.id}`}
+                                                        size="small"
+                                                        color="primary"
+                                                    >
+                                                        <ViewIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
+
+                                                {/* Düzenle */}
+                                                <Tooltip title="Düzenle">
+                                                    <IconButton
+                                                        component={Link}
+                                                        to={`/question-groups/${group.id}/edit`}
+                                                        size="small"
+                                                        color="primary"
+                                                    >
+                                                        <EditIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
+
+                                                {/* İframe URL'i Aç - Sadece iframe hazırsa göster */}
+                                                {group.iframe_status === 'completed' && group.iframe_code && (
+                                                    <Tooltip title="İframe URL'ini Aç">
+                                                        <IconButton
+                                                            onClick={() => handleOpenIframeUrl(group)}
+                                                            size="small"
+                                                            color="success"
+                                                        >
+                                                            <LaunchIcon fontSize="small" />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                )}
+
+                                                {/* Zip İndir - Sadece zip mevcut ise göster */}
+                                                {group.zip_url && (
+                                                    <Tooltip title="Zip Dosyasını İndir">
+                                                        <IconButton
+                                                            href={group.zip_url}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            size="small"
+                                                            color="secondary"
+                                                            component="a"
+                                                        >
+                                                            <DownloadIcon fontSize="small" />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                )}
+
+                                                {/* Sil */}
+                                                <Tooltip title="Sil">
+                                                    <IconButton
+                                                        color="error"
+                                                        onClick={(e) => handleDeleteClick(group.id, e)}
+                                                        size="small"
+                                                    >
+                                                        <DeleteIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
+                                            </Box>
                                         </TableCell>
                                     </TableRow>
                                 ))

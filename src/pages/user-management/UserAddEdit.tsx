@@ -85,6 +85,7 @@ const UserAddEdit: React.FC = () => {
             [name]: value
         }));
     };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
@@ -92,10 +93,10 @@ const UserAddEdit: React.FC = () => {
         setSuccess(null);
 
         try {
-            // Rol her zaman admin olarak gönder
             const submitData = {
                 ...formData,
-                role: 'admin'
+                // Edit modunda mevcut rolü koru, yeni kullanıcı eklerken admin yap
+                role: isEditMode ? formData.role : 'admin'
             };
 
             if (isEditMode) {
@@ -118,7 +119,22 @@ const UserAddEdit: React.FC = () => {
         }
     };
 
+    // Rol label'ını belirle
+    const getRoleLabel = () => {
+        if (isEditMode) {
+            return formData.role === 'admin' ? 'Admin' :
+                formData.role === 'editor' ? 'Editör' :
+                    formData.role;
+        }
+        return 'Admin';
+    };
 
+    const getRoleHelperText = () => {
+        if (isEditMode) {
+            return `Mevcut rol: ${getRoleLabel()}`;
+        }
+        return 'Tüm yeni kullanıcılar admin rolünde oluşturulur';
+    };
 
     return (
         <Box sx={{
@@ -198,23 +214,12 @@ const UserAddEdit: React.FC = () => {
                             </Grid>
                             <Grid item xs={12} md={6}>
                                 <TextField
-                                    label="Yayınevi"
-                                    name="publisher"
-                                    value={formData.publisher}
-                                    onChange={handleInputChange}
-                                    fullWidth
-                                    variant="outlined"
-                                    helperText="Varsayılan: Arı Yayıncılık"
-                                />
-                            </Grid>
-                            <Grid item xs={12} md={6}>
-                                <TextField
                                     label="Rol"
-                                    value="Admin"
+                                    value={getRoleLabel()}
                                     fullWidth
                                     variant="outlined"
                                     disabled
-                                    helperText="Tüm yeni kullanıcılar admin rolünde oluşturulur"
+                                    helperText={getRoleHelperText()}
                                     sx={{
                                         '& .MuiInputBase-input.Mui-disabled': {
                                             WebkitTextFillColor: '#666',

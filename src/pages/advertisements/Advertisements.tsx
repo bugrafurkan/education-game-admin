@@ -209,6 +209,7 @@ const Advertisements = () => {
     const [adName, setAdName] = useState('');
     const [adType, setAdType] = useState<'image' | 'video'>('image');
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [updateFile, setUpdateFile] = useState<File | null>(null); // Yeni eklenen
     const [startDate, setStartDate] = useState<Date | null>(null);
     const [endDate, setEndDate] = useState<Date | null>(null);
     const [grade, setGrade] = useState('');
@@ -256,6 +257,8 @@ const Advertisements = () => {
             setIsEditMode(false);
             setCurrentAd(null);
             resetForm();
+            // Yeni reklam ekleme modunda bugünün tarihini varsayılan olarak ayarla
+            setStartDate(new Date());
         }
         setOpenDialog(true);
     };
@@ -269,6 +272,7 @@ const Advertisements = () => {
         setAdName('');
         setAdType('image');
         setSelectedFile(null);
+        setUpdateFile(null); // Yeni eklenen
         setStartDate(null);
         setEndDate(null);
         setGrade('');
@@ -302,15 +306,22 @@ const Advertisements = () => {
                 alert(`Lütfen geçerli bir ${adType === 'image' ? 'banner' : 'video'} dosyası seçin.`);
                 return;
             }
-            setSelectedFile(file);
+
+            if (isEditMode) {
+                setUpdateFile(file); // Düzenleme modunda updateFile kullan
+            } else {
+                setSelectedFile(file); // Yeni ekleme modunda selectedFile kullan
+            }
         }
     };
+
     // Tarih formatını değiştiren yardımcı fonksiyon
     const formatDateForServer = (date: Date | null): string | null => {
         if (!date) return null;
         // MySQL uyumlu YYYY-MM-DD formatı
         return date.toISOString().split('T')[0];
     };
+
     const handleSubmit = async () => {
         if (!adName.trim()) {
             alert('Lütfen bir reklam adı girin.');
@@ -324,14 +335,38 @@ const Advertisements = () => {
 
         // Eğer düzenleme modundaysak
         if (isEditMode && currentAd) {
-            const success = await updateAdDetails(currentAd.id, {
+            // Tip değişmişse dosya zorunlu
+            const typeChanged = adType !== currentAd.type;
+            if (typeChanged && !updateFile) {
+                alert(`Reklam tipi değişti. Lütfen yeni bir ${adType === 'image' ? 'görsel' : 'video'} dosyası seçin.`);
+                return;
+            }
+
+            const updateData: {
+                name: string;
+                start_date: string;
+                end_date: string | null;
+                grade: string | undefined;
+                subject: string | undefined;
+                duration: number | undefined;
+                type?: 'image' | 'video';
+                file?: File;
+            } = {
                 name: adName,
-                start_date: formatDateForServer(startDate) !,
-                end_date:formatDateForServer(endDate),
+                start_date: formatDateForServer(startDate)!,
+                end_date: formatDateForServer(endDate),
                 grade: grade || undefined,
                 subject: subject || undefined,
                 duration: duration ?? undefined
-            });
+            };
+
+            // Eğer yeni dosya seçildiyse veya tip değişmişse ekle
+            if (updateFile) {
+                updateData.type = adType;
+                updateData.file = updateFile;
+            }
+
+            const success = await updateAdDetails(currentAd.id, updateData);
 
             if (success) {
                 setSuccessMessage('Reklam başarıyla güncellendi.');
@@ -349,12 +384,11 @@ const Advertisements = () => {
                 adName,
                 adType,
                 selectedFile,
-                formatDateForServer(startDate)!,        // ← ISO yerine MySQL formatı
+                formatDateForServer(startDate)!,
                 formatDateForServer(endDate),
                 duration,
                 grade || undefined,
                 subject || undefined,
-
             );
 
             if (success) {
@@ -528,6 +562,7 @@ const Advertisements = () => {
                                 className="custom-datepicker"
                                 locale="tr"
                                 wrapperClassName="datepicker-wrapper"
+                                minDate={new Date()} // Bugünden önceki tarihleri engelle
                                 maxDate={endDate || undefined} // Eğer endDate varsa, onu maksimum değer olarak ayarla
                             />
                         </Box>
@@ -556,7 +591,6 @@ const Advertisements = () => {
                             onChange={(e) => setDuration(Number(e.target.value) || 5)} // Boş değer girilirse 5 kullan
                             helperText="Reklamın gösterim süresi (1-10 saniye arası)"
                         />
-
 
                         <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
                             <FormControl fullWidth>
@@ -600,42 +634,59 @@ const Advertisements = () => {
                             </FormControl>
                         </Box>
 
-                        {!isEditMode && (
-                            <>
-                                <FormControl component="fieldset" sx={{ mt: 2, mb: 1 }}>
-                                    <FormLabel component="legend">Reklam Tipi</FormLabel>
-                                    <RadioGroup
-                                        row
-                                        value={adType}
-                                        onChange={(e) => {
-                                            setAdType(e.target.value as 'image' | 'video');
-                                            setSelectedFile(null);
-                                        }}
-                                    >
-                                        <FormControlLabel value="image" control={<Radio />} label="Banner Reklam" />
-                                        <FormControlLabel value="video" control={<Radio />} label="Video Reklam" />
-                                    </RadioGroup>
-                                </FormControl>
+                        {/* Reklam tipi seçimi - hem yeni ekleme hem düzenleme modunda */}
+                        <FormControl component="fieldset" sx={{ mt: 2, mb: 1 }}>
+                            <FormLabel component="legend">Reklam Tipi</FormLabel>
+                            <RadioGroup
+                                row
+                                value={adType}
+                                onChange={(e) => {
+                                    setAdType(e.target.value as 'image' | 'video');
+                                    // Tip değiştiğinde mevcut seçili dosyaları temizle
+                                    setSelectedFile(null);
+                                    setUpdateFile(null);
+                                }}
+                            >
+                                <FormControlLabel value="image" control={<Radio />} label="Banner Reklam" />
+                                <FormControlLabel value="video" control={<Radio />} label="Video Reklam" />
+                            </RadioGroup>
+                        </FormControl>
 
-                                <Box sx={{ border: '1px dashed #ccc', p: 3, borderRadius: 2, textAlign: 'center', mt: 2 }}>
-                                    <input
-                                        accept={adType === 'image' ? "image/*" : "video/*"}
-                                        style={{ display: 'none' }}
-                                        id="ad-file-upload"
-                                        type="file"
-                                        onChange={handleFileChange}
-                                    />
-                                    <label htmlFor="ad-file-upload">
-                                        <Button variant="outlined" component="span" startIcon={<UploadIcon />}>
-                                            {adType === 'image' ? 'Görsel Seç' : 'Video Seç'}
-                                        </Button>
-                                    </label>
-                                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                                        {selectedFile ? selectedFile.name : `Lütfen bir ${adType === 'image' ? 'görsel' : 'video'} dosyası seçin.`}
-                                    </Typography>
-                                </Box>
-                            </>
-                        )}
+                        {/* Dosya yükleme alanı - her iki modda da göster */}
+                        <Box sx={{ border: '1px dashed #ccc', p: 3, borderRadius: 2, textAlign: 'center', mt: 2 }}>
+                            <input
+                                accept={adType === 'image' ? "image/*" : "video/*"}
+                                style={{ display: 'none' }}
+                                id="ad-file-upload"
+                                type="file"
+                                onChange={handleFileChange}
+                            />
+                            <label htmlFor="ad-file-upload">
+                                <Button variant="outlined" component="span" startIcon={<UploadIcon />}>
+                                    {isEditMode
+                                        ? `${adType === 'image' ? 'Yeni Görsel' : 'Yeni Video'} Seç`
+                                        : `${adType === 'image' ? 'Görsel' : 'Video'} Seç`
+                                    }
+                                </Button>
+                            </label>
+                            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                {isEditMode ? (
+                                    updateFile ? (
+                                        <span style={{ color: 'green' }}>Yeni dosya: {updateFile.name}</span>
+                                    ) : (
+                                        adType !== currentAd?.type ? (
+                                            <span style={{ color: 'orange' }}>
+                                                Tip değişti: {adType === 'image' ? 'Banner' : 'Video'} dosyası seçin
+                                            </span>
+                                        ) : (
+                                            `Mevcut ${adType === 'image' ? 'görsel' : 'video'} korunacak. Değiştirmek için yeni dosya seçin.`
+                                        )
+                                    )
+                                ) : (
+                                    selectedFile ? selectedFile.name : `Lütfen bir ${adType === 'image' ? 'görsel' : 'video'} dosyası seçin.`
+                                )}
+                            </Typography>
+                        </Box>
                     </Box>
                 </DialogContent>
                 <DialogActions>

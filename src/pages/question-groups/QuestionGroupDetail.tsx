@@ -17,7 +17,8 @@ import {
     Download as DownloadIcon
 } from '@mui/icons-material';
 import * as questionGroupService from '../../services/question-group.service';
-import * as iframeService from '../../services/iframe.service'; // Yeni iframe servisi
+import * as iframeService from '../../services/iframe.service';
+import { usePublishers } from '../../hooks/usePublishers';
 
 // NodeJS tiplerini içe aktar
 type Timeout = ReturnType<typeof setTimeout>;
@@ -25,6 +26,7 @@ type Timeout = ReturnType<typeof setTimeout>;
 const QuestionGroupDetail = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+    const { publishers } = usePublishers();
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [questionGroup, setQuestionGroup] = useState<questionGroupService.QuestionGroup | null>(null);
@@ -275,35 +277,90 @@ const QuestionGroupDetail = () => {
                             Etkinlik Görseli
                         </Typography>
                         <Box sx={{ mt: 1, mb: 2 }}>
-                            {questionGroup.image_url ? (
-                                <Box
-                                    component="img"
-                                    src={questionGroup.image_url}
-                                    alt={questionGroup.name}
-                                    sx={{
-                                        maxWidth: '100%',
-                                        maxHeight: '300px',
-                                        objectFit: 'contain',
+                            {(() => {
+                                // Önce manuel yüklenen görsel varsa onu göster
+                                if (questionGroup.image_url) {
+                                    return (
+                                        <Box sx={{ position: 'relative' }}>
+                                            <Box
+                                                component="img"
+                                                src={questionGroup.image_url}
+                                                alt={questionGroup.name}
+                                                sx={{
+                                                    maxWidth: '100%',
+                                                    maxHeight: '300px',
+                                                    objectFit: 'contain',
+                                                    borderRadius: 1,
+                                                    border: '2px solid #2196f3'
+                                                }}
+                                            />
+                                            <Typography
+                                                variant="caption"
+                                                sx={{
+                                                    position: 'absolute',
+                                                    bottom: -20,
+                                                    left: 0,
+                                                    color: 'primary.main',
+                                                    fontWeight: 'medium'
+                                                }}
+                                            >
+                                                Yüklenen görsel
+                                            </Typography>
+                                        </Box>
+                                    );
+                                }
+
+                                // Manuel görsel yoksa yayınevi logosuna bak
+                                const publisherLogo = publishers.find(p => p.name === questionGroup.publisher)?.logo_url;
+                                if (publisherLogo) {
+                                    return (
+                                        <Box sx={{ position: 'relative' }}>
+                                            <Box
+                                                component="img"
+                                                src={publisherLogo}
+                                                alt={`${questionGroup.publisher} logosu`}
+                                                sx={{
+                                                    maxWidth: '100%',
+                                                    maxHeight: '300px',
+                                                    objectFit: 'contain',
+                                                    borderRadius: 1,
+                                                    border: '1px solid #e0e0e0'
+                                                }}
+                                            />
+                                            <Typography
+                                                variant="caption"
+                                                sx={{
+                                                    position: 'absolute',
+                                                    bottom: -20,
+                                                    left: 0,
+                                                    color: 'primary.main',
+                                                    fontWeight: 'medium'
+                                                }}
+                                            >
+                                                {questionGroup.publisher} yayınevi logosu
+                                            </Typography>
+                                        </Box>
+                                    );
+                                }
+
+                                // Hiçbir görsel yoksa placeholder göster
+                                return (
+                                    <Box sx={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        bgcolor: '#f5f5f5',
                                         borderRadius: 1,
-                                        border: '1px solid #e0e0e0'
-                                    }}
-                                />
-                            ) : (
-                                <Box sx={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    bgcolor: '#f5f5f5',
-                                    borderRadius: 1,
-                                    p: 4,
-                                    border: '1px dashed #cccccc'
-                                }}>
-                                    <ImageIcon sx={{ fontSize: 40, color: '#aaaaaa', mr: 2 }} />
-                                    <Typography color="text.secondary">
-                                        Bu etkinlik için görsel bulunmuyor
-                                    </Typography>
-                                </Box>
-                            )}
+                                        p: 4,
+                                        border: '1px dashed #cccccc'
+                                    }}>
+                                        <ImageIcon sx={{ fontSize: 40, color: '#aaaaaa', mr: 2 }} />
+                                        <Typography color="text.secondary">
+                                            Bu etkinlik için görsel bulunmuyor
+                                        </Typography>
+                                    </Box>
+                                );
+                            })()}
                         </Box>
                     </Grid>
 

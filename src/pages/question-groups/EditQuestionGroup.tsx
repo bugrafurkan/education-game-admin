@@ -77,6 +77,17 @@ const EditQuestionGroup = () => {
         fetchQuestionGroup();
     }, [id]);
 
+    // Publisher değiştiğinde logo kontrolü
+    useEffect(() => {
+        if (publisherName && !imageChanged) {
+            const selectedPublisher = publishers.find(p => p.name === publisherName);
+            if (selectedPublisher?.logo_url && !imageFile && !existingImage) {
+                setImagePreview(selectedPublisher.logo_url);
+                setUploadError(null);
+            }
+        }
+    }, [publisherName, publishers, imageFile, imageChanged, existingImage]);
+
     const fetchQuestionGroup = async () => {
         try {
             setLoading(true);
@@ -157,7 +168,18 @@ const EditQuestionGroup = () => {
 
     // DEĞIŞIKLIK: Publisher değiştir - Question sayfası gibi Select ile
     const handlePublisherChange = (event: SelectChangeEvent) => {
-        setPublisherName(event.target.value);
+        const newPublisherName = event.target.value as string;
+        setPublisherName(newPublisherName);
+
+        // Eğer manuel görsel yok ve mevcut görsel de yoksa, yayınevi logosunu kullan
+        if (!imageFile && !existingImage && newPublisherName) {
+            const selectedPublisher = publishers.find(p => p.name === newPublisherName);
+            if (selectedPublisher?.logo_url) {
+                setImagePreview(selectedPublisher.logo_url);
+                setUploadError(null);
+                setImageChanged(false); // Yayınevi logosu değişiklik sayılmaz
+            }
+        }
     };
 
     // Görsel yükleme işlemleri
@@ -223,6 +245,18 @@ const EditQuestionGroup = () => {
         }
 
         setUploadError(null);
+
+        // Görsel kaldırıldıktan sonra yayınevi logosu varsa onu göster
+        if (publisherName) {
+            const selectedPublisher = publishers.find(p => p.name === publisherName);
+            const logoUrl = selectedPublisher?.logo_url;
+            if (logoUrl) {
+                setTimeout(() => {
+                    setImagePreview(logoUrl);
+                    setImageChanged(false); // Yayınevi logosu değişiklik sayılmaz
+                }, 100);
+            }
+        }
     };
 
     // Form gönderme - DEĞIŞIKLIK: Publisher string olarak dahil
@@ -372,7 +406,22 @@ const EditQuestionGroup = () => {
                                     <MenuItem value="">Yayınevi Seçin</MenuItem>
                                     {publishers.map((publisher) => (
                                         <MenuItem key={publisher.id} value={publisher.name}>
-                                            {publisher.name}
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                {publisher.logo_url && (
+                                                    <Box
+                                                        component="img"
+                                                        src={publisher.logo_url}
+                                                        alt={publisher.name}
+                                                        sx={{
+                                                            width: 24,
+                                                            height: 24,
+                                                            objectFit: 'contain',
+                                                            borderRadius: 0.5
+                                                        }}
+                                                    />
+                                                )}
+                                                <Typography>{publisher.name}</Typography>
+                                            </Box>
                                         </MenuItem>
                                     ))}
                                 </Select>
@@ -408,10 +457,16 @@ const EditQuestionGroup = () => {
                         {/* Görsel Yükleme Alanı */}
                         <Grid item xs={12}>
                             <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                                Etkinlik Görseli (Opsiyonel)
+                                Etkinlik Görseli
+                                {publisherName && publishers.find(p => p.name === publisherName)?.logo_url && !imageFile && !existingImage && (
+                                    <Typography component="span" variant="caption" color="primary" sx={{ ml: 1 }}>
+                                        (Yayınevi logosu kullanılıyor)
+                                    </Typography>
+                                )}
                             </Typography>
 
                             {imagePreview ? (
+
                                 <Box sx={{
                                     position: 'relative',
                                     width: 'fit-content',
@@ -426,7 +481,8 @@ const EditQuestionGroup = () => {
                                             maxWidth: '100%',
                                             maxHeight: '200px',
                                             borderRadius: 1,
-                                            border: '1px solid #e0e0e0'
+                                            border: (imageFile || existingImage) ? '2px solid #2196f3' : '1px solid #e0e0e0',
+                                            objectFit: 'contain'
                                         }}
                                     />
                                     <IconButton
@@ -444,7 +500,26 @@ const EditQuestionGroup = () => {
                                     >
                                         <DeleteIcon />
                                     </IconButton>
+
+                                    {/* Yayınevi logosu mu yoksa yüklenen görsel mi göster */}
+                                    {!imageFile && !existingImage && publisherName && publishers.find(p => p.name === publisherName)?.logo_url && (
+                                        <Typography
+                                            variant="caption"
+                                            sx={{
+                                                position: 'absolute',
+                                                bottom: -25,
+                                                left: 0,
+                                                right: 0,
+                                                textAlign: 'center',
+                                                color: 'primary.main',
+                                                fontWeight: 'medium'
+                                            }}
+                                        >
+                                            Yayınevi logosu
+                                        </Typography>
+                                    )}
                                 </Box>
+
                             ) : (
                                 <Box
                                     sx={{
@@ -474,6 +549,13 @@ const EditQuestionGroup = () => {
                                     <Typography variant="caption" color="text.secondary">
                                         Maksimum dosya boyutu: 5MB (JPEG, PNG, GIF)
                                     </Typography>
+
+                                    {/* Yayınevi logosu olduğunda ek bilgi */}
+                                    {publisherName && publishers.find(p => p.name === publisherName)?.logo_url && (
+                                        <Typography variant="caption" color="primary.main" sx={{ display: 'block', mt: 1 }}>
+                                            Veya "{publisherName}" yayınevi logosu otomatik kullanılacak
+                                        </Typography>
+                                    )}
                                 </Box>
                             )}
 

@@ -15,12 +15,15 @@ interface UseAdvertisementsReturn {
     refreshAdvertisements: () => Promise<void>;
     addAdvertisement: (name: string, type: "image" | "video", file: File, start_date: string, end_date: string | null, duration: number | null, grade?: string | undefined, subject?: string | undefined) => Promise<boolean>;
     updateAdDetails: (id: number, data: {
-        name: string;
-        start_date: string;
-        end_date: string | null;
-        grade: string | undefined;
-        subject: string | undefined;
-        duration: number | undefined
+        name?: string;
+        is_active?: boolean;
+        start_date?: string;
+        end_date?: string | null;
+        grade?: string;
+        subject?: string;
+        duration?: number;
+        type?: 'image' | 'video';
+        file?: File;
     }) => Promise<boolean>;
     toggleAdvertisementStatus: (id: number, isActive: boolean) => Promise<boolean>;
     removeAdvertisement: (id: number) => Promise<boolean>;
@@ -87,6 +90,9 @@ export const useAdvertisements = (): UseAdvertisementsReturn => {
             end_date?: string | null;
             grade?: string;
             subject?: string;
+            duration?: number;
+            type?: 'image' | 'video';
+            file?: File;
         }
     ): Promise<boolean> => {
         setIsSubmitting(true);
@@ -103,7 +109,6 @@ export const useAdvertisements = (): UseAdvertisementsReturn => {
             setIsSubmitting(false);
         }
     };
-
     // Reklam durumunu değiştir (aktif/pasif)
     const toggleAdvertisementStatus = async (id: number, isActive: boolean): Promise<boolean> => {
         try {

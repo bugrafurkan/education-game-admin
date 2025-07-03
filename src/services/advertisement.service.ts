@@ -75,10 +75,46 @@ export const updateAdvertisement = async (
         start_date?: string;
         end_date?: string | null;
         duration?: number;
+        type?: 'image' | 'video';
+        file?: File;
     }
 ): Promise<Advertisement> => {
-    const response = await api.put<Advertisement>(`/advertisements/${id}`, data);
-    return response.data;
+    // Eğer dosya varsa FormData kullan
+    if (data.file) {
+        const formData = new FormData();
+
+        // Laravel method spoofing için
+        formData.append('_method', 'PUT');
+
+        // createAdvertisement'taki gibi her alanı tek tek ekle
+        if (data.name) formData.append('name', data.name);
+        if (data.type) formData.append('type', data.type);
+        if (data.file) formData.append('file', data.file);
+        if (data.start_date) formData.append('start_date', data.start_date);
+        if (data.end_date) formData.append('end_date', data.end_date);
+        if (data.grade !== null && data.grade !== undefined) {
+            formData.append('grade', data.grade.toString());
+        }
+        if (data.subject) formData.append('subject', data.subject);
+        if (data.duration !== undefined && data.duration !== null) {
+            formData.append('duration', data.duration.toString());
+        }
+        if (data.is_active !== undefined) {
+            formData.append('is_active', data.is_active.toString());
+        }
+
+        // POST metodu kullan (_method=PUT ile)
+        const response = await api.post<Advertisement>(`/advertisements/${id}?_method=PUT`, formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        });
+        return response.data;
+    } else {
+        // Dosya yoksa normal PUT ile JSON gönder
+        const response = await api.put<Advertisement>(`/advertisements/${id}`, data);
+        return response.data;
+    }
 };
 
 // Reklamı sil

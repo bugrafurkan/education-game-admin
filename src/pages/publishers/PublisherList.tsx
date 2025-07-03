@@ -1,30 +1,60 @@
 // src/pages/publishers/PublisherList.tsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
     Box, Typography, Paper, Button, Table, TableBody, TableCell,
     TableContainer, TableHead, TableRow, IconButton, Dialog,
     DialogTitle, DialogContent, DialogActions, TextField,
     Alert, CircularProgress, Chip, Grid, InputAdornment,
-    Tooltip, Fab
+    Tooltip, Fab, Avatar
 } from '@mui/material';
 import {
     Add as AddIcon,
     Edit as EditIcon,
     Delete as DeleteIcon,
     Search as SearchIcon,
-    Business as BusinessIcon
+    Business as BusinessIcon,
+    CloudUpload as CloudUploadIcon,
+    Image as ImageIcon,
+    DeleteOutline as DeleteOutlineIcon
 } from '@mui/icons-material';
 import { usePublishers } from '../../hooks/usePublishers';
 
 interface Publisher {
     id: number;
     name: string;
+    logo_url?: string;
     created_at?: string;
-    questions_count?: number; // Varsa publisher'a ait soru sayısı
+    questions_count?: number;
+    has_logo?: boolean;
 }
 
+// Drag & Drop dosya yükleme için stiller
+const dropzoneStyles = {
+    border: '2px dashed #cccccc',
+    borderRadius: '8px',
+    padding: '20px',
+    textAlign: 'center' as const,
+    cursor: 'pointer',
+    backgroundColor: '#f9f9f9',
+    transition: 'all .3s ease-in-out',
+    '&:hover': {
+        backgroundColor: '#f0f0f0',
+        borderColor: '#999999'
+    },
+    '&.active': {
+        borderColor: '#2196f3',
+        backgroundColor: 'rgba(33, 150, 243, 0.1)'
+    }
+};
+
 const PublisherList = () => {
-    const { publishers, loading: publishersLoading, createPublisher, deletePublisher, updatePublisher } = usePublishers();
+    const {
+        publishers,
+        loading: publishersLoading,
+        createPublisherFlexible: createPublisher,
+        deletePublisher,
+        updatePublisherFlexible: updatePublisher
+    } = usePublishers();
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -38,6 +68,12 @@ const PublisherList = () => {
     // Form states
     const [publisherName, setPublisherName] = useState('');
     const [selectedPublisher, setSelectedPublisher] = useState<Publisher | null>(null);
+
+    // Logo yükleme states
+    const [logoFile, setLogoFile] = useState<File | null>(null);
+    const [logoPreview, setLogoPreview] = useState<string | null>(null);
+    const [dragActive, setDragActive] = useState(false);
+    const [uploadError, setUploadError] = useState<string | null>(null);
 
     // Filtreleme
     const filteredPublishers = publishers.filter(publisher =>
@@ -59,6 +95,60 @@ const PublisherList = () => {
         }
     }, [error]);
 
+    // Logo yükleme işlemleri
+    const handleDrag = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.type === 'dragenter' || e.type === 'dragover') {
+            setDragActive(true);
+        } else if (e.type === 'dragleave') {
+            setDragActive(false);
+        }
+    }, []);
+
+    const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDragActive(false);
+
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+            handleFileChange(e.dataTransfer.files[0]);
+        }
+    }, []);
+
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            handleFileChange(e.target.files[0]);
+        }
+    };
+
+    const handleFileChange = (file: File) => {
+        if (!file.type.match('image.*')) {
+            setUploadError('Lütfen geçerli bir görsel dosyası yükleyin (JPEG, PNG, GIF, SVG, WebP)');
+            return;
+        }
+
+        if (file.size > 5 * 1024 * 1024) {
+            setUploadError('Logo dosyası 5MB\'tan küçük olmalıdır');
+            return;
+        }
+
+        setUploadError(null);
+        setLogoFile(file);
+
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setLogoPreview(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const handleRemoveLogo = () => {
+        setLogoFile(null);
+        setLogoPreview(null);
+        setUploadError(null);
+    };
+
     // Publisher ekleme
     const handleAddPublisher = async () => {
         if (!publisherName.trim()) {
@@ -76,11 +166,20 @@ const PublisherList = () => {
             setLoading(true);
             setError(null);
 
-            await createPublisher(publisherName.trim());
+            // Logo ile birlikte FormData oluştur
+            const formData = new FormData();
+            formData.append('name', publisherName.trim());
+
+            if (logoFile) {
+                formData.append('logo', logoFile);
+            }
+
+            // createPublisher metodunu FormData ile çağır
+            await createPublisher(formData);
 
             setSuccess('Yayınevi başarıyla eklendi!');
             setAddDialogOpen(false);
-            setPublisherName('');
+            resetForm();
         } catch (err) {
             console.error('Publisher ekleme hatası:', err);
             setError('Yayınevi eklenirken bir hata oluştu!');
@@ -89,37 +188,45 @@ const PublisherList = () => {
         }
     };
 
-    // Publisher düzenleme - Hook'ta update metodu olmadığı için kaldırıldı
+    // Publisher düzenleme
     const handleEditPublisher = async () => {
         if (!selectedPublisher) return;
-        else{
-            if (!publisherName.trim()) {
-                setError('Yayınevi adı boş olamaz!');
-                return;
-            }
 
-            if (publishers.some(p => p.name.toLowerCase() === publisherName.toLowerCase())) {
-                setError('Bu isimde bir yayınevi zaten mevcut!');
-                return;
-            }
-
-            try {
-                setLoading(true);
-                setError(null);
-
-                await updatePublisher(selectedPublisher.id,publisherName.trim());
-
-                setSuccess('Yayınevi başarıyla güncellendi!');
-                setEditDialogOpen(false);
-                setSelectedPublisher(null);
-            } catch (err) {
-                console.error('Publisher güncelleme hatası:', err);
-                setError('Yayınevi güncellenirken bir hata oluştu!');
-            } finally {
-                setLoading(false);
-            }
+        if (!publisherName.trim()) {
+            setError('Yayınevi adı boş olamaz!');
+            return;
         }
 
+        // Aynı isimde başka publisher var mı kontrol et
+        if (publishers.some(p => p.id !== selectedPublisher.id && p.name.toLowerCase() === publisherName.toLowerCase())) {
+            setError('Bu isimde bir yayınevi zaten mevcut!');
+            return;
+        }
+
+        try {
+            setLoading(true);
+            setError(null);
+
+            // Logo ile birlikte FormData oluştur
+            const formData = new FormData();
+            formData.append('name', publisherName.trim());
+            formData.append('_method', 'PUT'); // Laravel için
+
+            if (logoFile) {
+                formData.append('logo', logoFile);
+            }
+
+            await updatePublisher(selectedPublisher.id, formData);
+
+            setSuccess('Yayınevi başarıyla güncellendi!');
+            setEditDialogOpen(false);
+            resetForm();
+        } catch (err) {
+            console.error('Publisher güncelleme hatası:', err);
+            setError('Yayınevi güncellenirken bir hata oluştu!');
+        } finally {
+            setLoading(false);
+        }
     };
 
     // Publisher silme
@@ -134,7 +241,7 @@ const PublisherList = () => {
 
             setSuccess('Yayınevi başarıyla silindi!');
             setDeleteDialogOpen(false);
-            setSelectedPublisher(null);
+            resetForm();
         } catch (err) {
             console.error('Publisher silme hatası:', err);
             setError('Yayınevi silinirken bir hata oluştu!');
@@ -143,17 +250,29 @@ const PublisherList = () => {
         }
     };
 
+    // Form temizleme
+    const resetForm = () => {
+        setPublisherName('');
+        setSelectedPublisher(null);
+        setLogoFile(null);
+        setLogoPreview(null);
+        setUploadError(null);
+        setError(null);
+    };
+
     // Dialog açma fonksiyonları
     const openAddDialog = () => {
-        setPublisherName('');
-        setError(null);
+        resetForm();
         setAddDialogOpen(true);
     };
 
     const openEditDialog = (publisher: Publisher) => {
         setSelectedPublisher(publisher);
         setPublisherName(publisher.name);
+        setLogoPreview(publisher.logo_url || null);
+        setLogoFile(null);
         setError(null);
+        setUploadError(null);
         setEditDialogOpen(true);
     };
 
@@ -168,9 +287,7 @@ const PublisherList = () => {
         setAddDialogOpen(false);
         setEditDialogOpen(false);
         setDeleteDialogOpen(false);
-        setPublisherName('');
-        setSelectedPublisher(null);
-        setError(null);
+        resetForm();
     };
 
     // Enter tuşu ile kaydetme
@@ -184,6 +301,88 @@ const PublisherList = () => {
             }
         }
     };
+
+    // Logo render komponenti
+    const renderLogoUpload = () => (
+        <Box sx={{ mt: 2 }}>
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                Yayınevi Logosu (Opsiyonel)
+            </Typography>
+
+            {logoPreview ? (
+                <Box sx={{
+                    position: 'relative',
+                    width: 'fit-content',
+                    margin: '0 auto',
+                    mb: 2
+                }}>
+                    <Box
+                        component="img"
+                        src={logoPreview}
+                        alt="Logo önizleme"
+                        sx={{
+                            maxWidth: '200px',
+                            maxHeight: '100px',
+                            borderRadius: 1,
+                            border: '1px solid #e0e0e0',
+                            objectFit: 'contain'
+                        }}
+                    />
+                    <IconButton
+                        onClick={handleRemoveLogo}
+                        sx={{
+                            position: 'absolute',
+                            top: -10,
+                            right: -10,
+                            bgcolor: 'rgba(255, 255, 255, 0.8)',
+                            '&:hover': {
+                                bgcolor: 'rgba(255, 255, 255, 0.9)',
+                            }
+                        }}
+                        size="small"
+                    >
+                        <DeleteOutlineIcon fontSize="small" />
+                    </IconButton>
+                </Box>
+            ) : (
+                <Box
+                    sx={{
+                        ...dropzoneStyles,
+                        ...(dragActive ? {
+                            borderColor: '#2196f3',
+                            backgroundColor: 'rgba(33, 150, 243, 0.1)'
+                        } : {})
+                    }}
+                    onDragEnter={handleDrag}
+                    onDragOver={handleDrag}
+                    onDragLeave={handleDrag}
+                    onDrop={handleDrop}
+                    onClick={() => document.getElementById('logo-upload')?.click()}
+                >
+                    <input
+                        id="logo-upload"
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileSelect}
+                        style={{ display: 'none' }}
+                    />
+                    <CloudUploadIcon sx={{ fontSize: 32, color: '#666', mb: 1 }} />
+                    <Typography variant="body2">
+                        Logo yüklemek için tıklayın veya sürükleyin
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                        Maksimum 5MB (JPEG, PNG, GIF, SVG, WebP)
+                    </Typography>
+                </Box>
+            )}
+
+            {uploadError && (
+                <Alert severity="error" sx={{ mt: 1 }}>
+                    {uploadError}
+                </Alert>
+            )}
+        </Box>
+    );
 
     return (
         <Box sx={{
@@ -264,8 +463,9 @@ const PublisherList = () => {
                         <TableHead sx={{ bgcolor: '#f5f8fa' }}>
                             <TableRow>
                                 <TableCell width="10%">#</TableCell>
-                                <TableCell width="60%">Yayınevi Adı</TableCell>
-                                <TableCell width="15%" align="center">İşlemler</TableCell>
+                                <TableCell width="15%">Logo</TableCell>
+                                <TableCell width="55%">Yayınevi Adı</TableCell>
+                                <TableCell width="20%" align="center">İşlemler</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
@@ -293,22 +493,43 @@ const PublisherList = () => {
                                             />
                                         </TableCell>
                                         <TableCell>
+                                            <Avatar
+                                                src={publisher.logo_url}
+                                                alt={publisher.name}
+                                                sx={{
+                                                    width: 50,
+                                                    height: 50,
+                                                    borderRadius: 1,
+                                                    bgcolor: publisher.logo_url ? 'transparent' : 'grey.200'
+                                                }}
+                                                variant="rounded"
+                                            >
+                                                {!publisher.logo_url && <BusinessIcon />}
+                                            </Avatar>
+                                        </TableCell>
+                                        <TableCell>
                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                <BusinessIcon color="action" fontSize="small" />
                                                 <Typography fontWeight="medium">
                                                     {publisher.name}
                                                 </Typography>
+                                                {publisher.has_logo && (
+                                                    <Chip
+                                                        icon={<ImageIcon />}
+                                                        label="Logo var"
+                                                        size="small"
+                                                        color="success"
+                                                        variant="outlined"
+                                                    />
+                                                )}
                                             </Box>
                                         </TableCell>
-
                                         <TableCell align="center">
                                             <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1 }}>
-                                                <Tooltip title="Düzenle (Yakında)">
+                                                <Tooltip title="Düzenle">
                                                     <IconButton
                                                         color="primary"
                                                         size="small"
                                                         onClick={() => openEditDialog(publisher)}
-
                                                     >
                                                         <EditIcon fontSize="small" />
                                                     </IconButton>
@@ -374,6 +595,7 @@ const PublisherList = () => {
                         helperText={error || "Yayınevi adını girin"}
                         sx={{ mt: 2 }}
                     />
+                    {renderLogoUpload()}
                 </DialogContent>
                 <DialogActions sx={{ px: 3, pb: 2 }}>
                     <Button
@@ -420,6 +642,7 @@ const PublisherList = () => {
                         helperText={error || "Yayınevi adını düzenleyin"}
                         sx={{ mt: 2 }}
                     />
+                    {renderLogoUpload()}
                 </DialogContent>
                 <DialogActions sx={{ px: 3, pb: 2 }}>
                     <Button
@@ -453,12 +676,24 @@ const PublisherList = () => {
                     </Box>
                 </DialogTitle>
                 <DialogContent>
-                    <Typography>
-                        <strong>"{selectedPublisher?.name}"</strong> yayınevini silmek istediğinize emin misiniz?
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                        Bu işlem geri alınamaz. Ancak bu yayınevine ait sorular silinmeyecektir.
-                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                        {selectedPublisher?.logo_url && (
+                            <Avatar
+                                src={selectedPublisher.logo_url}
+                                alt={selectedPublisher.name}
+                                sx={{ width: 60, height: 60, borderRadius: 1 }}
+                                variant="rounded"
+                            />
+                        )}
+                        <Box>
+                            <Typography>
+                                <strong>"{selectedPublisher?.name}"</strong> yayınevini silmek istediğinize emin misiniz?
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                Bu işlem geri alınamaz. Logo dosyası da silinecektir. Ancak bu yayınevine ait sorular silinmeyecektir.
+                            </Typography>
+                        </Box>
+                    </Box>
                 </DialogContent>
                 <DialogActions sx={{ px: 3, pb: 2 }}>
                     <Button

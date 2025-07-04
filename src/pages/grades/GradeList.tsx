@@ -16,10 +16,12 @@ import { Delete, Edit, Add } from '@mui/icons-material';
 import { getGrades, deleteGrade } from '../../services/education.service';
 import { useNavigate } from 'react-router-dom';
 import { Grade } from '../../types/education';
+import { useAuth } from '../../hooks/useAuth';
 
 const GradeList = () => {
     const [grades, setGrades] = useState<Grade[]>([]);
     const navigate = useNavigate();
+    const { userRole } = useAuth();
 
     const fetchGrades = async () => {
         try {
@@ -56,6 +58,7 @@ const GradeList = () => {
                     variant="contained"
                     startIcon={<Add />}
                     onClick={() => navigate('/grades/add')}
+                    sx={{ display: userRole === 'admin' ? 'none' : 'flex' }}
                 >
                     Yeni Sınıf Ekle
                 </Button>
@@ -67,7 +70,7 @@ const GradeList = () => {
                         <TableRow>
                             <TableCell>#</TableCell>
                             <TableCell>Sınıf Adı</TableCell>
-                            <TableCell align="right">İşlemler</TableCell>
+                            <TableCell align="right" sx={{ display: userRole === 'admin' ? 'none' : 'table-cell' }}>İşlemler</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
@@ -75,7 +78,7 @@ const GradeList = () => {
                             <TableRow key={grade.id}>
                                 <TableCell>{index + 1}</TableCell>
                                 <TableCell>{grade.name}</TableCell>
-                                <TableCell align="right">
+                                <TableCell align="right" sx={{ display: userRole === 'admin' ? 'none' : 'table-cell' }}>
                                     <IconButton
                                         color="primary"
                                         onClick={() => navigate(`/grades/edit/${grade.id}`)}
@@ -91,7 +94,7 @@ const GradeList = () => {
 
                         {grades.length === 0 && (
                             <TableRow>
-                                <TableCell colSpan={3} align="center">
+                                <TableCell colSpan={userRole === 'admin' ? 2 : 3} align="center">
                                     Hiç sınıf bulunamadı.
                                 </TableCell>
                             </TableRow>

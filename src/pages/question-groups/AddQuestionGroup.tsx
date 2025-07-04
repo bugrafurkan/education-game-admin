@@ -1,4 +1,3 @@
-// src/pages/question-groups/AddQuestionGroup.tsx
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -6,11 +5,13 @@ import {
     Grid, TextField, FormControl, InputLabel, Select, MenuItem,
     SelectChangeEvent, Divider, Alert, CircularProgress, List,
     ListItem, ListItemText, Checkbox, ListItemIcon,
-    FormHelperText, Chip, IconButton
+    FormHelperText, Chip, IconButton, FormGroup, FormControlLabel,
+    Accordion, AccordionSummary, AccordionDetails, LinearProgress
 } from '@mui/material';
 import {
     CloudUpload as CloudUploadIcon,
-    DeleteOutline as DeleteIcon
+    DeleteOutline as DeleteIcon,
+    ExpandMore as ExpandMoreIcon
 } from '@mui/icons-material';
 import * as questionGroupService from '../../services/question-group.service';
 import * as gameService from '../../services/game.service';
@@ -41,19 +42,36 @@ const dropzoneStyles = {
     }
 };
 
+// Soru tipi interface'i
+interface QuestionTypeData {
+    key: 'multiple_choice' | 'true_false' | 'qa';
+    label: string;
+    questions: questionGroupService.Question[];
+    selectedQuestions: number[];
+    loading: boolean;
+}
+
+// Etkinlik kombinasyonu interface'i
+interface ActivityCombination {
+    gameId: number;
+    gameName: string;
+    questionType: string;
+    questionTypeLabel: string;
+    questionIds: number[];
+    name: string;
+}
+
 const AddQuestionGroup = () => {
     const navigate = useNavigate();
     const [activeStep, setActiveStep] = useState(0);
-    const [selectAllChecked, setSelectAllChecked] = useState(false);
 
     // Form verileri
     const [name, setName] = useState('');
-    const [questionType, setQuestionType] = useState<'multiple_choice' | 'true_false' | 'qa'>('multiple_choice');
-    const [gameId, setGameId] = useState<string>('');
+    const [selectedGames, setSelectedGames] = useState<number[]>([]);
+    const [selectedQuestionTypes, setSelectedQuestionTypes] = useState<string[]>([]);
     const [categoryId, setCategoryId] = useState<string>('');
     const [categoryExists, setCategoryExists] = useState<boolean>(false);
     const [creatingCategory, setCreatingCategory] = useState<boolean>(false);
-    const [selectedQuestions, setSelectedQuestions] = useState<number[]>([]);
     const [publisherName, setPublisherName] = useState<string>('');
 
     // Filtrelenmiş listeler
@@ -74,14 +92,44 @@ const AddQuestionGroup = () => {
 
     // Liste verileri
     const [games, setGames] = useState<gameService.Game[]>([]);
-    const [eligibleQuestions, setEligibleQuestions] = useState<questionGroupService.Question[]>([]);
+    
+    // Soru tipi bazlı veri yönetimi
+    const [questionTypeData, setQuestionTypeData] = useState<Record<string, QuestionTypeData>>({
+        'multiple_choice': {
+            key: 'multiple_choice',
+            label: 'Çoktan Seçmeli',
+            questions: [],
+            selectedQuestions: [],
+            loading: false
+        },
+        'true_false': {
+            key: 'true_false',
+            label: 'Doğru-Yanlış',
+            questions: [],
+            selectedQuestions: [],
+            loading: false
+        },
+        'qa': {
+            key: 'qa',
+            label: 'Klasik',
+            questions: [],
+            selectedQuestions: [],
+            loading: false
+        }
+    });
+
+    // Etkinlik kombinasyonları
+    const [activityCombinations, setActivityCombinations] = useState<ActivityCombination[]>([]);
 
     // Durum
     const [loading, setLoading] = useState(false);
     const [gamesLoading, setGamesLoading] = useState(false);
-    const [questionsLoading, setQuestionsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-
+    const [creationProgress, setCreationProgress] = useState<{
+        current: number;
+        total: number;
+        currentActivity: string;
+    } | null>(null);
 
     const { grades, subjects, units, topics } = useEducationStructure();
     const { categories, refreshCategories } = useCategories();
@@ -178,54 +226,69 @@ const AddQuestionGroup = () => {
         }
     }, [gradeId, subjectId, unitId, topicId, categories]);
 
-    // Seçilen oyun ve soru tipine göre uygun soruları yükle
+    // Seçilen soru tiplerinde değişiklik olduğunda soruları yükle
     useEffect(() => {
-        if (activeStep === 1 && gameId && questionType && categoryId) {
-            fetchEligibleQuestions();
-            setSelectAllChecked(false);
+        if (activeStep === 1 && selectedGames.length > 0 && selectedQuestionTypes.length > 0 && categoryId) {
+            selectedQuestionTypes.forEach(questionType => {
+                if (questionTypeData[questionType].questions.length === 0) {
+                    fetchQuestionsForType(questionType);
+                }
+            });
         }
-    }, [activeStep, gameId, questionType, categoryId]);
+    }, [activeStep, selectedGames, selectedQuestionTypes, categoryId]);
+
+    // Önizleme adımında kombinasyonları hesapla
+    useEffect(() => {
+        if (activeStep === 2) {
+            generateActivityCombinations();
+        }
+    }, [activeStep, selectedGames, selectedQuestionTypes, questionTypeData, name]);
 
     // Publisher değiştiğinde logo kontrolü
     useEffect(() => {
         if (publisherName) {
             const selectedPublisher = publishers.find(p => p.name === publisherName);
             if (selectedPublisher?.logo_url && !imageFile && !imagePreview) {
-                // Yayınevi logosunu varsayılan görsel olarak ayarla
                 setImagePreview(selectedPublisher.logo_url);
                 setUploadError(null);
             }
         } else {
-            // Publisher seçimi kaldırıldığında logo da temizlensin (sadece publisher logosu ise)
             if (imagePreview && !imageFile) {
                 setImagePreview(null);
             }
         }
     }, [publisherName, publishers, imageFile]);
 
-    const fetchEligibleQuestions = async () => {
+    // Belirli bir soru tipi için soruları yükle
+    const fetchQuestionsForType = async (questionType: string) => {
         try {
-            setQuestionsLoading(true);
-            setError(null);
+            setQuestionTypeData(prev => ({
+                ...prev,
+                [questionType]: {
+                    ...prev[questionType],
+                    loading: true
+                }
+            }));
 
             // Tüm soruları toplamak için array
             let allQuestions: questionGroupService.Question[] = [];
             let currentPage = 1;
             let hasMorePages = true;
 
+            // İlk oyunu kullanarak soruları çek (tüm oyunlar için aynı sorular kullanılabilir)
+            const firstGameId = selectedGames[0];
+
             // Tüm sayfaları sırayla çek
             while (hasMorePages) {
                 const response = await questionGroupService.getEligibleQuestions({
-                    game_id: parseInt(gameId),
-                    question_type: questionType,
+                    game_id: firstGameId,
+                    question_type: questionType as 'multiple_choice' | 'true_false' | 'qa',
                     category_id: parseInt(categoryId),
                     page: currentPage
                 });
 
-                // Bu sayfadaki soruları ekle
                 allQuestions = [...allQuestions, ...response.data];
 
-                // Son sayfaya ulaştık mı kontrol et
                 if (currentPage >= response.last_page) {
                     hasMorePages = false;
                 } else {
@@ -233,17 +296,53 @@ const AddQuestionGroup = () => {
                 }
             }
 
-            // Tüm soruları state'e kaydet
-            setEligibleQuestions(allQuestions);
-            setQuestionsLoading(false);
-
-            console.log(`Toplam ${allQuestions.length} soru yüklendi`);
+            setQuestionTypeData(prev => ({
+                ...prev,
+                [questionType]: {
+                    ...prev[questionType],
+                    questions: allQuestions,
+                    loading: false
+                }
+            }));
 
         } catch (err) {
-            console.error('Error fetching eligible questions:', err);
-            setError('Sorular yüklenirken bir hata oluştu.');
-            setQuestionsLoading(false);
+            console.error(`Error fetching questions for type ${questionType}:`, err);
+            setQuestionTypeData(prev => ({
+                ...prev,
+                [questionType]: {
+                    ...prev[questionType],
+                    loading: false
+                }
+            }));
         }
+    };
+
+    // Kombinasyonları oluştur
+    const generateActivityCombinations = () => {
+        const combinations: ActivityCombination[] = [];
+
+        selectedGames.forEach(gameId => {
+            const game = games.find(g => g.id === gameId);
+            if (!game) return;
+
+            selectedQuestionTypes.forEach(questionType => {
+                const typeData = questionTypeData[questionType];
+                const questionIds = typeData.selectedQuestions;
+
+                if (questionIds.length >= 16) {
+                    combinations.push({
+                        gameId,
+                        gameName: game.name,
+                        questionType,
+                        questionTypeLabel: typeData.label,
+                        questionIds,
+                        name: `${name} - ${game.name} - ${typeData.label}`
+                    });
+                }
+            });
+        });
+
+        setActivityCombinations(combinations);
     };
 
     // Adım kontrolü
@@ -255,22 +354,40 @@ const AddQuestionGroup = () => {
         setActiveStep((prevStep) => prevStep - 1);
     };
 
-    // Form alanları değişimleri
-    const handleQuestionTypeChange = (event: SelectChangeEvent) => {
-        setQuestionType(event.target.value as 'multiple_choice' | 'true_false' | 'qa');
-        setSelectedQuestions([]);
+    // Oyun seçimi
+    const handleGameToggle = (gameId: number) => {
+        setSelectedGames(prev => {
+            if (prev.includes(gameId)) {
+                return prev.filter(id => id !== gameId);
+            } else {
+                return [...prev, gameId];
+            }
+        });
     };
 
-    const handleGameChange = (event: SelectChangeEvent) => {
-        setGameId(event.target.value);
-        setSelectedQuestions([]);
+    // Soru tipi seçimi
+    const handleQuestionTypeToggle = (questionType: string) => {
+        setSelectedQuestionTypes(prev => {
+            if (prev.includes(questionType)) {
+                // Soru tipi kaldırılırken seçilen soruları da temizle
+                setQuestionTypeData(current => ({
+                    ...current,
+                    [questionType]: {
+                        ...current[questionType],
+                        selectedQuestions: []
+                    }
+                }));
+                return prev.filter(type => type !== questionType);
+            } else {
+                return [...prev, questionType];
+            }
+        });
     };
 
     const handlePublisherChange = (event: SelectChangeEvent) => {
         const newPublisherName = event.target.value;
         setPublisherName(newPublisherName);
 
-        // Eğer manuel olarak yüklenmiş bir görsel yoksa, yayınevi logosunu kullan
         if (!imageFile && newPublisherName) {
             const selectedPublisher = publishers.find(p => p.name === newPublisherName);
             if (selectedPublisher?.logo_url) {
@@ -343,64 +460,56 @@ const AddQuestionGroup = () => {
         setTopicId(event.target.value as number | '');
     };
 
-    // Soru seçimi
-    const handleQuestionToggle = (questionId: number) => {
-        const currentIndex = selectedQuestions.indexOf(questionId);
-        const newSelectedQuestions = [...selectedQuestions];
+    // Soru seçimi (tip bazlı)
+    const handleQuestionToggle = (questionType: string, questionId: number) => {
+        setQuestionTypeData(prev => {
+            const currentSelected = prev[questionType].selectedQuestions;
+            const newSelected = currentSelected.includes(questionId)
+                ? currentSelected.filter(id => id !== questionId)
+                : currentSelected.length >= 48
+                    ? currentSelected
+                    : [...currentSelected, questionId];
 
-        if (currentIndex === -1) {
-            if (newSelectedQuestions.length >= 48) {
-                setError('En fazla 48 soru seçebilirsiniz.');
-                return;
+            if (currentSelected.length >= 48 && !currentSelected.includes(questionId)) {
+                setError(`${prev[questionType].label} için en fazla 48 soru seçebilirsiniz.`);
+                setTimeout(() => setError(null), 3000);
+                return prev;
             }
-            newSelectedQuestions.push(questionId);
-        } else {
-            newSelectedQuestions.splice(currentIndex, 1);
-        }
 
-        setSelectedQuestions(newSelectedQuestions);
-        setError(null);
+            return {
+                ...prev,
+                [questionType]: {
+                    ...prev[questionType],
+                    selectedQuestions: newSelected
+                }
+            };
+        });
     };
 
-    // Sayfadaki tüm soruları seç/kaldır
-    const handleSelectAllToggle = () => {
-        if (selectAllChecked) {
-            // Tümünü kaldır - mevcut listedeki seçili olanları kaldır
-            setSelectedQuestions(prev =>
-                prev.filter(id => !eligibleQuestions.some(q => q.id === id))
-            );
-        } else {
-            // Tümünü seç - maksimum 48 soru ile sınırlı
-            const newSelections = [...selectedQuestions];
-
-            // Mevcut listeden henüz seçilmemiş soruları filtrele
-            const unselectedQuestions = eligibleQuestions.filter(
-                question => !newSelections.includes(question.id)
-            );
-
-            // Maksimum 48 soru sınırını kontrol et
-            const remainingSlots = 48 - newSelections.length;
-            const questionsToAdd = unselectedQuestions.slice(0, remainingSlots);
-
-            // Yeni soruları ekle
-            questionsToAdd.forEach(question => {
-                newSelections.push(question.id);
-            });
-
-            setSelectedQuestions(newSelections);
-
-            // Limit uyarısı
-            if (newSelections.length >= 48 && unselectedQuestions.length > questionsToAdd.length) {
-                setError(`Maksimum 48 soru seçim sınırına ulaşıldı. ${questionsToAdd.length} soru seçildi, ${unselectedQuestions.length - questionsToAdd.length} soru seçilemedi.`);
-                setTimeout(() => setError(null), 5000);
-            } else if (questionsToAdd.length > 0) {
-                // Başarılı seçim mesajı
-                const successMsg = `${questionsToAdd.length} soru seçildi. Toplam ${newSelections.length} soru seçili.`;
-                console.log(successMsg);
+    // Soru tipi için tümünü seç/kaldır
+    const handleSelectAllForType = (questionType: string) => {
+        setQuestionTypeData(prev => {
+            const typeData = prev[questionType];
+            const isAllSelected = typeData.questions.every(q => typeData.selectedQuestions.includes(q.id));
+            
+            let newSelected: number[];
+            if (isAllSelected) {
+                newSelected = [];
+            } else {
+                const unselected = typeData.questions
+                    .filter(q => !typeData.selectedQuestions.includes(q.id))
+                    .slice(0, 48 - typeData.selectedQuestions.length);
+                newSelected = [...typeData.selectedQuestions, ...unselected.map(q => q.id)];
             }
-        }
 
-        setSelectAllChecked(!selectAllChecked);
+            return {
+                ...prev,
+                [questionType]: {
+                    ...prev[questionType],
+                    selectedQuestions: newSelected
+                }
+            };
+        });
     };
 
     // Görsel yükleme işlemleri
@@ -456,7 +565,6 @@ const AddQuestionGroup = () => {
         setImagePreview(null);
         setUploadError(null);
 
-        // Görsel kaldırıldıktan sonra yayınevi logosu varsa onu göster
         if (publisherName) {
             const selectedPublisher = publishers.find(p => p.name === publisherName);
             if (selectedPublisher?.logo_url) {
@@ -467,71 +575,107 @@ const AddQuestionGroup = () => {
         }
     };
 
-    // Form gönderme
+    // Form gönderme (çoklu etkinlik oluşturma)
     const handleSubmit = async () => {
         try {
             setLoading(true);
             setError(null);
 
-            if (selectedQuestions.length < 16) {
-                setError('En az 16 soru seçmelisiniz.');
+            if (activityCombinations.length === 0) {
+                setError('Oluşturulacak etkinlik bulunamadı.');
                 setLoading(false);
                 return;
             }
 
-            if (selectedQuestions.length > 48) {
-                setError('En fazla 48 soru seçebilirsiniz.');
-                setLoading(false);
-                return;
-            }
-
-            const formData = new FormData();
-            formData.append('name', name);
-            formData.append('question_type', questionType);
-            formData.append('game_id', gameId);
-            formData.append('category_id', categoryId);
-            formData.append('publisher', publisherName);
-
-            selectedQuestions.forEach((id, index) => {
-                formData.append(`question_ids[${index}]`, id.toString());
+            setCreationProgress({
+                current: 0,
+                total: activityCombinations.length,
+                currentActivity: ''
             });
 
-            if (imageFile) {
-                formData.append('image', imageFile);
+            const successfulActivities: string[] = [];
+            const failedActivities: string[] = [];
+
+            for (let i = 0; i < activityCombinations.length; i++) {
+                const combination = activityCombinations[i];
+                
+                setCreationProgress({
+                    current: i,
+                    total: activityCombinations.length,
+                    currentActivity: combination.name
+                });
+
+                try {
+                    const formData = new FormData();
+                    formData.append('name', combination.name);
+                    formData.append('question_type', combination.questionType);
+                    formData.append('game_id', combination.gameId.toString());
+                    formData.append('category_id', categoryId);
+                    formData.append('publisher', publisherName);
+
+                    combination.questionIds.forEach((id, index) => {
+                        formData.append(`question_ids[${index}]`, id.toString());
+                    });
+
+                    if (imageFile) {
+                        formData.append('image', imageFile);
+                    }
+
+                    await questionGroupService.createQuestionGroupWithImage(formData);
+                    successfulActivities.push(combination.name);
+                } catch (err) {
+                    console.error(`Error creating activity ${combination.name}:`, err);
+                    failedActivities.push(combination.name);
+                }
             }
 
-            await questionGroupService.createQuestionGroupWithImage(formData);
-            alert('Etkinlik başarıyla oluşturuldu.');
-            navigate('/question-groups');
+            setCreationProgress({
+                current: activityCombinations.length,
+                total: activityCombinations.length,
+                currentActivity: 'Tamamlandı'
+            });
+
+            // Sonuç mesajı
+            let message = '';
+            if (successfulActivities.length > 0) {
+                message += `${successfulActivities.length} etkinlik başarıyla oluşturuldu.`;
+            }
+            if (failedActivities.length > 0) {
+                message += ` ${failedActivities.length} etkinlik oluşturulamadı.`;
+            }
+
+            if (failedActivities.length === 0) {
+                alert(message);
+                navigate('/question-groups');
+            } else {
+                setError(message + ' Başarısız etkinlikler: ' + failedActivities.join(', '));
+            }
+
         } catch (err) {
-            console.error('Error creating question group:', err);
-            setError('Etkinlik oluşturulurken bir hata oluştu.');
+            console.error('Error creating activities:', err);
+            setError('Etkinlikler oluşturulurken bir hata oluştu.');
         } finally {
             setLoading(false);
+            setCreationProgress(null);
         }
     };
 
-    // Soru tipi etiketini getir
-    const getQuestionTypeLabel = (type: string) => {
-        switch (type) {
-            case 'multiple_choice':
-                return 'Çoktan Seçmeli';
-            case 'true_false':
-                return 'Doğru-Yanlış';
-            case 'qa':
-                return 'Klasik';
-            default:
-                return type;
-        }
-    };
+
 
     // Adım geçerlilik kontrolleri
     const isFirstStepValid = () => {
-        return name.trim() !== '' && gameId !== '' && publisherName.trim() !== '';
+        return name.trim() !== '' && 
+               selectedGames.length > 0 && 
+               selectedQuestionTypes.length > 0 && 
+               publisherName.trim() !== '' && 
+               categoryExists;
     };
 
     const isSecondStepValid = () => {
-        return selectedQuestions.length >= 16 && selectedQuestions.length <= 48;
+        return selectedQuestionTypes.every(type => {
+            const typeData = questionTypeData[type];
+            return typeData.selectedQuestions.length >= 16 && typeData.selectedQuestions.length <= 48;
+        });
     };
 
     // Adım içeriği
@@ -547,15 +691,16 @@ const AddQuestionGroup = () => {
                         <Grid container spacing={3}>
                             <Grid item xs={12}>
                                 <TextField
-                                    label="Etkinlik Adı"
+                                    label="Etkinlik Adı (Temel)"
                                     fullWidth
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
                                     required
+                                    helperText="Bu isim oyun ve soru tipi ile birlikte kullanılacak"
                                 />
                             </Grid>
 
-                            {/* Publisher Alanı - Tam genişlik */}
+                            {/* Publisher Alanı */}
                             <Grid item xs={12} sm={6}>
                                 <FormControl fullWidth required>
                                     <InputLabel>Yayınevi</InputLabel>
@@ -597,21 +742,15 @@ const AddQuestionGroup = () => {
                                             </MenuItem>
                                         ))}
                                     </Select>
-                                    {!publisherName.trim() && activeStep === 0 && (
-                                        <Typography variant="caption" color="error" sx={{ mt: 0.5, ml: 1 }}>
-                                            Yayınevi seçimi zorunludur
-                                        </Typography>
-                                    )}
                                 </FormControl>
                             </Grid>
 
-                            {/* Kategori Seçimi - Ayrı satır, tam genişlik */}
+                            {/* Kategori Seçimi */}
                             <Grid item xs={12}>
                                 <Typography variant="subtitle1" gutterBottom>
                                     Kategori Seçimi
                                 </Typography>
 
-                                {/* Kategori dropdown'ları için ayrı Grid container */}
                                 <Grid container spacing={2}>
                                     <Grid item xs={12} sm={6} md={3}>
                                         <FormControl fullWidth required>
@@ -689,7 +828,7 @@ const AddQuestionGroup = () => {
                                         </FormControl>
                                     </Grid>
 
-                                    {/* Kategori Ekle Butonu - Ayrı satır */}
+                                    {/* Kategori Ekle Butonu */}
                                     {gradeId && subjectId && unitId && topicId && !categoryExists && (
                                         <Grid item xs={12}>
                                             <Button
@@ -726,43 +865,62 @@ const AddQuestionGroup = () => {
                                 )}
                             </Grid>
 
-                            {/* Soru Tipi */}
-                            <Grid item xs={12} sm={6}>
-                                <FormControl fullWidth>
-                                    <InputLabel>Soru Tipi</InputLabel>
-                                    <Select
-                                        value={questionType}
-                                        label="Soru Tipi"
-                                        onChange={handleQuestionTypeChange}
-                                    >
-                                        <MenuItem value="multiple_choice">Çoktan Seçmeli</MenuItem>
-                                        <MenuItem value="true_false">Doğru-Yanlış</MenuItem>
-                                        <MenuItem value="qa">Klasik</MenuItem>
-                                    </Select>
-                                </FormControl>
+                            {/* Oyun Seçimi - Çoklu */}
+                            <Grid item xs={12}>
+                                <Typography variant="subtitle1" gutterBottom>
+                                    Oyun Seçimi (Çoklu)
+                                </Typography>
+                                {gamesLoading ? (
+                                    <CircularProgress />
+                                ) : (
+                                    <FormGroup>
+                                        <Grid container spacing={1}>
+                                            {games.map((game) => (
+                                                <Grid item xs={12} sm={6} md={4} key={game.id}>
+                                                    <FormControlLabel
+                                                        control={
+                                                            <Checkbox
+                                                                checked={selectedGames.includes(game.id)}
+                                                                onChange={() => handleGameToggle(game.id)}
+                                                            />
+                                                        }
+                                                        label={`${game.name} (${game.type === 'jeopardy' ? 'Jeopardy' : 'Bilgi Çarkı'})`}
+                                                    />
+                                                </Grid>
+                                            ))}
+                                        </Grid>
+                                    </FormGroup>
+                                )}
+                                <FormHelperText>
+                                    En az 1 oyun seçmelisiniz. Seçilen: {selectedGames.length}
+                                </FormHelperText>
                             </Grid>
 
-                            {/* Oyun */}
-                            <Grid item xs={12} sm={6}>
-                                <FormControl fullWidth>
-                                    <InputLabel>Oyun</InputLabel>
-                                    <Select
-                                        value={gameId}
-                                        label="Oyun"
-                                        onChange={handleGameChange}
-                                        disabled={gamesLoading}
-                                    >
-                                        {gamesLoading ? (
-                                            <MenuItem value="" disabled>Yükleniyor...</MenuItem>
-                                        ) : (
-                                            games.map((game) => (
-                                                <MenuItem key={game.id} value={game.id.toString()}>
-                                                    {game.name} ({game.type === 'jeopardy' ? 'Jeopardy' : 'Bilgi Çarkı'})
-                                                </MenuItem>
-                                            ))
-                                        )}
-                                    </Select>
-                                </FormControl>
+                            {/* Soru Tipi Seçimi - Çoklu */}
+                            <Grid item xs={12}>
+                                <Typography variant="subtitle1" gutterBottom>
+                                    Soru Tipi Seçimi (Çoklu)
+                                </Typography>
+                                <FormGroup>
+                                    <Grid container spacing={1}>
+                                        {Object.values(questionTypeData).map((typeData) => (
+                                            <Grid item xs={12} sm={6} md={4} key={typeData.key}>
+                                                <FormControlLabel
+                                                    control={
+                                                        <Checkbox
+                                                            checked={selectedQuestionTypes.includes(typeData.key)}
+                                                            onChange={() => handleQuestionTypeToggle(typeData.key)}
+                                                        />
+                                                    }
+                                                    label={typeData.label}
+                                                />
+                                            </Grid>
+                                        ))}
+                                    </Grid>
+                                </FormGroup>
+                                <FormHelperText>
+                                    En az 1 soru tipi seçmelisiniz. Seçilen: {selectedQuestionTypes.length}
+                                </FormHelperText>
                             </Grid>
 
                             {/* Görsel Yükleme Alanı */}
@@ -850,166 +1008,220 @@ const AddQuestionGroup = () => {
             case 1:
                 return (
                     <Box>
-                        <Typography variant="h6" sx={{ mb: 1 }}>
-                            Soruları Seçin
+                        <Typography variant="h6" sx={{ mb: 2 }}>
+                            Soru Tipi Bazlı Soru Seçimi
                         </Typography>
 
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                            <Typography variant="body2" color="text.secondary">
-                                {getQuestionTypeLabel(questionType)} tipindeki sorulardan seçim yapabilirsiniz.
-                                {eligibleQuestions.length > 0 && (
-                                    <> (Toplam {eligibleQuestions.length} soru mevcut)</>
-                                )}
-                            </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                            Her soru tipi için ayrı ayrı sorularınızı seçin. Her tip için en az 16, en fazla 48 soru seçmelisiniz.
+                        </Typography>
 
-                            <Chip
-                                label={`Seçili: ${selectedQuestions.length}/48`}
-                                color={
-                                    selectedQuestions.length < 16 ? "error" :
-                                        selectedQuestions.length <= 48 ? "success" : "error"
-                                }
-                            />
-                        </Box>
+                        {selectedQuestionTypes.map((questionType) => {
+                            const typeData = questionTypeData[questionType];
+                            const isExpanded = typeData.selectedQuestions.length > 0 || typeData.questions.length > 0;
 
-                        <FormHelperText sx={{ mb: 2 }}>
-                            Not: En az 16, en fazla 48 soru seçmelisiniz.
-                        </FormHelperText>
-
-                        {questionsLoading ? (
-                            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                                <CircularProgress />
-                            </Box>
-                        ) : eligibleQuestions.length === 0 ? (
-                            <Alert severity="warning" sx={{ mb: 3 }}>
-                                Bu oyunda seçilen tipteki sorular bulunamadı. Lütfen önce soru ekleyin veya başka bir oyun/tip seçin.
-                            </Alert>
-                        ) : (
-                            <>
-                                {/* Kaydırılabilir Soru Listesi */}
-                                <Box sx={{
-                                    border: '1px solid #e0e0e0',
-                                    borderRadius: 1,
-                                    bgcolor: 'background.paper',
-                                    maxHeight: '600px',
-                                    overflow: 'hidden',
-                                    display: 'flex',
-                                    flexDirection: 'column'
-                                }}>
-                                    {/* Tümünü Seç Header - Sabit */}
-                                    <Box sx={{
-                                        borderBottom: '2px solid #f0f0f0',
-                                        bgcolor: '#f9f9f9',
-                                        p: 1
-                                    }}>
-                                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                            <Checkbox
-                                                checked={selectAllChecked}
-                                                onChange={handleSelectAllToggle}
-                                                disabled={eligibleQuestions.length === 0 || (selectedQuestions.length >= 48 && !selectAllChecked)}
-                                                indeterminate={
-                                                    selectedQuestions.some(id => eligibleQuestions.some(q => q.id === id)) &&
-                                                    !eligibleQuestions.every(q => selectedQuestions.includes(q.id))
-                                                }
-                                            />
-                                            <Typography variant="subtitle2" sx={{ ml: 1 }}>
-                                                Tüm Soruları Seç
-                                                {eligibleQuestions.length > 48 ?
-                                                    ` (ilk 48 soru seçilecek, toplam ${eligibleQuestions.length} soru)` :
-                                                    ` (${eligibleQuestions.length} soru)`
-                                                }
-                                                {selectedQuestions.length >= 48 && !selectAllChecked && " (maksimum 48 soru seçilebilir)"}
+                            return (
+                                <Accordion 
+                                    key={questionType}
+                                    expanded={isExpanded}
+                                    sx={{ mb: 2 }}
+                                >
+                                    <AccordionSummary
+                                        expandIcon={<ExpandMoreIcon />}
+                                        sx={{
+                                            bgcolor: typeData.selectedQuestions.length >= 16 ? 'success.light' : 'warning.light',
+                                            '&.Mui-expanded': {
+                                                bgcolor: typeData.selectedQuestions.length >= 16 ? 'success.light' : 'warning.light'
+                                            }
+                                        }}
+                                    >
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', mr: 2 }}>
+                                            <Typography variant="h6">
+                                                {typeData.label} Soruları
                                             </Typography>
+                                            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                                                <Chip
+                                                    label={`Seçili: ${typeData.selectedQuestions.length}/48`}
+                                                    color={
+                                                        typeData.selectedQuestions.length < 16 ? "error" :
+                                                        typeData.selectedQuestions.length <= 48 ? "success" : "error"
+                                                    }
+                                                    size="small"
+                                                />
+                                                <Chip
+                                                    label={`Mevcut: ${typeData.questions.length}`}
+                                                    variant="outlined"
+                                                    size="small"
+                                                />
+                                            </Box>
                                         </Box>
-                                    </Box>
+                                    </AccordionSummary>
+                                    <AccordionDetails>
+                                        {typeData.loading ? (
+                                            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                                                <CircularProgress />
+                                                <Typography sx={{ ml: 2 }}>
+                                                    {typeData.label} soruları yükleniyor...
+                                                </Typography>
+                                            </Box>
+                                        ) : typeData.questions.length === 0 ? (
+                                            <Alert severity="warning">
+                                                Bu kategori için {typeData.label.toLowerCase()} soru bulunamadı.
+                                            </Alert>
+                                        ) : (
+                                            <>
+                                                <FormHelperText sx={{ mb: 2 }}>
+                                                    En az 16, en fazla 48 soru seçmelisiniz.
+                                                </FormHelperText>
 
-                                    {/* Kaydırılabilir Soru Listesi */}
-                                    <Box sx={{
-                                        flex: 1,
-                                        overflow: 'auto',
-                                        maxHeight: '550px'
-                                    }}>
-                                        <List sx={{ p: 0 }}>
-                                            {eligibleQuestions.map((question, index) => {
-                                                const isSelected = selectedQuestions.indexOf(question.id) !== -1;
-
-                                                return (
-                                                    <ListItem
-                                                        key={question.id}
-                                                        dense
-                                                        onClick={() => handleQuestionToggle(question.id)}
-                                                        sx={{
-                                                            borderBottom: index === eligibleQuestions.length - 1 ? 'none' : '1px solid #f0f0f0',
-                                                            cursor: 'pointer',
-                                                            bgcolor: isSelected ? 'rgba(25, 118, 210, 0.08)' : 'transparent',
-                                                            '&:hover': {
-                                                                bgcolor: isSelected ? 'rgba(25, 118, 210, 0.12)' : 'rgba(0, 0, 0, 0.04)'
-                                                            },
-                                                            py: 1.5
-                                                        }}
-                                                    >
-                                                        <ListItemIcon sx={{ minWidth: 40 }}>
+                                                {/* Soru Listesi */}
+                                                <Box sx={{
+                                                    border: '1px solid #e0e0e0',
+                                                    borderRadius: 1,
+                                                    bgcolor: 'background.paper',
+                                                    maxHeight: '400px',
+                                                    overflow: 'hidden',
+                                                    display: 'flex',
+                                                    flexDirection: 'column'
+                                                }}>
+                                                    {/* Tümünü Seç Header */}
+                                                    <Box sx={{
+                                                        borderBottom: '2px solid #f0f0f0',
+                                                        bgcolor: '#f9f9f9',
+                                                        p: 1
+                                                    }}>
+                                                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
                                                             <Checkbox
-                                                                edge="start"
-                                                                checked={isSelected}
-                                                                tabIndex={-1}
-                                                                disableRipple
+                                                                checked={typeData.questions.length > 0 && typeData.questions.every(q => typeData.selectedQuestions.includes(q.id))}
+                                                                indeterminate={
+                                                                    typeData.selectedQuestions.length > 0 &&
+                                                                    !typeData.questions.every(q => typeData.selectedQuestions.includes(q.id))
+                                                                }
+                                                                onChange={() => handleSelectAllForType(questionType)}
+                                                                disabled={typeData.questions.length === 0}
                                                             />
-                                                        </ListItemIcon>
-                                                        <ListItemText
-                                                            primary={
-                                                                <Typography variant="body2" sx={{ fontWeight: isSelected ? 500 : 400 }}>
-                                                                    {question.question_text}
-                                                                </Typography>
-                                                            }
-                                                            secondary={
-                                                                <Typography variant="caption" color="text.secondary">
-                                                                    {question.category?.name} • Soru #{question.id}
-                                                                </Typography>
-                                                            }
-                                                        />
-                                                    </ListItem>
-                                                );
-                                            })}
-                                        </List>
-                                    </Box>
-                                </Box>
+                                                            <Typography variant="subtitle2" sx={{ ml: 1 }}>
+                                                                Tüm {typeData.label} Sorularını Seç
+                                                                {typeData.questions.length > 48 ?
+                                                                    ` (maksimum 48 soru seçilecek)` :
+                                                                    ` (${typeData.questions.length} soru)`
+                                                                }
+                                                            </Typography>
+                                                        </Box>
+                                                    </Box>
 
-                                {/* Seçili soruların özeti */}
-                                {selectedQuestions.length > 0 && (
-                                    <Box sx={{ mt: 3 }}>
-                                        <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                                            Seçili Sorular ({selectedQuestions.length}):
+                                                    {/* Kaydırılabilir Soru Listesi */}
+                                                    <Box sx={{
+                                                        flex: 1,
+                                                        overflow: 'auto',
+                                                        maxHeight: '350px'
+                                                    }}>
+                                                        <List sx={{ p: 0 }}>
+                                                            {typeData.questions.map((question, index) => {
+                                                                const isSelected = typeData.selectedQuestions.includes(question.id);
+
+                                                                return (
+                                                                    <ListItem
+                                                                        key={question.id}
+                                                                        dense
+                                                                        onClick={() => handleQuestionToggle(questionType, question.id)}
+                                                                        sx={{
+                                                                            borderBottom: index === typeData.questions.length - 1 ? 'none' : '1px solid #f0f0f0',
+                                                                            cursor: 'pointer',
+                                                                            bgcolor: isSelected ? 'rgba(25, 118, 210, 0.08)' : 'transparent',
+                                                                            '&:hover': {
+                                                                                bgcolor: isSelected ? 'rgba(25, 118, 210, 0.12)' : 'rgba(0, 0, 0, 0.04)'
+                                                                            },
+                                                                            py: 1.5
+                                                                        }}
+                                                                    >
+                                                                        <ListItemIcon sx={{ minWidth: 40 }}>
+                                                                            <Checkbox
+                                                                                edge="start"
+                                                                                checked={isSelected}
+                                                                                tabIndex={-1}
+                                                                                disableRipple
+                                                                            />
+                                                                        </ListItemIcon>
+                                                                        <ListItemText
+                                                                            primary={
+                                                                                <Typography variant="body2" sx={{ fontWeight: isSelected ? 500 : 400 }}>
+                                                                                    {question.question_text}
+                                                                                </Typography>
+                                                                            }
+                                                                            secondary={
+                                                                                <Typography variant="caption" color="text.secondary">
+                                                                                    {question.category?.name} • Soru #{question.id}
+                                                                                </Typography>
+                                                                            }
+                                                                        />
+                                                                    </ListItem>
+                                                                );
+                                                            })}
+                                                        </List>
+                                                    </Box>
+                                                </Box>
+
+                                                {/* Seçili soruların özeti */}
+                                                {typeData.selectedQuestions.length > 0 && (
+                                                    <Box sx={{ mt: 2 }}>
+                                                        <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                                                            Seçili {typeData.label} Soruları ({typeData.selectedQuestions.length}):
+                                                        </Typography>
+                                                        <Box sx={{
+                                                            display: 'flex',
+                                                            flexWrap: 'wrap',
+                                                            gap: 1,
+                                                            maxHeight: '80px',
+                                                            overflow: 'auto',
+                                                            p: 1,
+                                                            border: '1px solid #e0e0e0',
+                                                            borderRadius: 1,
+                                                            bgcolor: '#f9f9f9'
+                                                        }}>
+                                                            {typeData.selectedQuestions.map((questionId) => (
+                                                                <Chip
+                                                                    key={questionId}
+                                                                    label={`#${questionId}`}
+                                                                    size="small"
+                                                                    onDelete={() => handleQuestionToggle(questionType, questionId)}
+                                                                    color="primary"
+                                                                    variant="outlined"
+                                                                />
+                                                            ))}
+                                                        </Box>
+                                                    </Box>
+                                                )}
+                                            </>
+                                        )}
+                                    </AccordionDetails>
+                                </Accordion>
+                            );
+                        })}
+
+                        {/* Genel durum özeti */}
+                        <Box sx={{ mt: 3, p: 2, bgcolor: 'background.paper', borderRadius: 1, border: '1px solid #e0e0e0' }}>
+                            <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 1 }}>
+                                Seçim Durumu Özeti:
+                            </Typography>
+                            {selectedQuestionTypes.map(questionType => {
+                                const typeData = questionTypeData[questionType];
+                                const isValid = typeData.selectedQuestions.length >= 16 && typeData.selectedQuestions.length <= 48;
+                                
+                                return (
+                                    <Box key={questionType} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5 }}>
+                                        <Typography>
+                                            {typeData.label}:
                                         </Typography>
-                                        <Box sx={{
-                                            display: 'flex',
-                                            flexWrap: 'wrap',
-                                            gap: 1,
-                                            maxHeight: '120px',
-                                            overflow: 'auto',
-                                            p: 2,
-                                            border: '1px solid #e0e0e0',
-                                            borderRadius: 1,
-                                            bgcolor: '#f9f9f9'
-                                        }}>
-                                            {selectedQuestions.map((questionId) => {
-                                                const question = eligibleQuestions.find(q => q.id === questionId);
-                                                return (
-                                                    <Chip
-                                                        key={questionId}
-                                                        label={`#${questionId}`}
-                                                        size="small"
-                                                        onDelete={() => handleQuestionToggle(questionId)}
-                                                        color="primary"
-                                                        variant="outlined"
-                                                        title={question?.question_text || `Soru ID: ${questionId}`}
-                                                    />
-                                                );
-                                            })}
-                                        </Box>
+                                        <Chip
+                                            label={`${typeData.selectedQuestions.length} soru`}
+                                            color={isValid ? "success" : "error"}
+                                            size="small"
+                                        />
                                     </Box>
-                                )}
-                            </>
-                        )}
+                                );
+                            })}
+                        </Box>
                     </Box>
                 );
 
@@ -1017,75 +1229,93 @@ const AddQuestionGroup = () => {
                 return (
                     <Box>
                         <Typography variant="h6" sx={{ mb: 3 }}>
-                            Etkinlik Önizleme
+                            Oluşturulacak Etkinlikler Önizleme
                         </Typography>
 
-                        <Grid container spacing={3}>
-                            {/* Görsel Önizleme */}
-                            {imagePreview && (
-                                <Grid item xs={12}>
-                                    <Typography variant="subtitle1" fontWeight="bold">
-                                        Etkinlik Görseli:
-                                    </Typography>
-                                    <Box
-                                        component="img"
-                                        src={imagePreview}
-                                        alt="Etkinlik görseli"
-                                        sx={{
-                                            maxWidth: '100%',
-                                            maxHeight: '200px',
-                                            mt: 1,
-                                            borderRadius: 1,
-                                            border: '1px solid #e0e0e0'
-                                        }}
-                                    />
+                        {creationProgress && (
+                            <Box sx={{ mb: 3 }}>
+                                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                                    İşlem Durumu: {creationProgress.current}/{creationProgress.total}
+                                </Typography>
+                                <LinearProgress 
+                                    variant="determinate" 
+                                    value={(creationProgress.current / creationProgress.total) * 100} 
+                                    sx={{ mb: 1 }}
+                                />
+                                <Typography variant="caption" color="text.secondary">
+                                    {creationProgress.currentActivity}
+                                </Typography>
+                            </Box>
+                        )}
+
+                        {activityCombinations.length === 0 ? (
+                            <Alert severity="warning">
+                                Oluşturulacak etkinlik bulunamadı. Lütfen önceki adımlarda seçimlerinizi kontrol edin.
+                            </Alert>
+                        ) : (
+                            <>
+                                <Alert severity="info" sx={{ mb: 3 }}>
+                                    Toplam {activityCombinations.length} etkinlik oluşturulacak. 
+                                    Her oyun × soru tipi kombinasyonu için ayrı bir etkinlik oluşturulur.
+                                </Alert>
+
+                                {/* Görsel Önizleme */}
+                                {imagePreview && (
+                                    <Box sx={{ mb: 3 }}>
+                                        <Typography variant="subtitle1" fontWeight="bold">
+                                            Tüm Etkinlikler İçin Kullanılacak Görsel:
+                                        </Typography>
+                                        <Box
+                                            component="img"
+                                            src={imagePreview}
+                                            alt="Etkinlik görseli"
+                                            sx={{
+                                                maxWidth: '100%',
+                                                maxHeight: '200px',
+                                                mt: 1,
+                                                borderRadius: 1,
+                                                border: '1px solid #e0e0e0'
+                                            }}
+                                        />
+                                    </Box>
+                                )}
+
+                                {/* Genel Bilgiler */}
+                                <Grid container spacing={2} sx={{ mb: 3 }}>
+                                    <Grid item xs={12} sm={6}>
+                                        <Typography variant="subtitle1" fontWeight="bold">
+                                            Temel Ad:
+                                        </Typography>
+                                        <Typography>{name}</Typography>
+                                    </Grid>
+
+                                    <Grid item xs={12} sm={6}>
+                                        <Typography variant="subtitle1" fontWeight="bold">
+                                            Yayınevi:
+                                        </Typography>
+                                        <Typography>{publisherName}</Typography>
+                                    </Grid>
+
+                                    <Grid item xs={12} sm={6}>
+                                        <Typography variant="subtitle1" fontWeight="bold">
+                                            Kategori:
+                                        </Typography>
+                                        <Typography>{generateCategoryName()}</Typography>
+                                    </Grid>
+
+                                    <Grid item xs={12} sm={6}>
+                                        <Typography variant="subtitle1" fontWeight="bold">
+                                            Toplam Etkinlik:
+                                        </Typography>
+                                        <Typography>{activityCombinations.length}</Typography>
+                                    </Grid>
                                 </Grid>
-                            )}
 
-                            <Grid item xs={12} sm={6}>
-                                <Typography variant="subtitle1" fontWeight="bold">
-                                    Grup Adı:
-                                </Typography>
-                                <Typography>{name}</Typography>
-                            </Grid>
+                                <Divider sx={{ my: 3 }} />
 
-                            <Grid item xs={12} sm={6}>
-                                <Typography variant="subtitle1" fontWeight="bold">
-                                    Yayınevi:
-                                </Typography>
-                                <Typography>{publisherName || '-'}</Typography>
-                            </Grid>
-
-                            <Grid item xs={12} sm={6}>
-                                <Typography variant="subtitle1" fontWeight="bold">
-                                    Soru Tipi:
-                                </Typography>
-                                <Typography>{getQuestionTypeLabel(questionType)}</Typography>
-                            </Grid>
-
-                            <Grid item xs={12} sm={6}>
-                                <Typography variant="subtitle1" fontWeight="bold">
-                                    Oyun:
-                                </Typography>
-                                <Typography>
-                                    {games.find(g => g.id.toString() === gameId)?.name || '-'}
-                                </Typography>
-                            </Grid>
-
-                            <Grid item xs={12} sm={6}>
-                                <Typography variant="subtitle1" fontWeight="bold">
-                                    Soru Sayısı:
-                                </Typography>
-                                <Typography>
-                                    {selectedQuestions.length}
-                                </Typography>
-                            </Grid>
-
-                            <Grid item xs={12}>
-                                <Divider sx={{ my: 2 }} />
-
+                                {/* Etkinlik Listesi */}
                                 <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2 }}>
-                                    Seçilen Sorular:
+                                    Oluşturulacak Etkinlikler:
                                 </Typography>
 
                                 <List sx={{
@@ -1093,32 +1323,74 @@ const AddQuestionGroup = () => {
                                     bgcolor: 'background.paper',
                                     borderRadius: 1,
                                     border: '1px solid #e0e0e0',
-                                    maxHeight: '300px',
+                                    maxHeight: '400px',
                                     overflow: 'auto'
                                 }}>
-                                    {selectedQuestions.map((questionId, index) => {
-                                        const question = eligibleQuestions.find(q => q.id === questionId) ||
-                                            { id: questionId, question_text: `Soru #${questionId}`, category: { name: '-' } };
-
-                                        return (
-                                            <ListItem
-                                                key={questionId}
-                                                dense
-                                                sx={{
-                                                    borderBottom: '1px solid #f0f0f0',
-                                                    '&:last-child': { borderBottom: 'none' }
-                                                }}
-                                            >
-                                                <ListItemText
-                                                    primary={`${index + 1}. ${question.question_text}`}
-                                                    secondary={question.category?.name}
-                                                />
-                                            </ListItem>
-                                        );
-                                    })}
+                                    {activityCombinations.map((combination, index) => (
+                                        <ListItem
+                                            key={`${combination.gameId}-${combination.questionType}`}
+                                            sx={{
+                                                borderBottom: index === activityCombinations.length - 1 ? 'none' : '1px solid #f0f0f0',
+                                                flexDirection: 'column',
+                                                alignItems: 'flex-start',
+                                                py: 2
+                                            }}
+                                        >
+                                            <Box sx={{ width: '100%' }}>
+                                                <Typography variant="subtitle2" fontWeight="bold">
+                                                    {index + 1}. {combination.name}
+                                                </Typography>
+                                                <Box sx={{ display: 'flex', gap: 2, mt: 1, flexWrap: 'wrap' }}>
+                                                    <Chip
+                                                        label={`Oyun: ${combination.gameName}`}
+                                                        size="small"
+                                                        color="primary"
+                                                        variant="outlined"
+                                                    />
+                                                    <Chip
+                                                        label={`Tip: ${combination.questionTypeLabel}`}
+                                                        size="small"
+                                                        color="secondary"
+                                                        variant="outlined"
+                                                    />
+                                                    <Chip
+                                                        label={`${combination.questionIds.length} soru`}
+                                                        size="small"
+                                                        color="success"
+                                                        variant="outlined"
+                                                    />
+                                                </Box>
+                                            </Box>
+                                        </ListItem>
+                                    ))}
                                 </List>
-                            </Grid>
-                        </Grid>
+
+                                {/* Özet İstatistikler */}
+                                <Box sx={{ mt: 3, p: 2, bgcolor: 'background.paper', borderRadius: 1, border: '1px solid #e0e0e0' }}>
+                                    <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2 }}>
+                                        Özet İstatistikler:
+                                    </Typography>
+                                    <Grid container spacing={2}>
+                                        <Grid item xs={12} sm={6}>
+                                            <Typography variant="body2">
+                                                <strong>Seçilen Oyunlar:</strong> {selectedGames.length}
+                                            </Typography>
+                                            <Typography variant="body2">
+                                                <strong>Seçilen Soru Tipleri:</strong> {selectedQuestionTypes.length}
+                                            </Typography>
+                                        </Grid>
+                                        <Grid item xs={12} sm={6}>
+                                            <Typography variant="body2">
+                                                <strong>Toplam Etkinlik:</strong> {activityCombinations.length}
+                                            </Typography>
+                                            <Typography variant="body2">
+                                                <strong>Toplam Soru Kullanımı:</strong> {activityCombinations.reduce((total, combo) => total + combo.questionIds.length, 0)}
+                                            </Typography>
+                                        </Grid>
+                                    </Grid>
+                                </Box>
+                            </>
+                        )}
                     </Box>
                 );
 
@@ -1149,7 +1421,7 @@ const AddQuestionGroup = () => {
                         <Button
                             variant="contained"
                             onClick={handleSubmit}
-                            disabled={loading}
+                            disabled={loading || activityCombinations.length === 0}
                             sx={{
                                 py: 1,
                                 px: 3,
@@ -1158,7 +1430,7 @@ const AddQuestionGroup = () => {
                             }}
                             startIcon={loading ? <CircularProgress size={20} /> : null}
                         >
-                            {loading ? 'İşleniyor...' : 'Etkinliği Oluştur'}
+                            {loading ? 'Oluşturuluyor...' : `${activityCombinations.length} Etkinliği Oluştur`}
                         </Button>
                     ) : (
                         <Button
@@ -1183,7 +1455,7 @@ const AddQuestionGroup = () => {
     return (
         <Box>
             <Typography variant="h4" gutterBottom sx={{ mb: 4, fontWeight: 'bold' }}>
-                Yeni Etkinlik Oluştur
+                Yeni Etkinlikler Oluştur (Çoklu Seçim)
             </Typography>
 
             <Paper sx={{ p: 3, borderRadius: 2 }}>
